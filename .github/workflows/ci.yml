@@ -1,10 +1,11 @@
-# develop: pruebas. staging -> uat y main -> prd: pruebas y despliegue
+# develop: pruebas. staging -> uat, main -> prd: pruebas, imagen y despliegue
 # Guia: docs/github-actions.md
 name: Web
 
 on:
   push:
     branches: [develop, staging, main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -15,9 +16,6 @@ concurrency:
 jobs:
   pruebas:
     runs-on: ubuntu-latest
-    # Sin .env en el repo: vite.config exige el ambiente
-    env:
-      VITE_APP_ENV: dev
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,10 +28,56 @@ jobs:
       - run: npm run typecheck
       - run: npx vitest run
 
-  desplegar:
+  imagenes:
     needs: pruebas
-    # Solo staging y main despliegan; develop se queda en local
-    if: github.event_name != 'pull_request' && (github.ref_name == 'staging' || github.ref_name == 'main')
+    # staging, main y cada version vX.Y.Z publican su imagen
+    if: github.event_name != 'pull_request' && (github.ref_name == 'staging' || github.ref_name == 'main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      commit: ${{ steps.etiquetas.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: etiquetas
+        # sha-<commit> siempre; ademas uat, prd o el numero de version
+        run: |
+          echo "registro=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+          echo "commit=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          case "$GITHUB_REF" in
+            refs/heads/staging) echo "extra=uat" >> "$GITHUB_OUTPUT" ;;
+            refs/heads/main) echo "extra=prd" >> "$GITHUB_OUTPUT" ;;
+            refs/tags/v*) echo "extra=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT" ;;
+          esac
+      - name: Publicar
+        env:
+          REGISTRO: ${{ steps.etiquetas.outputs.registro }}
+          COMMIT: ${{ steps.etiquetas.outputs.commit }}
+          EXTRA: ${{ steps.etiquetas.outputs.extra }}
+        run: |
+          publicar() {
+            imagen="$REGISTRO/$1"
+            # Un commit ya compilado no se recompila: prd corre lo probado
+            if docker buildx imagetools inspect "$imagen:$COMMIT" > /dev/null 2>&1; then
+              docker buildx imagetools create -t "$imagen:$EXTRA" "$imagen:$COMMIT"
+            else
+              docker buildx build --push -f "$2" -t "$imagen:$COMMIT" -t "$imagen:$EXTRA" \
+                --cache-from "type=gha,scope=$1" --cache-to "type=gha,scope=$1,mode=max" .
+            fi
+          }
+          publicar pilotssh-web Dockerfile
+
+  desplegar:
+    needs: imagenes
+    # develop se queda en local; una version vX.Y.Z solo publica
+    if: github.ref_name == 'staging' || github.ref_name == 'main'
     runs-on: ubuntu-latest
     # prd pide aprobacion
     environment: ${{ github.ref_name == 'main' && 'prd' || 'uat' }}
@@ -42,6 +86,7 @@ jobs:
       - name: Desplegar
         env:
           RAMA: ${{ github.ref_name }}
+          IMAGE_TAG: ${{ needs.imagenes.outputs.commit }}
           DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
           DOKPLOY_COMPOSE_ID: ${{ vars.DOKPLOY_COMPOSE_ID }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
@@ -63,7 +108,7 @@ jobs:
             printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
             chmod 600 ~/.ssh/despliegue
             ssh -i ~/.ssh/despliegue -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
-              "cd '$DEPLOY_PATH' && git pull --ff-only origin '$RAMA' && docker compose up -d --build"
+              "cd '$DEPLOY_PATH' && git pull --ff-only origin '$RAMA' && IMAGE_TAG='$IMAGE_TAG' sh deploy/docker/desplegar.sh"
           else
             echo "Sin Dokploy ni SSH en este ambiente: no se despliega."
           fi
