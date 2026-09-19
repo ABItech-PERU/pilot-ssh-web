@@ -1,22 +1,26 @@
 import { Loader2Icon } from 'lucide-react'
 import { Navigate, Outlet, useLocation } from 'react-router'
 
+import { getDesvioDelAlta } from '@/features/auth/alta'
 import { useSession } from '@/features/auth/session'
 import { esPersonal, faltanDosPasos } from '@/features/backoffice/permisos'
 import { TwoFactorRequiredPage } from '@/features/backoffice/TwoFactorRequiredPage'
 
 /** Comodidad de navegación, no control de acceso: decide el backend en
- *  cada petición. */
+ *  cada petición. Única puerta de lo privado: aquí se exige el alta. */
 export function RequireAuth() {
-  const { isAuthenticated, isResolving } = useSession()
+  const { user, isAuthenticated, isResolving } = useSession()
   const ubicacion = useLocation()
 
   if (isResolving) return <PantallaDeEspera />
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !user) {
     // Destino guardado para volver ahí tras entrar
     return <Navigate to="/login" state={{ from: ubicacion.pathname }} replace />
   }
+
+  const desvio = getDesvioDelAlta(user.onboarding.completed, ubicacion.pathname)
+  if (desvio) return <Navigate to={desvio} replace />
 
   return <Outlet />
 }
