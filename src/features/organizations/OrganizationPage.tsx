@@ -301,17 +301,84 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactN
   )
 }
 
+/** Mismo marco que la página: al llegar los datos no se mueve nada. */
 function Esqueleto() {
   return (
     <div className="space-y-6">
-      <Skeleton className="h-8 w-56" />
-      <Skeleton className="h-5 w-40" />
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Skeleton className="h-20 rounded-lg" />
-        <Skeleton className="h-20 rounded-lg" />
-        <Skeleton className="h-20 rounded-lg" />
+      <div className="space-y-1">
+        <Skeleton className="h-7 w-56 sm:h-8" />
+        <Skeleton className="h-5 w-72 max-w-full" />
       </div>
-      <Skeleton className="h-40 rounded-lg" />
+
+      <Skeleton className="h-5.5 w-20 rounded-full" />
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        {['miembros', 'servidores', 'saldo'].map((cifra) => (
+          <div key={cifra} className="rounded-lg border p-4">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="mt-1 h-7 w-12" />
+          </div>
+        ))}
+      </div>
+
+      <section className="space-y-2">
+        <Skeleton className="h-4 w-16" />
+        <div className="divide-y rounded-lg border">
+          <FilaEsqueleto valor={<Skeleton className="size-8 rounded-md" />} />
+          {/* Largo de «Espacio de …»: en móvil baja de línea, como el real */}
+          <FilaEsqueleto valor={<Skeleton className="h-5 w-48" />} />
+          <FilaEsqueleto valor={<Skeleton className="h-5 w-24" />} conPista />
+        </div>
+      </section>
+
+      <section className="space-y-2">
+        <Skeleton className="h-4 w-16" />
+        <div className="grid divide-y rounded-lg border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+          {['rol', 'alta'].map((dato) => (
+            <div
+              key={dato}
+              className="flex items-center justify-between gap-3 p-4 sm:block"
+            >
+              <span className="flex h-5 items-center">
+                <Skeleton className="h-4 w-12" />
+              </span>
+              <Skeleton className="h-5 w-24 sm:mt-1" />
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function FilaEsqueleto({
+  valor,
+  conPista,
+}: {
+  valor: React.ReactNode
+  conPista?: boolean
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+      <span className="flex items-center gap-3">
+        <Skeleton className="size-4" />
+        {/* Alto de línea del texto real: al cargar, la fila no crece */}
+        <span>
+          <span className="flex h-5 items-center">
+            <Skeleton className="h-4 w-20" />
+          </span>
+          {conPista && (
+            <span className="flex h-4 items-center">
+              <Skeleton className="h-3 w-48" />
+            </span>
+          )}
+        </span>
+      </span>
+      <span className="flex items-center gap-3">
+        {valor}
+        {/* En móvil, el lápiz: botón cuadrado */}
+        <Skeleton className="h-9 w-9 sm:w-20" />
+      </span>
     </div>
   )
 }
