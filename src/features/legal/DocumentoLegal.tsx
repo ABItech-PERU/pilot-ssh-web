@@ -31,7 +31,7 @@ export function DocumentoLegal({
 
       <div className="mt-12 grid gap-12 lg:grid-cols-[14rem_minmax(0,1fr)]">
         <nav aria-label="Contenido" className="hidden lg:block">
-          <ol className="sticky top-24 space-y-2 text-sm">
+          <ol className="sticky top-[calc(6rem+var(--alto-aviso))] space-y-2 text-sm">
             {apartados.map(({ id, titulo: nombre }, indice) => (
               <li key={id}>
                 <a

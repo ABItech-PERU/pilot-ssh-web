@@ -93,7 +93,7 @@ export function TerminalPage() {
 
   if (!servidor.data || !credencial) {
     return (
-      <div className="bg-term-bg text-term-dim grid h-dvh place-items-center text-sm">
+      <div className="bg-term-bg text-term-dim grid h-pantalla place-items-center text-sm">
         <span className="flex items-center gap-2">
           <Loader2Icon className="size-4 animate-spin" />
           Preparando la terminal
@@ -242,7 +242,7 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
   return (
     // Sin scroll de pagina: desplaza xterm por dentro. El recorte absorbe los
     // pixeles de mas que xterm mide en sus filas (evita una segunda barra)
-    <div className="bg-term-bg text-term-text flex h-dvh flex-col overflow-hidden">
+    <div className="bg-term-bg text-term-text flex h-pantalla flex-col overflow-hidden">
       <header className="border-term-border flex h-12 shrink-0 items-center gap-3 border-b px-3">
         <Button
           variant="ghost"
@@ -339,7 +339,7 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
 
 function PantallaDeAviso({ texto }: { texto: string }) {
   return (
-    <div className="bg-background grid min-h-dvh place-items-center px-6">
+    <div className="bg-background grid min-h-pantalla place-items-center px-6">
       <div className="max-w-md text-center">
         <p className="text-sm">{texto}</p>
         <Button asChild variant="outline" className="mt-6">

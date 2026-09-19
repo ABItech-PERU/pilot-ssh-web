@@ -8,7 +8,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 
 /** Acceso, registro, recuperación y verificación, sin navegación.
  *
- *  `fixed inset-0`, no `h-dvh`: fuera del flujo el body mide cero y la
+ *  `fixed`, no `h-dvh`: fuera del flujo el body mide cero y la
  *  página no se desplaza ni por redondeo de subpíxel con zoom. Solo se
  *  desplaza la columna del formulario, en pantallas bajas.
  */
@@ -16,7 +16,7 @@ export function GuestLayout() {
   useLockDocumentScroll()
 
   return (
-    <div className="fixed inset-0 grid overflow-hidden lg:grid-cols-[1fr_minmax(0,40rem)]">
+    <div className="top-aviso fixed inset-x-0 bottom-0 grid overflow-hidden lg:grid-cols-[1fr_minmax(0,40rem)]">
       <ProofPanel />
 
       <div className="flex min-h-0 flex-col overflow-y-auto">

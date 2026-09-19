@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 
 export function NotFoundPage() {
   return (
-    <div className="grid min-h-dvh place-items-center px-6">
+    <div className="grid min-h-pantalla place-items-center px-6">
       <div className="text-center">
         <p className="text-muted-foreground font-mono text-sm">404</p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight">Esta página no existe</h1>

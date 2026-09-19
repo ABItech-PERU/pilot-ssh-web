@@ -44,7 +44,11 @@ export function RequirePlatformStaff() {
 
 function PantallaDeEspera() {
   return (
-    <div className="grid min-h-dvh place-items-center" role="status" aria-live="polite">
+    <div
+      className="grid min-h-pantalla place-items-center"
+      role="status"
+      aria-live="polite"
+    >
       <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
       <span className="sr-only">Comprobando tu sesión</span>
     </div>

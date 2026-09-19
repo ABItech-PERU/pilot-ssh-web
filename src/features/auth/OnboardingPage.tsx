@@ -172,7 +172,7 @@ export function OnboardingPage() {
   const progreso = buildPasos(paso, alcanzado, correoConfirmado)
 
   return (
-    <div className="bg-background flex min-h-dvh flex-col">
+    <div className="bg-background flex min-h-pantalla flex-col">
       {/* Única salida de quien entra por error: no hay otra navegación */}
       <header className="py-4">
         <Container className="flex items-center justify-between gap-4">

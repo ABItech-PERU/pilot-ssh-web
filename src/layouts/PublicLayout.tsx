@@ -29,7 +29,7 @@ export function PublicLayout() {
   useDesplazamientoAlNavegar()
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="min-h-pantalla flex flex-col">
       <PublicHeader />
       <main className="flex-1">
         <Outlet />
@@ -45,7 +45,7 @@ function PublicHeader() {
   const [menuAbierto, setMenuAbierto] = useState(false)
 
   return (
-    <header className="bg-background/80 sticky top-0 z-30 border-b backdrop-blur-lg">
+    <header className="bg-background/80 top-aviso sticky z-30 border-b backdrop-blur-lg">
       <Container className="flex h-16 items-center gap-8">
         <Link to="/" aria-label="Pilot SSH, inicio">
           <BrandLockup />

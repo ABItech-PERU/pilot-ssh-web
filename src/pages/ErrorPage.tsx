@@ -15,7 +15,7 @@ export function ErrorPage() {
   }
 
   return (
-    <div className="grid min-h-dvh place-items-center px-6">
+    <div className="grid min-h-pantalla place-items-center px-6">
       <div className="max-w-md text-center">
         <h1 className="text-2xl font-bold tracking-tight">
           Algo se rompió en esta pantalla

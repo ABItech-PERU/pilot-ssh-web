@@ -3,6 +3,32 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Alto de la franja de UAT: 0 sin ella. Lo descuentan las pantallas de
+   altura completa y lo que se pega arriba */
+:root {
+  --alto-aviso: 0px;
+}
+
+:root:has([data-aviso-ambiente]) {
+  --alto-aviso: 1.5rem;
+}
+
+html {
+  scroll-padding-top: var(--alto-aviso);
+}
+
+@utility h-pantalla {
+  height: calc(100dvh - var(--alto-aviso));
+}
+
+@utility min-h-pantalla {
+  min-height: calc(100dvh - var(--alto-aviso));
+}
+
+@utility top-aviso {
+  top: var(--alto-aviso);
+}
+
 /* Tinta con sesgo azul y acento teal. Sin verde fosforito de terminal:
    cansa la vista en jornadas largas. */
 :root {

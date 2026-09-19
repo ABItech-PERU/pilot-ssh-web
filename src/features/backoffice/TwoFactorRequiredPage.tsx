@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
  *  contraseña robada no debe bastar. Lleva a activarlos. */
 export function TwoFactorRequiredPage() {
   return (
-    <div className="grid min-h-dvh place-items-center px-4 py-10">
+    <div className="grid min-h-pantalla place-items-center px-4 py-10">
       <div className="flex w-full max-w-md flex-col items-center gap-8 text-center">
         <BrandLockup />
         <div className="bg-card flex w-full flex-col items-center gap-4 rounded-lg border p-6 sm:p-8">

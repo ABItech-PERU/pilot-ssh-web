@@ -1,15 +1,20 @@
 import { env } from '@/lib/env'
 
-/** Solo en UAT: que nadie confunda pruebas con producción. */
+/** Solo en UAT: que nadie confunda pruebas con producción. Fija arriba;
+ *  `data-aviso-ambiente` activa `--alto-aviso`, que las pantallas descuentan. */
 export function AvisoDeAmbiente() {
   if (env.ambiente !== 'uat') return null
 
   return (
     <div
       role="note"
-      className="bg-warning px-4 py-1 text-center text-xs font-medium text-black"
+      data-aviso-ambiente
+      className="bg-warning sticky top-0 z-40 flex h-(--alto-aviso) items-center justify-center px-4 text-xs font-medium text-black"
     >
-      Ambiente de pruebas: los pagos no cobran y los datos no son reales.
+      <span className="truncate sm:hidden">Ambiente de pruebas</span>
+      <span className="truncate max-sm:hidden">
+        Ambiente de pruebas: los pagos no cobran y los datos no son reales.
+      </span>
     </div>
   )
 }

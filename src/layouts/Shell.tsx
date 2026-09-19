@@ -41,11 +41,11 @@ export function Shell({ barra, descripcionDelMenu, avisos }: Props) {
   return (
     <div
       className={cn(
-        'bg-background min-h-dvh lg:grid',
+        'bg-background min-h-pantalla lg:grid',
         colapsada ? 'lg:grid-cols-[4rem_1fr]' : 'lg:grid-cols-[17.5rem_1fr]',
       )}
     >
-      <div className="sticky top-0 hidden h-dvh lg:block">
+      <div className="top-aviso h-pantalla sticky hidden lg:block">
         {barra({ colapsada, onAlternar: alternar })}
       </div>
 
@@ -67,7 +67,7 @@ export function Shell({ barra, descripcionDelMenu, avisos }: Props) {
       </Sheet>
 
       <div className="flex min-w-0 flex-col">
-        <header className="bg-background/85 sticky top-0 z-30 border-b backdrop-blur lg:hidden">
+        <header className="bg-background/85 top-aviso sticky z-30 border-b backdrop-blur lg:hidden">
           <Container className="flex h-14 items-center gap-2 lg:justify-end">
             <Button
               variant="ghost"
