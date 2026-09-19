@@ -5,7 +5,7 @@ en el mismo proyecto y el mismo dominio. No hay dos aplicaciones ni dos
 despliegues: lo que separa lo publico de lo privado es el arbol de rutas.
 
 ```
-/  /pricing /security /terms /privacy   publico, compilado a HTML
+/  /pricing /security /terms /privacy   publico, prerenderizado a HTML
 /login  /register    autenticacion           solo invitados
 /onboarding          segundo paso del alta   autenticado
 /app/*               panel                   autenticado
@@ -31,16 +31,16 @@ titular. Todo lo de `/app` y de autenticacion entra por `lazy` en el router.
 
 **REPARTO POR CARPETA:**
 
-| Carpeta | Responsabilidad | No le toca |
-|---|---|---|
-| `features/<dominio>/` | Pantallas, llamadas y estado de un dominio | Nada de otro dominio |
-| `layouts/` | Los tres armazones: publico, invitado, panel | No pide datos de dominio |
-| `routes/` | Arbol de rutas y guards | No pinta contenido |
-| `components/ui/` | shadcn generado | No se escribe a mano |
-| `components/` | Composicion propia sobre `ui/` | No conoce features |
-| `lib/` | Cliente HTTP, errores, formato, utilidades | No conoce features |
-| `types/` | Contrato con la API | No tiene logica |
-| `pages/` | Pantallas sueltas sin dominio (404, error) | No crece con el producto |
+| Carpeta               | Responsabilidad                              | No le toca               |
+| --------------------- | -------------------------------------------- | ------------------------ |
+| `features/<dominio>/` | Pantallas, llamadas y estado de un dominio   | Nada de otro dominio     |
+| `layouts/`            | Los tres armazones: publico, invitado, panel | No pide datos de dominio |
+| `routes/`             | Arbol de rutas y guards                      | No pinta contenido       |
+| `components/ui/`      | shadcn generado                              | No se escribe a mano     |
+| `components/`         | Composicion propia sobre `ui/`               | No conoce features       |
+| `lib/`                | Cliente HTTP, errores, formato, utilidades   | No conoce features       |
+| `types/`              | Contrato con la API                          | No tiene logica          |
+| `pages/`              | Pantallas sueltas sin dominio (404, error)   | No crece con el producto |
 
 **DIRECCION DE LAS DEPENDENCIAS.** `features` importa de `lib`, `components` y
 `types`; nunca al reves. Un import de `lib` hacia `features` delata la pieza
@@ -52,29 +52,29 @@ mal puesta.
 
 **CAPAS DENTRO DE UNA FEATURE:**
 
-| Archivo | Responsabilidad | Equivalente en el backend |
-|---|---|---|
-| `api.ts` | Llamadas tipadas y claves de consulta | `urls.py` + `serializers.py` |
-| `<Pantalla>Page.tsx` | Estados, composicion, orquestacion | `views.py` |
-| `<Cosa>Dialog.tsx` / `<Cosa>Form.tsx` | Un formulario, una responsabilidad | — |
-| `<algo>.ts` | Decision pura, probable sin montar nada | `services.py` |
-| `*.test.ts` | Junto a lo que prueba | `tests/` |
+| Archivo                               | Responsabilidad                         | Equivalente en el backend    |
+| ------------------------------------- | --------------------------------------- | ---------------------------- |
+| `api.ts`                              | Llamadas tipadas y claves de consulta   | `urls.py` + `serializers.py` |
+| `<Pantalla>Page.tsx`                  | Estados, composicion, orquestacion      | `views.py`                   |
+| `<Cosa>Dialog.tsx` / `<Cosa>Form.tsx` | Un formulario, una responsabilidad      | —                            |
+| `<algo>.ts`                           | Decision pura, probable sin montar nada | `services.py`                |
+| `*.test.ts`                           | Junto a lo que prueba                   | `tests/`                     |
 
 Una pantalla que hace tres mutaciones y decide reglas esta haciendo de
 servicio: la decision se extrae a una funcion pura del mismo directorio.
 
 **PUNTOS UNICOS DE ESCRITURA.** Una sola puerta por concepto:
 
-| Concepto | Unica puerta |
-|---|---|
-| Peticion a la API | `lib/http.ts` |
-| Normalizar un fallo | `lib/api-error.ts` → `toApiError` |
-| Errores del backend en un formulario | `lib/form.ts` → `applyFieldErrors` |
-| Sesion y tokens | `features/auth/token-store.ts` |
-| Abrir sesion con unos tokens | `signIn` / `completeTwoFactor` de la sesion |
-| Organizacion actual | `features/organizations/current.ts` |
-| Fechas y cantidades | `lib/format.ts` |
-| Tema claro/oscuro | `components/theme-provider.tsx` |
+| Concepto                             | Unica puerta                                |
+| ------------------------------------ | ------------------------------------------- |
+| Peticion a la API                    | `lib/http.ts`                               |
+| Normalizar un fallo                  | `lib/api-error.ts` → `toApiError`           |
+| Errores del backend en un formulario | `lib/form.ts` → `applyFieldErrors`          |
+| Sesion y tokens                      | `features/auth/token-store.ts`              |
+| Abrir sesion con unos tokens         | `signIn` / `completeTwoFactor` de la sesion |
+| Organizacion actual                  | `features/organizations/current.ts`         |
+| Fechas y cantidades                  | `lib/format.ts`                             |
+| Tema claro/oscuro                    | `components/theme-provider.tsx`             |
 
 **EL TEMA ARRANCA EN OSCURO.** Quien no ha elegido ve oscuro, no lo que diga
 el sistema; despues manda su eleccion, que incluye «Sistema». Lo aplica un

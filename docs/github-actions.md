@@ -1,126 +1,81 @@
 # GitHub Actions
 
-Qué hace el flujo de `.github/workflows/ci.yml` y qué hay que configurar en
-GitHub y en el servidor para que la web se despliegue sola.
-
-## Ramas
-
-Cada rama lleva a un ambiente, igual que en la API:
-
-| Rama        | Al subir                                    | Ambiente                                         |
-| ----------- | ------------------------------------------- | ------------------------------------------------ |
-| `feature/*` | Nada. Se abre un _pull request_ a `develop` | —                                                |
-| `develop`   | Pruebas                                     | `dev`: la máquina de cada quien, no se despliega |
-| `staging`   | Pruebas y despliegue                        | `uat`                                            |
-| `main`      | Pruebas y despliegue, con aprobación        | `prd`                                            |
-
-Se promueve con _pull requests_: `develop → staging → main`.
+Qué hace `.github/workflows/ci.yml` y qué configurar para que la web se
+despliegue sola. La API tiene el suyo:
+[su guía](../../pilot-ssh-api/docs/github-actions.md).
 
 ## Qué hace
 
-1. **Pruebas.** `npm run typecheck` y `npx vitest run`.
-2. **Despliegue.** Solo en `staging` y `main`, y solo si las pruebas pasan.
-   Usa la forma que tenga configurada el ambiente en GitHub:
+| Paso        | Cuándo                                  | Qué hace                                                             |
+| ----------- | --------------------------------------- | -------------------------------------------------------------------- |
+| `pruebas`   | Siempre                                 | `npm run typecheck` y `npx vitest run`, sin variables de ambiente    |
+| `imagenes`  | `staging`, `main` y tags `v*`           | Publica `ghcr.io/abitech-peru/pilotssh-web`                          |
+| `desplegar` | Solo `staging` (`uat`) y `main` (`prd`) | Dokploy si hay `DOKPLOY_API_KEY`; si no, SSH si hay `DEPLOY_SSH_KEY` |
 
-   | Forma                   | Sirve para                    | Qué hace                                              |
-   | ----------------------- | ----------------------------- | ----------------------------------------------------- |
-   | [Dokploy](#con-dokploy) | Un servidor con Dokploy       | Le pide a Dokploy que despliegue                      |
-   | [SSH](#por-ssh)         | Cualquier servidor con Docker | Entra al servidor y actualiza la carpeta del ambiente |
+Etiquetas: `sha-<7 del commit>` siempre, `uat` o `prd` según la rama, y
+`X.Y.Z` con el tag `vX.Y.Z`. Un commit ya compilado se reetiqueta, no se
+recompila: `prd` corre la imagen probada en `uat`.
 
-   Si el ambiente tiene las dos, usa Dokploy. Sin ninguna, no despliega.
-
-Para lanzarlo a mano: _Actions → Web → Run workflow_, eligiendo la rama.
-
-**Antes de desplegar la web, la API de ese ambiente tiene que estar arriba:**
-la compilación le pide el contacto, la empresa y los precios.
+Las `APP_` **no** van en GitHub: van en el `.env` del servidor o en el
+_Environment_ de Dokploy.
 
 ## Configurar GitHub
 
-1. **Rama por defecto:** _Settings → General → Default branch_ → `develop`.
-2. **Protección de ramas:** _Settings → Branches_. En `staging` y `main`,
-   exigir _pull request_ y que las pruebas pasen.
-3. **Ambientes:** _Settings → Environments_, uno llamado `uat` y otro `prd`.
-   - **Deployment branches:** solo `staging` en `uat` y solo `main` en `prd`.
-   - **Required reviewers**, solo en `prd`: quién aprueba cada despliegue.
-   - Las variables y el secreto de la forma elegida, abajo.
-
-Las `VITE_` no van en GitHub: van en el `.env` del servidor, porque la
-imagen se compila allí.
+1. _Settings → General → Default branch_ → `develop`.
+2. _Settings → Branches_: en `staging` y `main`, _pull request_ y pruebas
+   obligatorias.
+3. _Settings → Environments_: `uat` (solo rama `staging`) y `prd` (solo
+   `main`, con _Required reviewers_). En cada uno, las variables de la forma
+   elegida, abajo.
 
 ## Con Dokploy
 
-En Dokploy, un servicio **Compose** por ambiente:
+Un servicio **Compose de tipo Stack** por ambiente:
 
-1. **Provider:** GitHub, el repositorio `pilot-ssh-web` y la rama del
-   ambiente (`staging` o `main`). _Compose Path:_ `./docker-compose.yml`.
-2. **Trigger Type:** `On Tag`, y **Autodeploy** apagado. Así Dokploy solo
-   despliega cuando GitHub se lo pide, con las pruebas ya pasadas.
-3. **Environment:** el `.env` del ambiente. Ver [entorno.md](entorno.md).
-
-   ```env
-   VITE_APP_ENV=uat
-   VITE_API_URL=https://uat-api-pilotssh.abitech.com.pe
-   VITE_SITE_URL=https://uat-pilotssh.abitech.com.pe
-   PRERENDER_API_URL=
-   WEB_PORT=8192
-   ```
-
-4. **Sin dominio en Dokploy** si el servidor tiene CloudPanel: el HTTPS lo
-   pone CloudPanel. Ver [docker.md](docker.md#https).
+| Campo          | Valor                                                                                                                                                                   |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _Provider_     | GitHub, `pilot-ssh-web`, rama `staging` o `main`                                                                                                                        |
+| _Compose Path_ | `./docker-compose.yml`                                                                                                                                                  |
+| _Trigger Type_ | `On Tag`, con _Autodeploy_ apagado                                                                                                                                      |
+| _Environment_  | El `.env` del ambiente, con `IMAGE_TAG=uat` o `IMAGE_TAG=prd`. Ejemplo en [deployment.md](deployment.md#paso-1--instalar-el-ambiente--una-vez-para-uat-y-otra-para-prd) |
+| _Registry_     | `ghcr.io`, con un token de GitHub con `read:packages`                                                                                                                   |
+| Dominios       | Ninguno si hay CloudPanel: el HTTPS lo pone él                                                                                                                          |
 
 En el ambiente de GitHub:
 
 | Qué      | Nombre               | Valor                                                                             |
 | -------- | -------------------- | --------------------------------------------------------------------------------- |
 | Variable | `DOKPLOY_URL`        | La dirección de Dokploy, sin `/` al final                                         |
-| Variable | `DOKPLOY_COMPOSE_ID` | Lo que va tras `/compose/` en la dirección del navegador, con el servicio abierto |
+| Variable | `DOKPLOY_COMPOSE_ID` | Lo que va tras `/compose/` en la URL del navegador. **No** el de la _Webhook URL_ |
 | Secreto  | `DOKPLOY_API_KEY`    | _Settings → Profile → API/CLI → Generate_                                         |
-
-El id **no** es el que aparece al final de la _Webhook URL_: ese es otro.
 
 ## Por SSH
 
-En el servidor, una sola vez por ambiente:
+En el servidor, la carpeta del ambiente [ya creada](deployment.md#paso-1--instalar-el-ambiente--una-vez-para-uat-y-otra-para-prd),
+y un usuario que pueda usar `docker`, hacer `git pull` y con
+`docker login ghcr.io` hecho. Una llave solo para desplegar:
 
-1. **La carpeta**, levantada como explica [docker.md](docker.md): el
-   repositorio clonado en la rama del ambiente y su `.env`.
-2. **Una llave para desplegar.** Sin contraseña y solo para esto:
+```bash
+ssh-keygen -t ed25519 -N "" -f despliegue
+cat despliegue.pub >> ~/.ssh/authorized_keys
+ssh-keyscan -p 22 servidor.sudominio.com   # la huella, para DEPLOY_KNOWN_HOSTS
+```
 
-   ```bash
-   ssh-keygen -t ed25519 -N "" -f despliegue
-   cat despliegue.pub >> ~/.ssh/authorized_keys
-   ```
-
-   El usuario tiene que poder usar `docker` y hacer `git pull` de esa carpeta.
-
-3. **La huella del servidor**, para que GitHub sepa que habla con él:
-
-   ```bash
-   ssh-keyscan -p 22 servidor.sudominio.com
-   ```
-
-En el ambiente de GitHub:
-
-| Qué      | Nombre               | Valor                                                        |
-| -------- | -------------------- | ------------------------------------------------------------ |
-| Variable | `DEPLOY_HOST`        | El servidor                                                  |
-| Variable | `DEPLOY_PORT`        | El puerto SSH. Sin ella, `22`                                |
-| Variable | `DEPLOY_USER`        | El usuario                                                   |
-| Variable | `DEPLOY_PATH`        | La carpeta del ambiente, por ejemplo `/srv/pilotssh/web-uat` |
-| Variable | `DEPLOY_KNOWN_HOSTS` | Lo que imprimió `ssh-keyscan`                                |
-| Secreto  | `DEPLOY_SSH_KEY`     | El contenido del archivo `despliegue`, la llave privada      |
+En el ambiente de GitHub: variables `DEPLOY_HOST`, `DEPLOY_PORT` (por defecto
+`22`), `DEPLOY_USER`, `DEPLOY_PATH` (por ejemplo `/srv/pilotssh/web-uat`) y
+`DEPLOY_KNOWN_HOSTS`; secreto `DEPLOY_SSH_KEY`, la llave privada `despliegue`.
 
 Cada despliegue corre, en esa carpeta:
 
 ```bash
-git pull --ff-only origin <rama> && docker compose up -d --build
+git pull --ff-only origin <rama> && IMAGE_TAG=sha-<commit> sh deploy/docker/desplegar.sh
 ```
 
 ## Si algo falla
 
-| Síntoma                                  | Causa                                                                            |
-| ---------------------------------------- | -------------------------------------------------------------------------------- |
-| _Desplegar_ responde `404` de Dokploy    | `DOKPLOY_COMPOSE_ID` no es el del servicio                                       |
-| La web da `502` en el navegador          | CloudPanel apunta a otro puerto que `WEB_PORT`. Ver [docker.md](docker.md#https) |
-| La compilación se detiene al leer la API | La API de ese ambiente no responde, o falta `PRERENDER_API_URL`                  |
-| En Dokploy no cambia nada tras un push   | Las pruebas fallaron: el despliegue solo corre si pasan                          |
+| Síntoma                                  | Causa                                                                                |
+| ---------------------------------------- | ------------------------------------------------------------------------------------ |
+| Dokploy responde `404`                   | `DOKPLOY_COMPOSE_ID` no es el del servicio                                           |
+| No baja la imagen                        | Falta `docker login ghcr.io`, o el registro en Dokploy                               |
+| El servicio sigue en la versión anterior | La API de ese ambiente no responde. Ver [deployment.md](deployment.md#si-algo-falla) |
+| No se despliega tras un push             | Las pruebas fallaron                                                                 |

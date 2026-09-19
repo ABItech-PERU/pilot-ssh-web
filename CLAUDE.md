@@ -20,45 +20,59 @@ otras apps, y sin una sola palabra de cómo está construido esto.
 
 ## Comandos
 
+Todo con Docker Swarm y el mismo `docker-compose.yml` en `dev`, `uat` y `prd`;
+en `dev` se suma `docker-compose.dev.yml` (Vite con el código montado). Desde
+la carpeta del proyecto, en Git Bash. En local, Vite corre en
+`pilotssh_web_dev_app` (http://localhost:5190), con la API de desarrollo
+levantada antes (`docs/desarrollo.md`). Servidores: `docs/deployment.md`.
+
 ```bash
-npm run dev          # local: recarga sola, proxy a /api y /ws
-npm run build        # chequea tipos y compila a dist/
-npm run preview      # sirve dist/ como en produccion
-npm test             # pruebas
+sh deploy/docker/desplegar.sh                          # levanta o actualiza el ambiente del .env
+docker service logs -f pilotssh_web_dev_app            # registro de Vite
+sh deploy/docker/pruebas.sh                            # tipos y pruebas
+docker exec $(docker ps -q -f name=pilotssh_web_dev_app) npm run build   # compila a dist/ y dist-ssr/
+docker stack rm pilotssh_web_dev                       # parar
 npx shadcn@latest add <componente>
 ```
 
-`npm run dev` no necesita CORS: el proxy sirve `/api` y `/ws` desde el mismo
-origen. En producción no hay proxy y `VITE_API_URL` se incrusta al compilar:
-`npm run build` no compila sin `VITE_API_URL` y `VITE_SITE_URL` públicas con https
-(en el `.env` del ambiente; ver `docs/entorno.md`), y escribe en HTML las páginas públicas con datos de la API
-(`scripts/prerender.mjs`): se cargan sin carga diferida para no parpadear.
+En local no hace falta CORS: el proxy de Vite sirve `/api`, `/media` y `/ws`
+desde el mismo origen (`host.docker.internal:8000`, el nginx de la API de
+desarrollo). En `uat` y `prd` no hay proxy.
+
+**La compilación no depende del ambiente: una imagen para todos.** El `.env`
+(`APP_ENV`, `APP_API_URL`, `APP_SITE_URL`; ver `docs/entorno.md`) se lee al
+arrancar, no al compilar. `src/lib/env.ts` lee `globalThis.__PILOTSSH__` de
+`/config.js`, que `index.html` carga antes que la app: en local lo sirve un
+plugin de `vite.config.ts`; en Docker lo escribe `scripts/prerender.mjs` al
+arrancar el contenedor, junto con el HTML de las páginas públicas con datos de
+la API. Esas páginas se cargan sin carga diferida para no parpadear.
 
 **La web publicada lleva política de contenido (CSP) sin `'unsafe-inline'` en
 scripts.** Nada de scripts en línea en `index.html`, ni `eval` (zod va con
-`jitless`). Un dominio nuevo de terceros se añade a la receta de nginx de
-README → Publicar, comprobado en el navegador con la política puesta.
+`jitless`). Un dominio nuevo de terceros se añade a la CSP de
+`deploy/docker/nginx.conf`, comprobado en el navegador con la política puesta.
 
 ## Puertas de calidad
 
 Las dos pasan antes de entregar. Prohibido `it.skip` para que pase la suite.
 
 ```bash
-npm run typecheck
-npm test
+sh deploy/docker/pruebas.sh
 ```
+
+Corre `npm run typecheck` y `npx vitest run` en el contenedor de desarrollo.
 
 ## Estructura
 
-| Carpeta | Responsabilidad |
-|---|---|
-| `features/` | Un dominio por carpeta: `api.ts` y sus pantallas |
-| `layouts/` | Los tres armazones: público, invitado, panel |
-| `routes/` | Árbol de rutas y guards |
-| `components/ui/` | shadcn generado: **no se edita a mano** |
-| `components/` | Composición propia sobre `ui/` |
-| `lib/` | Cliente HTTP, errores, formato |
-| `types/api.ts` | Contrato con el backend |
+| Carpeta          | Responsabilidad                                  |
+| ---------------- | ------------------------------------------------ |
+| `features/`      | Un dominio por carpeta: `api.ts` y sus pantallas |
+| `layouts/`       | Los tres armazones: público, invitado, panel     |
+| `routes/`        | Árbol de rutas y guards                          |
+| `components/ui/` | shadcn generado: **no se edita a mano**          |
+| `components/`    | Composición propia sobre `ui/`                   |
+| `lib/`           | Cliente HTTP, errores, formato                   |
+| `types/api.ts`   | Contrato con el backend                          |
 
 `features` importa de `lib`, `components` y `types`; nunca al revés.
 
@@ -70,22 +84,22 @@ excepciones de seguridad.
 
 `core/*` es la base global compartida con el backend: **no se edita aquí.**
 
-| Ámbito | Archivos |
-|---|---|
-| `core/` | filosofía · naming · comentarios · commits · idioma · seguridad · pruebas · errores |
-| `tech/` | react · typescript · tailwind · datos · formularios · testing |
-| `project/` | architecture · domain · **copy** · seguridad · gotchas |
+| Ámbito     | Archivos                                                                            |
+| ---------- | ----------------------------------------------------------------------------------- |
+| `core/`    | filosofía · naming · comentarios · commits · idioma · seguridad · pruebas · errores |
+| `tech/`    | react · typescript · tailwind · datos · formularios · testing                       |
+| `project/` | architecture · domain · **copy** · seguridad · gotchas                              |
 
 **Antes de tocar `.ts` o `.tsx` lee `project/gotchas.md`:** trampas que ya
 costaron una sesión cada una.
 
 Tres hooks las hacen cumplir:
 
-| Hook | Cuándo | Qué hace |
-|---|---|---|
-| `revisar_comentarios.py` | cada edición | Avisa de comentarios que incumplen `core/02` |
-| `recordar_contrato.py` | al tocar `types/api.ts` o un `api.ts` | Recuerda contrastar con los serializers y la colección |
-| `revisar_commit.py` | antes de cada commit | **Rechaza** el mensaje si incumple `core/03` |
+| Hook                     | Cuándo                                | Qué hace                                               |
+| ------------------------ | ------------------------------------- | ------------------------------------------------------ |
+| `revisar_comentarios.py` | cada edición                          | Avisa de comentarios que incumplen `core/02`           |
+| `recordar_contrato.py`   | al tocar `types/api.ts` o un `api.ts` | Recuerda contrastar con los serializers y la colección |
+| `revisar_commit.py`      | antes de cada commit                  | **Rechaza** el mensaje si incumple `core/03`           |
 
 ## Lo que más se rompe
 

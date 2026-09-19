@@ -47,10 +47,6 @@ navegacion de SPA con chunk diferido no lo dispara: el script muere por
 timeout con la URL ya cambiada. Usar `{ waitUntil: 'commit' }` o leer
 `page.url()`.
 
-**Node 22 resuelve `localhost` a `::1`** y el backend escucha solo en IPv4.
-Un `fetch` desde un script de Node a `localhost:8000` da `ECONNREFUSED`;
-desde el navegador funciona. En scripts, `127.0.0.1`.
-
 **El socket se abre en un `setTimeout(0)` cancelable, no en el efecto.**
 StrictMode monta, limpia y remonta en el mismo tick: un socket abierto de forma
 sincrona llega al backend, le arranca un intento SSH y se aborta acto seguido.
@@ -115,9 +111,15 @@ ruta, ningun vendor entra en su chunk y todo acaba en el de entrada.
 **Todo sale de `react-router`, no de `react-router-dom`.** Desde la v7 el
 segundo paquete es solo una reexportacion.
 
-**El proxy de Vite sirve `/api` y `/ws` en desarrollo.** Por eso no hay CORS en
-local y `VITE_API_URL` va vacio. En produccion no hay proxy: si la API vive en
-otro dominio, hay que configurarlo alli.
+**El proxy de Vite sirve `/api`, `/media` y `/ws` en desarrollo**, hacia
+`host.docker.internal:8000` (el nginx de la API de desarrollo) y sin
+`changeOrigin`. Por eso no hay CORS en local y `APP_API_URL`
+va vacio. En `uat` y `prd` no hay proxy: si la API vive en otro dominio, hay
+que configurarlo alli.
+
+**`APP_API_URL` se lee al arrancar, no al compilar.** `src/lib/env.ts` lee
+`/config.js`; tocar el `.env` pide `sh deploy/docker/desplegar.sh`, no
+compilar.
 
 **El backend tarda 10 segundos en responder a un servidor inalcanzable.** Es el
 `CONNECT_TIMEOUT` de Paramiko, no lentitud de la interfaz. El `timeout` del

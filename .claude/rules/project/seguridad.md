@@ -14,9 +14,9 @@ no confundir y no facilitar el trabajo a un atacante.
    una columna es cortesia. Un permiso comprobado solo en el cliente es un
    permiso ausente: se cambia con la consola abierta.
 
-2. **NINGUN SECRETO EN EL BUNDLE.** Todo lo que entra por `VITE_*` viaja al
-   navegador y es publico. Ahi va la URL de la API y poco mas. Una clave de
-   servicio en un `.env` de Vite esta publicada.
+2. **NINGUN SECRETO EN EL BUNDLE NI EN `config.js`.** `/config.js` viaja al
+   navegador y es publico: lleva el ambiente y la URL de la API, nada mas.
+   Una clave de servicio en el bundle o en `config.js` esta publicada.
 
 3. **NADA DE `dangerouslySetInnerHTML` CON DATO DE USUARIO.** El nombre de un
    servidor, de una organizacion o de una persona lo escribe alguien. React
@@ -75,8 +75,7 @@ no confundir y no facilitar el trabajo a un atacante.
 ## Antes de dar algo por terminado
 
 ```bash
-npm run typecheck
-npm test
+sh deploy/docker/pruebas.sh
 ```
 
 Y la pregunta que no puede quedar sin respuesta: **si alguien abre esta
