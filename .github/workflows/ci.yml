@@ -1,0 +1,67 @@
+# develop: pruebas. staging -> uat y main -> prd: pruebas, imagen y despliegue
+# Las VITE_ van como variables de cada ambiente en GitHub
+# Guia: ../pilot-ssh-api/docs/github-actions.md
+name: Web
+
+on:
+  push:
+    branches: [develop, staging, main]
+  pull_request:
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      - run: npm run typecheck
+      - run: npx vitest run
+
+  imagen:
+    needs: pruebas
+    # develop no se despliega
+    if: github.event_name == 'push' && github.ref_name != 'develop'
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'prd' || 'uat' }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - id: registro
+        # ghcr exige minusculas
+        run: echo "imagen=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/pilotssh-web" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          push: true
+          build-args: |
+            VITE_APP_ENV=${{ vars.VITE_APP_ENV }}
+            VITE_API_URL=${{ vars.VITE_API_URL }}
+            VITE_SITE_URL=${{ vars.VITE_SITE_URL }}
+          tags: |
+            ${{ steps.registro.outputs.imagen }}:${{ vars.VITE_APP_ENV }}
+            ${{ steps.registro.outputs.imagen }}:${{ github.sha }}
+      - name: Avisar al servidor
+        env:
+          WEBHOOK: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "Sin DEPLOY_WEBHOOK_URL: imagen publicada, sin desplegar."
+            exit 0
+          fi
+          curl -fsS -X POST "$WEBHOOK"

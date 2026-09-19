@@ -1,0 +1,22 @@
+# Pilot SSH, web: docker compose up -d --build
+# Cambiar una VITE_ es volver a compilar. La API del ambiente, arriba antes
+# Guia: docs/docker.md
+
+name: pilotssh_web_${VITE_APP_ENV:?Falta VITE_APP_ENV en el .env}
+
+services:
+  web:
+    container_name: pilotssh_web_${VITE_APP_ENV}_app
+    # Sin WEB_IMAGE compila aqui; con ella baja la de GitHub Actions
+    image: ${WEB_IMAGE:-pilotssh-web:${VITE_APP_ENV}}
+    build:
+      context: .
+      args:
+        VITE_APP_ENV: ${VITE_APP_ENV}
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_SITE_URL: ${VITE_SITE_URL}
+        PRERENDER_API_URL: ${PRERENDER_API_URL:-}
+    restart: unless-stopped
+    ports:
+      # Solo local: la publica el proxy con HTTPS
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-8092}:80"
