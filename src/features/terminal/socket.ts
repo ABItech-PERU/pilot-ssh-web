@@ -3,6 +3,7 @@
 export const CIERRE = {
   NORMAL: 1000,
   ANORMAL: 1006,
+  REINICIO: 1012,
   NO_AUTENTICADO: 4401,
   ORGANIZACION_SUSPENDIDA: 4402,
   SIN_PERMISO: 4403,
@@ -56,6 +57,8 @@ export function describeClose(codigo: number): {
         motivo: 'No tiene permiso para entrar a este servidor con esa credencial.',
         reintentable: false,
       }
+    case CIERRE.REINICIO:
+      return { motivo: 'Pilot SSH se actualizó. Reconectando…', reintentable: true }
     case CIERRE.CADUCADA:
       return {
         motivo: 'La sesión se cerró por tiempo. Puede abrir otra.',
@@ -69,6 +72,13 @@ export function describeClose(codigo: number): {
     default:
       return { motivo: 'Se perdió la conexión con el servidor.', reintentable: true }
   }
+}
+
+/** Un relevo de versión cierra con 1012: se reconecta solo, pocas veces. */
+export const RECONEXION = { intentos: 3, esperaMs: 1500 } as const
+
+export function reconnectsAutomatically(codigo: number, intentosHechos: number): boolean {
+  return codigo === CIERRE.REINICIO && intentosHechos < RECONEXION.intentos
 }
 
 /** Comillas simples: la shell no interpreta nada dentro. Una comilla

@@ -20,6 +20,8 @@ import {
   CIERRE,
   describeClose,
   parseIncoming,
+  RECONEXION,
+  reconnectsAutomatically,
   type EstadoTerminal,
 } from '@/features/terminal/socket'
 import { FORMAS_DE_ENTRAR } from '@/features/servers/auth-type'
@@ -119,6 +121,7 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
   const contenedor = useRef<HTMLDivElement | null>(null)
   const [estado, setEstado] = useState<EstadoTerminal>({ fase: 'conectando' })
   const [intento, setIntento] = useState(0)
+  const reconexiones = useRef(0)
 
   const reconectar = useCallback(() => {
     setEstado({ fase: 'conectando' })
@@ -161,6 +164,8 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
 
     let socket: WebSocket | null = null
     let inicialPendiente = buildInitialCommand(rutaInicial)
+    let reintento: number | undefined
+    let vigente = true
 
     const enviar = (carga: object) => {
       if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(carga))
@@ -176,6 +181,7 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
       )
 
       socket.onopen = () => {
+        reconexiones.current = 0
         setEstado({ fase: 'conectada' })
         terminal.focus()
         enviarTamano()
@@ -196,12 +202,31 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
 
       socket.onclose = (evento) => {
         const { motivo, reintentable } = describeClose(evento.code)
+        terminal.write(`\r\n\x1b[2m— ${motivo} —\x1b[0m\r\n`)
+
+        if (reconnectsAutomatically(evento.code, reconexiones.current)) {
+          reconexiones.current += 1
+          setEstado({ fase: 'conectando' })
+          // Pasa por el interceptor: renueva el token que lleva la query
+          reintento = window.setTimeout(() => {
+            serversApi.fetchServer(server.id).then(
+              () => {
+                if (vigente) reconectar()
+              },
+              () => {
+                if (vigente)
+                  setEstado({
+                    fase: 'cerrada',
+                    codigo: CIERRE.ANORMAL,
+                    ...describeClose(CIERRE.ANORMAL),
+                  })
+              },
+            )
+          }, RECONEXION.esperaMs)
+          return
+        }
+
         setEstado({ fase: 'cerrada', codigo: evento.code, motivo, reintentable })
-        terminal.write(`
-
-[2m— ${motivo} —[0m
-
-`)
       }
     }, 0)
 
@@ -217,7 +242,9 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
     observador.observe(nodo)
 
     return () => {
+      vigente = false
       window.clearTimeout(apertura)
+      window.clearTimeout(reintento)
       cancelAnimationFrame(marco)
       observador.disconnect()
       teclado.dispose()

@@ -8,6 +8,8 @@ import {
   describeClose,
   parseIncoming,
   quoteForShell,
+  RECONEXION,
+  reconnectsAutomatically,
 } from '@/features/terminal/socket'
 
 const SERVIDOR = '0f8fad5b-d9cb-469f-a165-70867728950e'
@@ -117,5 +119,22 @@ describe('parseIncoming', () => {
 
   it('sin message no hay nada que pintar', () => {
     expect(parseIncoming('{"type":"output"}')).toBeNull()
+  })
+})
+
+describe('reconnectsAutomatically', () => {
+  it('un relevo de versión reconecta solo y lo dice', () => {
+    expect(reconnectsAutomatically(CIERRE.REINICIO, 0)).toBe(true)
+    expect(describeClose(CIERRE.REINICIO).motivo).toContain('Reconectando')
+  })
+
+  it('deja de intentarlo tras unos pocos intentos', () => {
+    expect(reconnectsAutomatically(CIERRE.REINICIO, RECONEXION.intentos)).toBe(false)
+  })
+
+  it('otros cierres esperan a la persona', () => {
+    for (const codigo of [CIERRE.NORMAL, CIERRE.ANORMAL, CIERRE.SIN_PERMISO]) {
+      expect(reconnectsAutomatically(codigo, 0)).toBe(false)
+    }
   })
 })
