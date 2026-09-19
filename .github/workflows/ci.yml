@@ -1,5 +1,4 @@
-# develop: pruebas. staging -> uat y main -> prd: pruebas, imagen y despliegue
-# Las VITE_ van como variables de cada ambiente en GitHub
+# develop: pruebas. staging -> uat y main -> prd: pruebas y despliegue
 # Guia: ../pilot-ssh-api/docs/github-actions.md
 name: Web
 
@@ -27,41 +26,25 @@ jobs:
       - run: npm run typecheck
       - run: npx vitest run
 
-  imagen:
+  desplegar:
     needs: pruebas
     # develop no se despliega
     if: github.event_name == 'push' && github.ref_name != 'develop'
     runs-on: ubuntu-latest
+    # Variables y secreto por ambiente; prd pide aprobacion
     environment: ${{ github.ref_name == 'main' && 'prd' || 'uat' }}
-    permissions:
-      contents: read
-      packages: write
     steps:
-      - uses: actions/checkout@v4
-      - id: registro
-        # ghcr exige minusculas
-        run: echo "imagen=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/pilotssh-web" >> "$GITHUB_OUTPUT"
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
-        with:
-          push: true
-          build-args: |
-            VITE_APP_ENV=${{ vars.VITE_APP_ENV }}
-            VITE_API_URL=${{ vars.VITE_API_URL }}
-            VITE_SITE_URL=${{ vars.VITE_SITE_URL }}
-          tags: |
-            ${{ steps.registro.outputs.imagen }}:${{ vars.VITE_APP_ENV }}
-            ${{ steps.registro.outputs.imagen }}:${{ github.sha }}
-      - name: Avisar al servidor
+      - name: Desplegar en Dokploy
         env:
-          WEBHOOK: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+          DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
+          DOKPLOY_COMPOSE_ID: ${{ vars.DOKPLOY_COMPOSE_ID }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
         run: |
-          if [ -z "$WEBHOOK" ]; then
-            echo "Sin DEPLOY_WEBHOOK_URL: imagen publicada, sin desplegar."
+          if [ -z "$DOKPLOY_API_KEY" ]; then
+            echo "Sin DOKPLOY_API_KEY en este ambiente: no se despliega."
             exit 0
           fi
-          curl -fsS -X POST "$WEBHOOK"
+          curl -fsS -X POST "$DOKPLOY_URL/api/compose.deploy" \
+            -H "x-api-key: $DOKPLOY_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"composeId\": \"$DOKPLOY_COMPOSE_ID\"}"

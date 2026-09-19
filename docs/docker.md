@@ -54,19 +54,6 @@ Lo que empieza por `VITE_` queda dentro del JavaScript al compilar. Por eso:
 | Ver el registro                | `docker compose logs -f web`               |
 | Parar                          | `docker compose down`                      |
 
-## Imagen ya compilada
-
-Con `WEB_IMAGE` se baja la imagen que publica GitHub Actions en vez de
-compilar:
-
-```env
-WEB_IMAGE=ghcr.io/abitech-peru/pilotssh-web:prd
-```
-
-```bash
-docker compose pull && docker compose up -d
-```
-
 ## GitHub Actions
 
 El flujo y su configuración son los de la API: ver
@@ -78,4 +65,3 @@ El flujo y su configuración son los de la API: ver
 | ------------------ | --------------------------------- | ----------------------------- |
 | `WEB_PORT`         | Puerto en el servidor             | `8092`                        |
 | `WEB_BIND_ADDRESS` | En qué dirección escucha          | `127.0.0.1`                   |
-| `WEB_IMAGE`        | Imagen a bajar en vez de compilar | `pilotssh-web:<VITE_APP_ENV>` |

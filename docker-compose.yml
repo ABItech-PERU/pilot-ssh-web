@@ -7,8 +7,7 @@ name: pilotssh_web_${VITE_APP_ENV:?Falta VITE_APP_ENV en el .env}
 services:
   web:
     container_name: pilotssh_web_${VITE_APP_ENV}_app
-    # Sin WEB_IMAGE compila aqui; con ella baja la de GitHub Actions
-    image: ${WEB_IMAGE:-pilotssh-web:${VITE_APP_ENV}}
+    image: pilotssh-web:${VITE_APP_ENV}
     build:
       context: .
       args:
