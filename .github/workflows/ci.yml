@@ -31,20 +31,35 @@ jobs:
     # develop no se despliega
     if: github.event_name == 'push' && github.ref_name != 'develop'
     runs-on: ubuntu-latest
-    # Variables y secreto por ambiente; prd pide aprobacion
+    # prd pide aprobacion
     environment: ${{ github.ref_name == 'main' && 'prd' || 'uat' }}
     steps:
-      - name: Desplegar en Dokploy
+      # Dokploy o SSH, segun lo configurado en el ambiente
+      - name: Desplegar
         env:
+          RAMA: ${{ github.ref_name }}
           DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
           DOKPLOY_COMPOSE_ID: ${{ vars.DOKPLOY_COMPOSE_ID }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
-          if [ -z "$DOKPLOY_API_KEY" ]; then
-            echo "Sin DOKPLOY_API_KEY en este ambiente: no se despliega."
-            exit 0
+          if [ -n "$DOKPLOY_API_KEY" ]; then
+            curl -fsS -X POST "$DOKPLOY_URL/api/compose.deploy" \
+              -H "x-api-key: $DOKPLOY_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"composeId\": \"$DOKPLOY_COMPOSE_ID\"}"
+          elif [ -n "$DEPLOY_SSH_KEY" ]; then
+            mkdir -p ~/.ssh
+            printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/despliegue
+            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+            chmod 600 ~/.ssh/despliegue
+            ssh -i ~/.ssh/despliegue -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+              "cd '$DEPLOY_PATH' && git pull --ff-only origin '$RAMA' && docker compose up -d --build"
+          else
+            echo "Sin Dokploy ni SSH en este ambiente: no se despliega."
           fi
-          curl -fsS -X POST "$DOKPLOY_URL/api/compose.deploy" \
-            -H "x-api-key: $DOKPLOY_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d "{\"composeId\": \"$DOKPLOY_COMPOSE_ID\"}"
