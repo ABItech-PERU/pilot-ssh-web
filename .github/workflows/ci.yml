@@ -15,6 +15,9 @@ concurrency:
 jobs:
   pruebas:
     runs-on: ubuntu-latest
+    # Sin .env en el repo: vite.config exige el ambiente
+    env:
+      VITE_APP_ENV: dev
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
