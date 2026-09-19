@@ -1,12 +1,22 @@
-/** Origen de la API. Vacio en desarrollo: el proxy de Vite sirve /api. */
-const apiUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
+/** De /config.js: lo sirve Vite en dev y lo escribe el arranque en Docker. */
+export interface Configuracion {
+  ambiente: 'dev' | 'uat' | 'prd'
+  /** Vacio en dev: el proxy de Vite sirve /api. */
+  apiUrl: string
+}
+
+declare global {
+  var __PILOTSSH__: Partial<Configuracion> | undefined
+}
+
+const configuracion = globalThis.__PILOTSSH__ ?? {}
+const apiUrl = (configuracion.apiUrl ?? '').replace(/\/$/, '')
 
 export const env = {
   apiUrl,
-  /** dev, uat o prd: el mismo valor que APP_ENV en la API. */
-  ambiente: import.meta.env.VITE_APP_ENV ?? 'dev',
+  ambiente: configuracion.ambiente ?? 'dev',
 
-  /** Base del WebSocket. Produccion exige wss: el token viaja en la query. */
+  /** wss fuera de dev: el token viaja en la query. */
   get socketUrl() {
     if (!apiUrl) {
       const protocolo = window.location.protocol === 'https:' ? 'wss:' : 'ws:'

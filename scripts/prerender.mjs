@@ -1,20 +1,34 @@
-// Tras `vite build`: HTML por página pública, sitemap, robots y el cascarón
-// del panel (app.html). Lee contacto y precios de la API.
-import { readFileSync, rmSync, writeFileSync } from 'node:fs'
+// Prepara la web compilada para un ambiente: config.js, HTML por página
+// pública, sitemap, robots y el cascarón del panel (app.html). Corre al
+// arrancar el contenedor, con su .env: la misma imagen sirve a todos.
+//   node --env-file=.env scripts/prerender.mjs
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { JSDOM } from 'jsdom'
-import { loadEnv } from 'vite'
+
+import { buildConfigScript, readConfiguracion } from './configuracion.mjs'
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dist = path.join(raiz, 'dist')
-const entorno = loadEnv('production', raiz, ['VITE_', 'PRERENDER_'])
-const sitioUrl = entorno.VITE_SITE_URL.replace(/\/$/, '')
+const ssr = path.join(raiz, 'dist-ssr')
+
+const configuracion = readConfiguracion(process.env)
+const { sitioUrl } = configuracion
 // Pruebas no debe salir en Google: ni sitemap ni permiso a los buscadores
-const indexable = entorno.VITE_APP_ENV === 'prd'
-// Si la API publicada no se alcanza desde donde se compila, otra dirección
-const apiUrl = (entorno.PRERENDER_API_URL || entorno.VITE_API_URL).replace(/\/$/, '')
+const indexable = configuracion.ambiente === 'prd'
+// Si la API publicada no se alcanza desde el servidor, otra dirección
+const apiUrl = (process.env.PRERENDER_API_URL || configuracion.apiUrl).replace(/\/$/, '')
+if (!sitioUrl) throw new Error('Falta APP_SITE_URL: las páginas la usan en sus enlaces.')
+if (!apiUrl)
+  throw new Error('Falta APP_API_URL o PRERENDER_API_URL: la API da contacto y precios.')
+
+// index.html se reemplaza por la portada: la primera vez se guarda aparte
+const PLANTILLA = path.join(ssr, 'plantilla.html')
+if (!existsSync(PLANTILLA)) copyFileSync(path.join(dist, 'index.html'), PLANTILLA)
+const plantilla = readFileSync(PLANTILLA, 'utf8')
+const CABECERA = /<!--cabecera-->[\s\S]*?<!--\/cabecera-->/
 
 // Algunos módulos del cliente usan window al importarse
 const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: sitioUrl })
@@ -22,6 +36,7 @@ Object.assign(globalThis, {
   window: dom.window,
   document: dom.window.document,
   localStorage: dom.window.localStorage,
+  __PILOTSSH__: { ambiente: configuracion.ambiente, apiUrl: configuracion.apiUrl },
 })
 dom.window.matchMedia = () => ({
   matches: false,
@@ -29,23 +44,33 @@ dom.window.matchMedia = () => ({
   removeEventListener() {},
 })
 
+const INTENTOS = 30
+const ESPERA_MS = 2000
+
+/** Reintenta: al arrancar el servidor, la API puede tardar en responder. */
 async function leer(ruta) {
-  const respuesta = await fetch(`${apiUrl}/api${ruta}`).catch((error) => {
-    throw new Error(
-      `La API no responde en ${apiUrl}: ${error.cause?.message ?? error.message}`,
-    )
-  })
-  if (!respuesta.ok) throw new Error(`${apiUrl}/api${ruta} respondió ${respuesta.status}`)
-  return respuesta.json()
+  for (let intento = 1; ; intento++) {
+    try {
+      const respuesta = await fetch(`${apiUrl}/api${ruta}`)
+      if (respuesta.ok) return respuesta.json()
+      throw new Error(`respondió ${respuesta.status}`)
+    } catch (error) {
+      if (intento === INTENTOS) {
+        throw new Error(
+          `La API no responde en ${apiUrl}/api${ruta}: ${error.cause?.message ?? error.message}`,
+        )
+      }
+      await new Promise((resolver) => setTimeout(resolver, ESPERA_MS))
+    }
+  }
 }
 
 const datos = { sitio: await leer('/site'), precios: await leer('/pricing') }
 const { renderPage, buildHead, PAGINAS_PUBLICAS, LOGO } = await import(
-  pathToFileURL(path.join(raiz, 'dist-ssr', 'prerender.js')).href
+  pathToFileURL(path.join(ssr, 'prerender.js')).href
 )
 
-const plantilla = readFileSync(path.join(dist, 'index.html'), 'utf8')
-const CABECERA = /<!--cabecera-->[\s\S]*?<!--\/cabecera-->/
+writeFileSync(path.join(dist, 'config.js'), buildConfigScript(configuracion))
 
 writeFileSync(
   path.join(dist, 'app.html'),
@@ -91,10 +116,9 @@ writeFileSync(
     : 'User-agent: *\nDisallow: /\n',
 )
 
-rmSync(path.join(raiz, 'dist-ssr'), { recursive: true, force: true })
 dom.window.close()
 console.log(
   indexable
-    ? '  sitemap.xml, robots.txt, app.html'
-    : '  robots.txt (sin indexar), app.html',
+    ? '  config.js, sitemap.xml, robots.txt, app.html'
+    : '  config.js, robots.txt (sin indexar), app.html',
 )
