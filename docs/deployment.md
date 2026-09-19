@@ -69,10 +69,10 @@ sh deploy/docker/desplegar.sh
 Termina cuando la línea dice `converged`. Compruébelo:
 
 ```bash
-docker stack services pilotssh_web_uat
+docker service ls
 ```
 
-Debe ver `pilotssh_web_uat_app` con `2/2`.
+Debe ver el servicio `app` de la web con `2/2`.
 
 ---
 
@@ -87,17 +87,28 @@ Compruébelo abriendo `https://uat-pilotssh.abitech.com.pe`.
 
 ---
 
-## Mantener · _en el servidor, en la carpeta del ambiente_
+## Mantener
 
-Las versiones nuevas las despliega GitHub solo. Para hacerlo a mano:
+Las versiones nuevas las despliega GitHub solo.
 
-| Quiero…                          | Comando                                               |
-| -------------------------------- | ----------------------------------------------------- |
-| Desplegar la última versión      | `git pull && sh deploy/docker/desplegar.sh`           |
-| Aplicar un cambio del `.env`     | `sh deploy/docker/desplegar.sh`                       |
-| Volver a una versión anterior    | `IMAGE_TAG=sha-1a2b3c4 sh deploy/docker/desplegar.sh` |
-| Deshacer el último despliegue ya | `docker service rollback pilotssh_web_uat_app`        |
-| Ver lo que pasa en la web        | `docker service logs -f pilotssh_web_uat_app`         |
+**Desplegar a mano** · en el servidor, dentro de la carpeta del ambiente:
+
+| Quiero…                       | Comando                                               |
+| ----------------------------- | ----------------------------------------------------- |
+| Desplegar la última versión   | `git pull && sh deploy/docker/desplegar.sh`           |
+| Aplicar un cambio del `.env`  | `sh deploy/docker/desplegar.sh`                       |
+| Volver a una versión anterior | `IMAGE_TAG=sha-1a2b3c4 sh deploy/docker/desplegar.sh` |
+
+Con un panel de despliegue, use su botón de desplegar; para volver a una
+versión, cambie `IMAGE_TAG` en su configuración.
+
+**Revisar** · en el servidor, por SSH. El nombre del servicio sale con
+`docker service ls`:
+
+| Quiero…                       | Comando                              |
+| ----------------------------- | ------------------------------------ |
+| Ver lo que pasa en la web     | `docker service logs -f <servicio>`  |
+| Deshacer el último despliegue | `docker service rollback <servicio>` |
 
 ---
 
