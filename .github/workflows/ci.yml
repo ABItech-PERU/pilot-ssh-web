@@ -1,5 +1,5 @@
 # develop: pruebas. staging -> uat y main -> prd: pruebas y despliegue
-# Guia: ../pilot-ssh-api/docs/github-actions.md
+# Guia: docs/github-actions.md
 name: Web
 
 on:

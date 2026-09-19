@@ -51,7 +51,8 @@ Sin backend la aplicación arranca, pero el login responde que no hay conexión.
    Tal cual sirve para desarrollar: `VITE_API_URL` vacía hace que el proxy de
    Vite reenvíe `/api` y `/ws` al backend en el 8000, sin CORS. Cada variable
    está en [Variables de entorno](docs/entorno.md). Para levantarla con
-   Docker, [docs/docker.md](docs/docker.md).
+   Docker, [docs/docker.md](docs/docker.md), y para desplegarla sola con
+   GitHub Actions, [docs/github-actions.md](docs/github-actions.md).
 
 3. **Comprobar que compila**
 
