@@ -8,7 +8,7 @@ import { chromium } from 'playwright'
 const [salida = '.', ruta = '/login', ...banderas] = process.argv.slice(2)
 const conSesion = banderas.includes('--auth')
 
-const BASE = 'http://localhost:5173'
+const BASE = 'http://localhost:5190'
 const DEMO = { email: 'ana@acme.pe', password: '12345678' }
 
 const TAMANOS = [

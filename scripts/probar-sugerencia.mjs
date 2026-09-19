@@ -1,6 +1,6 @@
 import { chromium } from 'playwright'
 
-const BASE = 'http://localhost:5173'
+const BASE = 'http://localhost:5190'
 const salida = process.argv[2] ?? '.'
 
 const navegador = await chromium.launch()

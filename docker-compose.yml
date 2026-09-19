@@ -1,21 +1,32 @@
-# Pilot SSH, web: docker compose up -d --build
-# Cambiar una VITE_ es volver a compilar. La API del ambiente, arriba antes
-# Guia: docs/docker.md
-
-name: pilotssh_web_${VITE_APP_ENV:?Falta VITE_APP_ENV en el .env}
+# Pilot SSH, web, en Docker Swarm: dos copias que se relevan sin corte
+#   sh deploy/docker/desplegar.sh
+# Guia: docs/deployment.md
 
 services:
-  web:
-    container_name: pilotssh_web_${VITE_APP_ENV}_app
-    image: pilotssh-web:${VITE_APP_ENV}
-    build:
-      context: .
-      args:
-        VITE_APP_ENV: ${VITE_APP_ENV}
-        VITE_API_URL: ${VITE_API_URL}
-        VITE_SITE_URL: ${VITE_SITE_URL}
-        PRERENDER_API_URL: ${PRERENDER_API_URL:-}
-    restart: unless-stopped
+  app:
+    image: ${IMAGE_REGISTRY:-ghcr.io/abitech-peru}/pilotssh-web:${IMAGE_TAG:?Falta IMAGE_TAG}
+    env_file: .env
     ports:
-      # Solo local: la publica el proxy con HTTPS
-      - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-8092}:80"
+      - target: 80
+        published: ${WEB_PORT:-8092}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      # El arranque prerenderiza: espera a la API
+      start_period: 90s
+    deploy:
+      replicas: 2
+      # La nueva atiende antes de apagar la vieja; si falla, vuelve atras
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+        monitor: 20s
+      rollback_config:
+        parallelism: 1
+        order: start-first
+      restart_policy:
+        condition: any
+        delay: 5s
