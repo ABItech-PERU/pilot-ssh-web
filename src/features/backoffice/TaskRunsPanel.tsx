@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
+import { CalendarClockIcon } from 'lucide-react'
 import { useState } from 'react'
 
 import { Pagination } from '@/components/pagination'
 import { SidePanelBody, SidePanelContent, SidePanelHeader } from '@/components/side-panel'
-import { ErrorState } from '@/components/states'
+import { EmptyState, ErrorState } from '@/components/states'
 import { Sheet, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import * as platformApi from '@/features/backoffice/api'
@@ -72,7 +73,13 @@ export function TaskRunsPanel({ tarea, open, onOpenChange }: Props) {
                 </div>
               )}
               {corridas.data?.count === 0 && (
-                <p className="text-muted-foreground text-sm">Todavía no ha corrido.</p>
+                <EmptyState
+                  compacto
+                  enmarcado
+                  icon={CalendarClockIcon}
+                  title="Todavía no ha corrido"
+                  description="Cada corrida queda aquí, con cuánto duró y cómo terminó."
+                />
               )}
 
               <ol className="space-y-2">

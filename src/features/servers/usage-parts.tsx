@@ -3,6 +3,7 @@ import { useState } from 'react'
 
 import { FilterBar } from '@/components/filter-bar'
 import { PeriodFilter, PeriodRange } from '@/components/period-filter'
+import { LineaEsqueleto } from '@/components/states'
 import { Skeleton } from '@/components/ui/skeleton'
 import { resolverPeriodo, type Periodo, type Rango } from '@/lib/periods'
 import type { UsageStats } from '@/types/api'
@@ -85,7 +86,7 @@ export function Cifra({
       </dt>
       <dd className="mt-2">
         {valor === undefined ? (
-          <Skeleton className="h-7 w-16" />
+          <LineaEsqueleto texto="2xl" className="w-16" />
         ) : (
           <span
             className={cn(
@@ -98,6 +99,19 @@ export function Cifra({
         )}
         <span className="text-muted-foreground mt-1 block text-xs">{pie}</span>
       </dd>
+    </div>
+  )
+}
+
+/** Mismo alto que `ActividadDiaria`. */
+export function ActividadDiariaEsqueleto() {
+  return (
+    <div className="space-y-2">
+      <Skeleton className="h-24 w-full" />
+      <div className="flex justify-between">
+        <LineaEsqueleto texto="xs" className="w-20" />
+        <LineaEsqueleto texto="xs" className="w-20" />
+      </div>
     </div>
   )
 }
@@ -139,23 +153,23 @@ export function Ranking({
   vacio,
 }: {
   filas?: { nombre: string; total: number; maquina?: boolean }[]
-  vacio: string
+  /** `EmptyState` compacto: marco del bloque. */
+  vacio: React.ReactNode
 }) {
   if (filas === undefined) {
     return (
       <ul className="divide-y">
         {Array.from({ length: 3 }, (_, indice) => (
-          <li key={indice} className="px-4 py-3">
-            <Skeleton className="h-4 w-32" />
+          <li key={indice} className="space-y-1.5 px-4 py-3">
+            <LineaEsqueleto className="w-32" />
+            <Skeleton className="h-1.5 w-full rounded-full" />
           </li>
         ))}
       </ul>
     )
   }
 
-  if (filas.length === 0) {
-    return <p className="text-muted-foreground p-4 text-sm">{vacio}</p>
-  }
+  if (filas.length === 0) return vacio
 
   const tope = Math.max(...filas.map((fila) => fila.total), 1)
 

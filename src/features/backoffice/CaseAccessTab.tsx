@@ -56,6 +56,7 @@ export function CaseAccessTab() {
   if (servidores.data?.count === 0) {
     return (
       <EmptyState
+        enmarcado
         icon={ServerOffIcon}
         title="Sin servidores"
         description="Esta organización todavía no ha registrado ninguno."

@@ -1,5 +1,5 @@
 import { useQuery, type QueryKey } from '@tanstack/react-query'
-import { ActivityIcon, KeyRoundIcon } from 'lucide-react'
+import { ActivityIcon, KeyRoundIcon, SearchXIcon, TerminalIcon } from 'lucide-react'
 import { useState } from 'react'
 
 import { columnaDeNumero, DataTable, type Columna } from '@/components/data-table'
@@ -10,6 +10,7 @@ import {
   SearchInput,
 } from '@/components/filter-bar'
 import { Pagination } from '@/components/pagination'
+import { EmptyState } from '@/components/states'
 import { PeriodFilter, PeriodRange } from '@/components/period-filter'
 import type { FiltrosDeHistorial } from '@/features/servers/api'
 import { EstadoDeSesion } from '@/features/servers/server-parts'
@@ -215,9 +216,19 @@ export function SessionsHistory({ clave, pedir, credenciales, total }: Props) {
         onReintentar={() => historial.refetch()}
         // Vacío distinto sin datos que sin resultados del filtro
         vacio={
-          listado.hayFiltros
-            ? 'Ninguna sesión coincide con ese filtro.'
-            : 'Nadie ha abierto la terminal todavía.'
+          listado.hayFiltros ? (
+            <EmptyState
+              icon={SearchXIcon}
+              title="Nada con esos filtros"
+              description="Pruebe con otro estado, persona o periodo, o límpielos."
+            />
+          ) : (
+            <EmptyState
+              icon={TerminalIcon}
+              title="Sin sesiones todavía"
+              description="Cada terminal que se abra quedará aquí, con quién y cuándo."
+            />
+          )
         }
         filasEsperadas={Math.min(total, porPagina)}
       />

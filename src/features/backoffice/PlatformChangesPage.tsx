@@ -290,7 +290,7 @@ function Historial() {
           cargando={cambios.isPending}
           error={cambios.error}
           onReintentar={() => cambios.refetch()}
-          filasEsperadas={Math.min(porPagina, cambios.data?.results.length || porPagina)}
+          filasEsperadas={Math.min(porPagina, cambios.data?.results.length || 5)}
           vacio={
             listado.hayFiltros ? (
               <EmptyState

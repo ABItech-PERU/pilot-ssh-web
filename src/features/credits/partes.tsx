@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { FiltroSelect } from '@/components/filter-bar'
 import { PeriodRange } from '@/components/period-filter'
 import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
+import { LineaEsqueleto } from '@/components/states'
 import type { LadoDelMovimiento } from '@/features/credits/movimientos'
 import type { TonoDeRecarga } from '@/features/credits/recargas'
 import type { Tono } from '@/features/credits/saldo'
@@ -54,14 +54,15 @@ export function Cifra({
 }) {
   return (
     <div className="rounded-lg border p-4">
-      <dt className="text-muted-foreground flex items-center gap-2 text-xs">
+      {/* Alto fijo de insignia: sin salto al llegar */}
+      <dt className="text-muted-foreground flex h-5.5 items-center gap-2 text-xs">
         <Icono className="size-4 shrink-0" />
         {etiqueta}
         {insignia && <span className="ml-auto">{insignia}</span>}
       </dt>
       <dd className="mt-2 space-y-1">
         {valor === undefined ? (
-          <Skeleton className="h-7 w-24" />
+          <LineaEsqueleto texto="2xl" className="w-24" />
         ) : (
           <p>
             <span
@@ -73,7 +74,7 @@ export function Cifra({
           </p>
         )}
         {pie === undefined ? (
-          <Skeleton className="h-3 w-36" />
+          <LineaEsqueleto texto="xs" className="w-36" />
         ) : (
           <p className="text-muted-foreground text-xs">{pie}</p>
         )}

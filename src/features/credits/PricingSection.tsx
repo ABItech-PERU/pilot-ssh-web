@@ -1,6 +1,6 @@
 import { CheckIcon } from 'lucide-react'
 
-import { ErrorState } from '@/components/states'
+import { ErrorState, LineaEsqueleto } from '@/components/states'
 import { Skeleton } from '@/components/ui/skeleton'
 import { describirGratis, RECURSOS } from '@/features/credits/tarifas'
 import { useTarifas } from '@/features/credits/use-creditos'
@@ -28,14 +28,18 @@ export function PricingSection({ zonaDeCobro }: { zonaDeCobro?: string }) {
           Cómo se cobra
         </h2>
         {/* Zona de cobro: dice en qué día cae el uso nocturno */}
-        {zona && (
-          <p className="text-muted-foreground text-xs">
-            Cada día de uso va de 00:00 a 23:59,{' '}
-            {zona.nombre === 'UTC'
-              ? 'hora UTC'
-              : `hora de ${zona.ciudad} (${zona.desfase})`}
-            : la zona del propietario.
-          </p>
+        {zonaDeCobro === undefined ? (
+          <LineaEsqueleto texto="xs" className="w-96 max-w-full" />
+        ) : (
+          zona && (
+            <p className="text-muted-foreground text-xs">
+              Cada día de uso va de 00:00 a 23:59,{' '}
+              {zona.nombre === 'UTC'
+                ? 'hora UTC'
+                : `hora de ${zona.ciudad} (${zona.desfase})`}
+              : la zona del propietario.
+            </p>
+          )
         )}
       </div>
       <div className="overflow-hidden rounded-lg border">
@@ -51,8 +55,15 @@ export function PricingSection({ zonaDeCobro }: { zonaDeCobro?: string }) {
                 ))
               : Array.from({ length: 2 }, (_, indice) => (
                   <li key={indice} className="flex items-center gap-3 px-4 py-3">
-                    <Skeleton className="size-8 rounded-md" />
-                    <Skeleton className="h-4 w-56" />
+                    <Skeleton className="size-8 shrink-0 rounded-md" />
+                    <div className="min-w-0 flex-1">
+                      <LineaEsqueleto className="w-56 max-w-full" />
+                      <LineaEsqueleto texto="xs" className="w-40" />
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <LineaEsqueleto className="w-20" />
+                      <LineaEsqueleto texto="xs" className="w-16" />
+                    </div>
                   </li>
                 ))}
           </ul>

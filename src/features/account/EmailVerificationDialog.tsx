@@ -12,10 +12,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { EmailCodeField, WrongEmailLink } from '@/features/account/EmailCodeField'
+import { RegaloAlConfirmar } from '@/features/account/RegaloAlConfirmar'
 import {
   codigoVigente,
   useConfirmarCorreo,
-  useRegaloAlConfirmar,
 } from '@/features/account/use-confirmar-correo'
 import { useSession } from '@/features/auth/session'
 
@@ -53,16 +53,19 @@ function FormularioDeCorreo({
     codigoVigente(user?.email_code_expires_at ?? null),
   )
   const { pedir, confirmar, aviso, limpiarAviso } = useConfirmarCorreo(onCerrar)
-  const regalo = useRegaloAlConfirmar()
 
   return (
     <>
       <DialogHeader>
         <DialogTitle>Confirme su correo</DialogTitle>
         <DialogDescription>
-          {enviado
-            ? `Introduzca el código que le enviamos a ${email}.`
-            : `Al confirmarlo recibe ${regalo}.`}
+          {enviado ? (
+            `Introduzca el código que le enviamos a ${email}.`
+          ) : (
+            <>
+              Al confirmarlo recibe <RegaloAlConfirmar />.
+            </>
+          )}
         </DialogDescription>
       </DialogHeader>
 

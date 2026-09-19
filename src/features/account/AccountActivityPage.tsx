@@ -1,6 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { cn } from 'cn'
-import { ArrowLeftIcon, LaptopIcon, ListFilterIcon } from 'lucide-react'
+import {
+  ArrowLeftIcon,
+  HistoryIcon,
+  LaptopIcon,
+  ListFilterIcon,
+  SearchXIcon,
+} from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 
@@ -13,7 +19,7 @@ import {
 } from '@/components/filter-bar'
 import { Pagination } from '@/components/pagination'
 import { PeriodFilter, PeriodRange } from '@/components/period-filter'
-import { PageHeader } from '@/components/states'
+import { EmptyState, PageHeader } from '@/components/states'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   clavesActividad,
@@ -194,9 +200,19 @@ export function AccountActivityPage() {
         error={actividad.error}
         onReintentar={() => actividad.refetch()}
         vacio={
-          listado.hayFiltros
-            ? 'Ningún registro coincide con ese filtro.'
-            : 'Sin actividad este mes.'
+          listado.hayFiltros ? (
+            <EmptyState
+              icon={SearchXIcon}
+              title="Nada con esos filtros"
+              description="Pruebe con otro tipo, equipo o periodo, o límpielos."
+            />
+          ) : (
+            <EmptyState
+              icon={HistoryIcon}
+              title="Sin actividad en el periodo"
+              description="Aquí queda cada inicio de sesión y cada cambio de seguridad."
+            />
+          )
         }
       />
 

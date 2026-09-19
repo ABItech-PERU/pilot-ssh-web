@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
+import { ReceiptIcon } from 'lucide-react'
 import { useOutletContext } from 'react-router'
 
 import { Bloque, VerTodo } from '@/components/bloque'
-import { ErrorState } from '@/components/states'
-import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState, ErrorState, LineaEsqueleto } from '@/components/states'
 import * as creditsApi from '@/features/credits/api'
 import type { ContextoDeCreditos } from '@/features/credits/CreditsPage'
 import { conceptoDe } from '@/features/credits/movimientos'
@@ -57,16 +57,25 @@ export function CreditsSummaryTab() {
           ) : ultimos.isPending ? (
             <ul className="divide-y">
               {Array.from({ length: MOVIMIENTOS_EN_RESUMEN }, (_, indice) => (
-                <li key={indice} className="flex items-center justify-between px-4 py-3">
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-4 w-14" />
+                <li
+                  key={indice}
+                  className="flex items-center justify-between gap-3 px-4 py-2.5"
+                >
+                  <div>
+                    <LineaEsqueleto className="w-40" />
+                    <LineaEsqueleto texto="xs" className="w-16" />
+                  </div>
+                  <LineaEsqueleto className="w-10" />
                 </li>
               ))}
             </ul>
           ) : ultimos.data.results.length === 0 ? (
-            <p className="text-muted-foreground p-4 text-sm">
-              Aquí aparecerán las recargas y el uso de cada día.
-            </p>
+            <EmptyState
+              compacto
+              icon={ReceiptIcon}
+              title="Sin movimientos"
+              description="Aquí aparecerán las recargas y el uso de cada día."
+            />
           ) : (
             <ul className="divide-y">
               {ultimos.data.results.map((movimiento) => (

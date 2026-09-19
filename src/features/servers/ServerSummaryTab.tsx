@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { PencilIcon, PlusIcon } from 'lucide-react'
-import { Link, useNavigate, useOutletContext } from 'react-router'
+import { KeyRoundIcon, LinkIcon, PencilIcon, PlusIcon } from 'lucide-react'
+import { Link, useOutletContext } from 'react-router'
 
-import { Bloque, VacioDeBloque, VerTodo } from '@/components/bloque'
+import { Bloque, VerTodo } from '@/components/bloque'
+import { EmptyState } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import { puedeGestionar } from '@/features/access/levels'
 import * as serversApi from '@/features/servers/api'
@@ -18,7 +19,6 @@ const SESIONES_EN_RESUMEN = 3
 /** Listas largas cortadas, con enlace a su pestana. */
 export function ServerSummaryTab() {
   const server = useOutletContext<Server>()
-  const navegar = useNavigate()
   const { acciones, dialogos } = useCredentialActions(server)
   // Anadir y editar solo quien gestiona la maquina
   const gestiona = puedeGestionar(server)
@@ -46,10 +46,23 @@ export function ServerSummaryTab() {
           }
         >
           {server.users.length === 0 ? (
-            <VacioDeBloque
-              texto="Sin credencial no hay terminal."
-              accion="Añadir credencial"
-              onAccion={gestiona ? acciones.onAnadirCredencial : undefined}
+            <EmptyState
+              compacto
+              icon={KeyRoundIcon}
+              title="Sin credenciales"
+              description="Sin credencial no hay terminal."
+              action={
+                gestiona && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={acciones.onAnadirCredencial}
+                  >
+                    <PlusIcon />
+                    Añadir credencial
+                  </Button>
+                )
+              }
             />
           ) : (
             <ul className="divide-y">
@@ -98,11 +111,20 @@ export function ServerSummaryTab() {
           }
         >
           {server.links.length === 0 ? (
-            <VacioDeBloque
-              texto="El panel, el monitoreo y todo lo del servidor entero."
-              accion="Añadir enlace"
-              onAccion={
-                gestiona ? () => navegar(buildServerPath(server.id, 'links')) : undefined
+            <EmptyState
+              compacto
+              icon={LinkIcon}
+              title="Sin enlaces"
+              description="El panel, el monitoreo y todo lo del servidor entero."
+              action={
+                gestiona && (
+                  <Button asChild variant="outline" size="sm">
+                    <Link to={buildServerPath(server.id, 'links')}>
+                      <PlusIcon />
+                      Añadir enlace
+                    </Link>
+                  </Button>
+                )
               }
             />
           ) : (

@@ -1,9 +1,9 @@
-import { PlusIcon } from 'lucide-react'
+import { KeyRoundIcon, PlusIcon, SearchXIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useOutletContext } from 'react-router'
 
-import { VacioDeBloque } from '@/components/bloque'
 import { SearchInput } from '@/components/filter-bar'
+import { EmptyState } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import { puedeGestionar } from '@/features/access/levels'
 import { FilaCredencial } from '@/features/servers/server-parts'
@@ -49,13 +49,27 @@ export function ServerCredentialsTab() {
 
       <div className="overflow-hidden rounded-lg border">
         {server.users.length === 0 ? (
-          <VacioDeBloque
-            texto="Sin credencial no hay terminal."
-            accion="Añadir credencial"
-            onAccion={gestiona ? acciones.onAnadirCredencial : undefined}
+          <EmptyState
+            compacto
+            icon={KeyRoundIcon}
+            title="Sin credenciales"
+            description="Sin credencial no hay terminal."
+            action={
+              gestiona && (
+                <Button variant="outline" size="sm" onClick={acciones.onAnadirCredencial}>
+                  <PlusIcon />
+                  Añadir credencial
+                </Button>
+              )
+            }
           />
         ) : filtradas.length === 0 ? (
-          <p className="text-muted-foreground p-4 text-sm">Ninguna coincide.</p>
+          <EmptyState
+            compacto
+            icon={SearchXIcon}
+            title="Ninguna coincide"
+            description="Pruebe con otro texto."
+          />
         ) : (
           <ul className="divide-y">
             {filtradas.map((credencial) => (

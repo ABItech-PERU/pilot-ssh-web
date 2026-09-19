@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarClockIcon, PlusIcon, XIcon } from 'lucide-react'
+import { CalendarClockIcon, PlusIcon, ServerIcon, XIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { FormDialogContent } from '@/components/form-dialog'
+import { EmptyState } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -51,9 +52,12 @@ export function GroupAccessDialog({ slug, grupo, concesiones, onOpenChange }: Pr
 
         <div className="divide-y rounded-lg border">
           {concesiones.length === 0 ? (
-            <p className="text-muted-foreground p-3 text-sm">
-              Todavía no alcanza ningún servidor.
-            </p>
+            <EmptyState
+              compacto
+              icon={ServerIcon}
+              title="Sin accesos todavía"
+              description="Todavía no alcanza ningún servidor."
+            />
           ) : (
             concesiones.map((concesion) => (
               <Concesion key={concesion.id} slug={slug} concesion={concesion} />

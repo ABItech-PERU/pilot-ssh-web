@@ -40,6 +40,7 @@ export function Shell({ barra, descripcionDelMenu, avisos }: Props) {
 
   return (
     <div
+      data-panel
       className={cn(
         'bg-background min-h-pantalla lg:grid',
         colapsada ? 'lg:grid-cols-[4rem_1fr]' : 'lg:grid-cols-[17.5rem_1fr]',

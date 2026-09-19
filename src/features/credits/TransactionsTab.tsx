@@ -204,10 +204,7 @@ export function TransactionsTab() {
         cargando={movimientos.isPending}
         error={movimientos.error}
         onReintentar={() => movimientos.refetch()}
-        filasEsperadas={Math.min(
-          porPagina,
-          movimientos.data?.results.length || porPagina,
-        )}
+        filasEsperadas={Math.min(porPagina, movimientos.data?.results.length || 5)}
         vacio={
           listado.hayFiltros ? (
             <EmptyState

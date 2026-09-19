@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2Icon } from 'lucide-react'
+import { LaptopIcon, Loader2Icon } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { SettingsSection } from '@/components/settings-section'
+import { EmptyState } from '@/components/states'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -103,7 +104,12 @@ export function OpenSessions() {
             No se pudieron cargar las sesiones.
           </p>
         ) : sesiones.length === 0 ? (
-          <p className="text-muted-foreground p-4 text-sm">No hay sesiones abiertas.</p>
+          <EmptyState
+            compacto
+            icon={LaptopIcon}
+            title="Sin sesiones abiertas"
+            description="Cada equipo donde inicie sesión aparece aquí."
+          />
         ) : (
           sesiones.map((sesion) => {
             const esActual = sesion.id === actual

@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 
 import { TabNav } from '@/components/tab-nav'
 import { Button } from '@/components/ui/button'
+import { LineaEsqueleto } from '@/components/states'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSession } from '@/features/auth/session'
 import * as platformApi from '@/features/backoffice/api'
@@ -64,30 +65,16 @@ export function OrganizationCasePage() {
   })
 
   if (detalle.isError) return <NoEncontrada />
-  if (detalle.isPending) return <Esqueleto />
+  if (detalle.isPending) return <Esqueleto slug={slug} conAcceso={atiende(user)} />
 
   const organizacion = detalle.data
   const quienAtiende = atiende(user)
   const propia = organizacion.is_own
   const estado = describirEstadoDeOrganizacion(organizacion.status)
 
-  const pestanas: { etiqueta: string; pestana?: PestanaDelCaso; visible: boolean }[] = [
-    { etiqueta: 'Resumen', visible: true },
-    { etiqueta: 'Equipo', pestana: 'team', visible: true },
-    { etiqueta: 'Acceso', pestana: 'access', visible: quienAtiende },
-    { etiqueta: 'Dinero', pestana: 'money', visible: true },
-    { etiqueta: 'Notas', pestana: 'notes', visible: true },
-  ]
-
   return (
     <div className="space-y-6">
-      <Link
-        to={buildPlatformPath('organizations')}
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
-      >
-        <ArrowLeftIcon className="size-4" />
-        Organizaciones
-      </Link>
+      <VolverAOrganizaciones />
 
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
@@ -148,14 +135,12 @@ export function OrganizationCasePage() {
 
       <TabNav
         etiqueta="Secciones de la organización"
-        pestanas={pestanas
-          .filter((pestana) => pestana.visible)
-          .map(({ etiqueta, pestana }) => ({
-            to: buildCasePath(organizacion.slug, pestana),
-            etiqueta,
-            cuenta: pestana === 'team' ? organizacion.members_count : null,
-            end: true,
-          }))}
+        pestanas={pestanasDelCaso(quienAtiende).map(({ etiqueta, pestana }) => ({
+          to: buildCasePath(organizacion.slug, pestana),
+          etiqueta,
+          cuenta: pestana === 'team' ? organizacion.members_count : null,
+          end: true,
+        }))}
       />
 
       <Outlet context={organizacion} />
@@ -219,22 +204,62 @@ function NoEncontrada() {
   )
 }
 
-/** Misma forma que la ficha: al cargar no salta nada. */
-function Esqueleto() {
+/** «Acceso» diagnostica terminales: solo para quien atiende. */
+function pestanasDelCaso(conAcceso: boolean) {
+  const todas: { etiqueta: string; pestana?: PestanaDelCaso; visible: boolean }[] = [
+    { etiqueta: 'Resumen', visible: true },
+    { etiqueta: 'Equipo', pestana: 'team', visible: true },
+    { etiqueta: 'Acceso', pestana: 'access', visible: conAcceso },
+    { etiqueta: 'Dinero', pestana: 'money', visible: true },
+    { etiqueta: 'Notas', pestana: 'notes', visible: true },
+  ]
+  return todas.filter((pestana) => pestana.visible)
+}
+
+function VolverAOrganizaciones() {
+  return (
+    <Link
+      to={buildPlatformPath('organizations')}
+      className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
+    >
+      <ArrowLeftIcon className="size-4" />
+      Organizaciones
+    </Link>
+  )
+}
+
+/** Lo fijo, real; lo de la API, barras de su alto. */
+function Esqueleto({ slug, conAcceso }: { slug: string; conAcceso: boolean }) {
   return (
     <div className="space-y-6" aria-busy>
-      <Skeleton className="h-5 w-32" />
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Skeleton className="size-10 rounded-lg" />
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-56" />
-            <Skeleton className="h-4 w-40" />
+      <VolverAOrganizaciones />
+
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <Skeleton className="size-10 shrink-0 rounded-lg" />
+          <div className="min-w-0 space-y-1">
+            <LineaEsqueleto texto="2xl" className="w-56" />
+            <div className="flex h-5.5 items-center">
+              <Skeleton className="h-4 w-44" />
+            </div>
           </div>
         </div>
-        <Skeleton className="h-10 w-40" />
-      </div>
-      <Skeleton className="h-10 w-full" />
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <Skeleton className="h-10 w-28" />
+          <Skeleton className="h-10 w-40" />
+        </div>
+      </header>
+
+      <TabNav
+        etiqueta="Secciones de la organización"
+        pestanas={pestanasDelCaso(conAcceso).map(({ etiqueta, pestana }) => ({
+          to: buildCasePath(slug, pestana),
+          etiqueta,
+          cuentaPendiente: pestana === 'team',
+          end: true,
+        }))}
+      />
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Skeleton className="h-64 rounded-lg" />
         <Skeleton className="h-64 rounded-lg" />

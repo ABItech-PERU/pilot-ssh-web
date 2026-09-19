@@ -1,7 +1,5 @@
-import { ChevronRightIcon, PlusIcon } from 'lucide-react'
+import { ChevronRightIcon } from 'lucide-react'
 import { Link } from 'react-router'
-
-import { Button } from '@/components/ui/button'
 
 /** Bloque de una pantalla de resumen: rótulo, acción y marco. Lo comparten
  *  servidores, credenciales y créditos. */
@@ -54,28 +52,5 @@ export function VerTodo({
       {children}
       <ChevronRightIcon className="size-4" />
     </button>
-  )
-}
-
-export function VacioDeBloque({
-  texto,
-  accion,
-  onAccion,
-}: {
-  texto: string
-  accion: string
-  /** Sin manejador, solo el texto: no se ofrece un alta que daria 403. */
-  onAccion?: () => void
-}) {
-  return (
-    <div className="flex flex-col items-start gap-3 p-4">
-      <p className="text-muted-foreground text-sm">{texto}</p>
-      {onAccion && (
-        <Button variant="outline" size="sm" onClick={onAccion}>
-          <PlusIcon />
-          {accion}
-        </Button>
-      )}
-    </div>
   )
 }

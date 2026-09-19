@@ -24,9 +24,10 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { DataTable, type Columna } from '@/components/data-table'
 import { FilterBar, FiltroSelect, SearchInput, ViewToggle } from '@/components/filter-bar'
 import { Pagination } from '@/components/pagination'
-import { PageHeader } from '@/components/states'
+import { EmptyState, PageHeader } from '@/components/states'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -118,7 +119,7 @@ export function ServersPage() {
     page: listado.pagina,
   }
 
-  const opcionesDeEtiqueta = useLabelOptions(
+  const { opciones: opcionesDeEtiqueta, cargando: cargandoEtiquetas } = useLabelOptions(
     serversApi.clavesServidor.etiquetas,
     serversApi.fetchLabels,
   )
@@ -308,16 +309,20 @@ export function ServersPage() {
           }
           opciones={CREDENCIALES}
         />
-        {opcionesDeEtiqueta.length > 1 && (
-          <FiltroSelect
-            icono={TagIcon}
-            etiqueta="Filtrar por etiqueta"
-            valor={listado.filtros.label || 'todas'}
-            onChange={(valor) =>
-              listado.setFiltro('label', valor === 'todas' ? '' : valor)
-            }
-            opciones={opcionesDeEtiqueta}
-          />
+        {cargandoEtiquetas ? (
+          <Skeleton className="h-10 w-48" />
+        ) : (
+          opcionesDeEtiqueta.length > 1 && (
+            <FiltroSelect
+              icono={TagIcon}
+              etiqueta="Filtrar por etiqueta"
+              valor={listado.filtros.label || 'todas'}
+              onChange={(valor) =>
+                listado.setFiltro('label', valor === 'todas' ? '' : valor)
+              }
+              opciones={opcionesDeEtiqueta}
+            />
+          )
         )}
         <FiltroSelect
           icono={ArrowUpDownIcon}
@@ -426,7 +431,7 @@ const PASOS = [
 /** Primer uso: explica lo que viene y ofrece un solo boton. */
 function PrimerServidor({ onAnadir }: { onAnadir: () => void }) {
   return (
-    <div className="mx-auto flex max-w-lg flex-col items-center text-left">
+    <div className="mx-auto flex max-w-lg flex-col items-center px-6 py-12 text-left whitespace-normal">
       <h2 className="text-lg font-semibold">Registre su primer servidor</h2>
       <p className="text-muted-foreground mt-1 text-center text-sm">
         Tres pasos y la terminal queda en el navegador.
@@ -459,15 +464,11 @@ function PrimerServidor({ onAnadir }: { onAnadir: () => void }) {
 
 function SinResultados() {
   return (
-    <div className="flex flex-col items-center">
-      <span className="bg-muted text-muted-foreground grid size-11 place-items-center rounded-full">
-        <SearchXIcon className="size-5" />
-      </span>
-      <h2 className="mt-4 text-base font-semibold">Ningún servidor coincide</h2>
-      <p className="text-muted-foreground mt-1 max-w-sm text-sm">
-        Pruebe otro texto o limpie los filtros.
-      </p>
-    </div>
+    <EmptyState
+      icon={SearchXIcon}
+      title="Ningún servidor coincide"
+      description="Pruebe con otro texto o limpie los filtros."
+    />
   )
 }
 
@@ -622,17 +623,11 @@ function MenuDeFila({
 /** Miembro sin concesiones: el acceso lo da quien administra. */
 function SinAcceso() {
   return (
-    <div className="flex flex-col items-center">
-      <span className="bg-muted text-muted-foreground grid size-11 place-items-center rounded-full">
-        <ServerIcon className="size-5" />
-      </span>
-      <h2 className="mt-4 text-base font-semibold">
-        Todavía no tiene acceso a ningún servidor
-      </h2>
-      <p className="text-muted-foreground mt-1 max-w-sm text-center text-sm">
-        Quien administra la organización se lo concede.
-      </p>
-    </div>
+    <EmptyState
+      icon={ServerIcon}
+      title="Todavía no tiene acceso a ningún servidor"
+      description="Quien administra la organización se lo concede."
+    />
   )
 }
 

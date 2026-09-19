@@ -2,6 +2,7 @@ import { cn } from 'cn'
 import { AlertTriangleIcon, RefreshCwIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { LineaEsqueleto } from '@/components/states'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -65,7 +66,7 @@ interface Props<T> {
   cargando: boolean
   error?: unknown
   onReintentar?: () => void
-  /** Segun la causa: no tener nada no es lo mismo que no encontrar. */
+  /** `EmptyState` sin marco; distinto sin datos que sin coincidencias. */
   vacio: React.ReactNode
   /** Filas del esqueleto: las de la carga anterior o la pagina entera. */
   filasEsperadas?: number
@@ -134,7 +135,7 @@ export function DataTable<T>({
               </TableRow>
             ) : datos.length === 0 ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={columnas.length} className="py-12 text-center">
+                <TableCell colSpan={columnas.length} className="p-0">
                   {vacio}
                 </TableCell>
               </TableRow>
@@ -167,15 +168,7 @@ export function DataTable<T>({
         {cargando ? (
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: Math.min(huesos, 6) }, (_, indice) => (
-              <li key={indice} className="rounded-lg border p-4">
-                <Skeleton className="h-5 w-2/5" />
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-2/3" />
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                </div>
-              </li>
+              <TarjetaEsqueleto key={indice} columnas={columnas} />
             ))}
           </ul>
         ) : error ? (
@@ -183,7 +176,7 @@ export function DataTable<T>({
             <AvisoDeError error={error} onReintentar={onReintentar} />
           </div>
         ) : datos.length === 0 ? (
-          <div className="rounded-lg border px-6 py-12 text-center">{vacio}</div>
+          <div className="rounded-lg border">{vacio}</div>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {datos.map((fila, indice) => (
@@ -234,6 +227,32 @@ function TarjetaDeFila<T>({
               {columna.header}
             </dt>
             <dd className="mt-1 text-sm">{columna.cell(fila, indice)}</dd>
+          </div>
+        ))}
+      </dl>
+    </li>
+  )
+}
+
+/** Forma de `TarjetaDeFila`: sin salto al cargar. */
+function TarjetaEsqueleto<T>({ columnas }: { columnas: Columna<T>[] }) {
+  const titulo = columnas.find((columna) => columna.rol === 'titulo') ?? columnas[0]
+  const resto = columnas.filter(
+    (columna) => columna !== titulo && columna.rol !== 'acciones',
+  )
+
+  return (
+    <li className="rounded-lg border p-4" aria-hidden>
+      <LineaEsqueleto className="w-2/5" />
+      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+        {resto.map((columna) => (
+          <div key={columna.key}>
+            <dt className="text-muted-foreground text-[11px] tracking-[0.12em] uppercase">
+              {columna.header}
+            </dt>
+            <dd className="mt-1">
+              <LineaEsqueleto className="w-3/4" />
+            </dd>
           </div>
         ))}
       </dl>

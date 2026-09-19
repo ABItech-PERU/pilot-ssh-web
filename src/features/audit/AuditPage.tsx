@@ -5,6 +5,8 @@ import {
   ListFilterIcon,
   Loader2Icon,
   LockIcon,
+  ScrollTextIcon,
+  SearchXIcon,
   UserIcon,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -50,6 +52,7 @@ export function AuditPage() {
       <div className="space-y-6">
         <PageHeader title={TITULO} description={DESCRIPCION} />
         <EmptyState
+          enmarcado
           icon={LockIcon}
           title="Solo para quien administra"
           description="Dice quién entró a cada servidor. La ven el propietario y los administradores."
@@ -251,9 +254,19 @@ function Registro({ slug, espacio }: { slug: string; espacio: string }) {
         onReintentar={() => registro.refetch()}
         // Vacío según causa: sin datos o sin coincidencias
         vacio={
-          listado.hayFiltros
-            ? 'Ningún registro coincide con ese filtro.'
-            : 'Sin actividad este mes.'
+          listado.hayFiltros ? (
+            <EmptyState
+              icon={SearchXIcon}
+              title="Nada con esos filtros"
+              description="Pruebe con otro tipo, otra persona u otro periodo, o límpielos."
+            />
+          ) : (
+            <EmptyState
+              icon={ScrollTextIcon}
+              title="Sin actividad en el periodo"
+              description="Aquí queda cada terminal abierta y cada cambio del equipo."
+            />
+          )
         }
       />
 

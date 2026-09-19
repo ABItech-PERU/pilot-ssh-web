@@ -5,6 +5,7 @@ import {
   ChevronDownIcon,
   CoinsIcon,
   GiftIcon,
+  PackageIcon,
   PlusIcon,
   Trash2Icon,
   StarIcon,
@@ -15,7 +16,7 @@ import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { SettingsRow, SettingsSection } from '@/components/settings-section'
-import { ErrorState, PageHeader } from '@/components/states'
+import { EmptyState, ErrorState, PageHeader } from '@/components/states'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -161,9 +162,12 @@ function Precios() {
           </div>
         ) : paquetes.data ? (
           paquetes.data.length === 0 ? (
-            <p className="text-muted-foreground p-4 text-sm">
-              Sin paquetes: el cliente no tiene nada que elegir al recargar.
-            </p>
+            <EmptyState
+              compacto
+              icon={PackageIcon}
+              title="Sin paquetes"
+              description="El cliente no tiene nada que elegir al recargar."
+            />
           ) : (
             <>
               {enOferta.map((oferta) => (
@@ -175,9 +179,12 @@ function Precios() {
                 />
               ))}
               {enOferta.length === 0 && (
-                <p className="text-muted-foreground p-4 text-sm">
-                  Ninguno se ofrece ahora: el cliente no tiene qué elegir al recargar.
-                </p>
+                <EmptyState
+                  compacto
+                  icon={PackageIcon}
+                  title="Ninguno en oferta"
+                  description="El cliente no tiene qué elegir al recargar."
+                />
               )}
               {retirados.length > 0 && (
                 <Retirados

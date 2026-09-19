@@ -17,6 +17,11 @@ html {
   scroll-padding-top: var(--alto-aviso);
 }
 
+/* Panel: barra de scroll reservada; al cargar no corre la vista */
+html:has([data-panel]) {
+  scrollbar-gutter: stable;
+}
+
 @utility h-pantalla {
   height: calc(100dvh - var(--alto-aviso));
 }

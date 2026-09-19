@@ -14,7 +14,6 @@ import { DataTable, type Columna } from '@/components/data-table'
 import { FilterBar, PageSizeSelect } from '@/components/filter-bar'
 import { Pagination } from '@/components/pagination'
 import { EmptyState, ErrorState } from '@/components/states'
-import { Skeleton } from '@/components/ui/skeleton'
 import * as creditsApi from '@/features/credits/api'
 import type { ContextoDeCreditos } from '@/features/credits/CreditsPage'
 import {
@@ -24,7 +23,7 @@ import {
   usePeriodoDeListado,
   type PeriodoDeCreditos,
 } from '@/features/credits/partes'
-import { Barras } from '@/features/credits/UsageChart'
+import { Barras, BarrasEsqueleto } from '@/features/credits/UsageChart'
 import { construirSerieDelRango, contar } from '@/features/credits/uso'
 import { formatCredits, formatDay } from '@/lib/format'
 import { useListado } from '@/lib/use-listado'
@@ -181,7 +180,7 @@ export function UsageTab() {
 
           <Bloque titulo={porMes ? 'Créditos por mes' : 'Créditos por día'}>
             <div className="p-4">
-              {serie ? <Barras serie={serie} /> : <Skeleton className="h-36 w-full" />}
+              {serie ? <Barras serie={serie} /> : <BarrasEsqueleto />}
             </div>
           </Bloque>
         </>

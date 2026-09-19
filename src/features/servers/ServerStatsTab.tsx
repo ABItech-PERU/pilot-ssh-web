@@ -1,13 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
-import { KeyRoundIcon, ShieldAlertIcon, TimerIcon, UsersIcon } from 'lucide-react'
+import {
+  CircleCheckIcon,
+  KeyRoundIcon,
+  ShieldAlertIcon,
+  TimerIcon,
+  UsersIcon,
+} from 'lucide-react'
 import { useOutletContext } from 'react-router'
 
 import { Bloque } from '@/components/bloque'
-import { ErrorState } from '@/components/states'
-import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState, ErrorState, LineaEsqueleto } from '@/components/states'
 import * as serversApi from '@/features/servers/api'
 import {
   ActividadDiaria,
+  ActividadDiariaEsqueleto,
   BarraDePeriodo,
   Cifra,
   Ranking,
@@ -71,11 +77,7 @@ export function ServerStatsTab() {
 
       <Bloque titulo="Actividad del periodo">
         <div className="p-4">
-          {datos ? (
-            <ActividadDiaria datos={datos} />
-          ) : (
-            <Skeleton className="h-24 w-full" />
-          )}
+          {datos ? <ActividadDiaria datos={datos} /> : <ActividadDiariaEsqueleto />}
         </div>
       </Bloque>
 
@@ -86,7 +88,14 @@ export function ServerStatsTab() {
               nombre: fila.name,
               total: fila.sessions,
             }))}
-            vacio="Nadie ha entrado en ese periodo."
+            vacio={
+              <EmptyState
+                compacto
+                icon={UsersIcon}
+                title="Sin uso en el periodo"
+                description="Nadie ha entrado en ese tiempo."
+              />
+            }
           />
         </Bloque>
 
@@ -97,20 +106,30 @@ export function ServerStatsTab() {
               total: fila.sessions,
               maquina: true,
             }))}
-            vacio="Ninguna se ha usado en ese periodo."
+            vacio={
+              <EmptyState
+                compacto
+                icon={KeyRoundIcon}
+                title="Sin uso en el periodo"
+                description="Ninguna credencial se ha usado en ese tiempo."
+              />
+            }
           />
         </Bloque>
       </div>
 
       <Bloque titulo="Credenciales que no usa nadie">
         {datos === undefined ? (
-          <div className="p-4">
-            <Skeleton className="h-4 w-40" />
+          <div className="px-4 py-3">
+            <LineaEsqueleto className="w-40" />
           </div>
         ) : datos.unused_credentials.length === 0 ? (
-          <p className="text-muted-foreground p-4 text-sm">
-            Todas se han usado alguna vez.
-          </p>
+          <EmptyState
+            compacto
+            icon={CircleCheckIcon}
+            title="Todas en uso"
+            description="Cada credencial se ha usado alguna vez."
+          />
         ) : (
           <ul className="divide-y">
             {datos.unused_credentials.map((username) => (

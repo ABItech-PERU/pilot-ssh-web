@@ -16,7 +16,7 @@ import { toast } from 'sonner'
 import { AvatarViewerDialog } from '@/components/avatar-viewer-dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { SettingsRow, SettingsSection } from '@/components/settings-section'
-import { PageHeader } from '@/components/states'
+import { LineaEsqueleto, PageHeader } from '@/components/states'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -301,7 +301,7 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactN
   )
 }
 
-/** Mismo marco que la página: al llegar los datos no se mueve nada. */
+/** Marco de la página: sin salto al cargar. */
 function Esqueleto() {
   return (
     <div className="space-y-6">
@@ -325,7 +325,7 @@ function Esqueleto() {
         <Skeleton className="h-4 w-16" />
         <div className="divide-y rounded-lg border">
           <FilaEsqueleto valor={<Skeleton className="size-8 rounded-md" />} />
-          {/* Largo de «Espacio de …»: en móvil baja de línea, como el real */}
+          {/* Largo de «Espacio de …»: en móvil baja de línea */}
           <FilaEsqueleto valor={<Skeleton className="h-5 w-48" />} />
           <FilaEsqueleto valor={<Skeleton className="h-5 w-24" />} conPista />
         </div>
@@ -339,9 +339,7 @@ function Esqueleto() {
               key={dato}
               className="flex items-center justify-between gap-3 p-4 sm:block"
             >
-              <span className="flex h-5 items-center">
-                <Skeleton className="h-4 w-12" />
-              </span>
+              <LineaEsqueleto className="w-12" />
               <Skeleton className="h-5 w-24 sm:mt-1" />
             </div>
           ))}
@@ -362,21 +360,14 @@ function FilaEsqueleto({
     <div className="flex flex-wrap items-center justify-between gap-3 p-4">
       <span className="flex items-center gap-3">
         <Skeleton className="size-4" />
-        {/* Alto de línea del texto real: al cargar, la fila no crece */}
-        <span>
-          <span className="flex h-5 items-center">
-            <Skeleton className="h-4 w-20" />
-          </span>
-          {conPista && (
-            <span className="flex h-4 items-center">
-              <Skeleton className="h-3 w-48" />
-            </span>
-          )}
-        </span>
+        <div>
+          <LineaEsqueleto className="w-20" />
+          {conPista && <LineaEsqueleto texto="xs" className="w-48" />}
+        </div>
       </span>
       <span className="flex items-center gap-3">
         {valor}
-        {/* En móvil, el lápiz: botón cuadrado */}
+        {/* Móvil: lápiz cuadrado */}
         <Skeleton className="h-9 w-9 sm:w-20" />
       </span>
     </div>

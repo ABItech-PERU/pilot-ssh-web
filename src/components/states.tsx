@@ -30,31 +30,56 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
 interface EmptyStateProps {
   icon: React.ElementType
   title: string
-  description: string
+  description?: string
   action?: React.ReactNode
+  /** Suelto en página; tabla o tarjeta ya ponen marco. */
+  enmarcado?: boolean
+  /** Paneles pequeños: menos aire. */
+  compacto?: boolean
   className?: string
 }
 
+/** Vacío único de la app: todos iguales. */
 export function EmptyState({
   icon: Icon,
   title,
   description,
   action,
+  enmarcado = false,
+  compacto = false,
   className,
 }: EmptyStateProps) {
   return (
     <div
       className={cn(
-        'border-border/70 flex flex-col items-center rounded-lg border border-dashed px-6 py-14 text-center',
+        'flex flex-col items-center text-center whitespace-normal',
+        compacto ? 'px-4 py-8' : 'px-6 py-12',
+        enmarcado && 'rounded-lg border',
         className,
       )}
     >
-      <span className="bg-muted text-muted-foreground grid size-11 place-items-center rounded-full">
-        <Icon className="size-5" />
+      <span
+        className={cn(
+          'bg-muted text-muted-foreground grid place-items-center rounded-full',
+          compacto ? 'size-9' : 'size-11',
+        )}
+      >
+        <Icon className={compacto ? 'size-4' : 'size-5'} />
       </span>
-      <h2 className="mt-4 text-base font-semibold">{title}</h2>
-      <p className="text-muted-foreground mt-1 max-w-sm text-sm">{description}</p>
-      {action && <div className="mt-5">{action}</div>}
+      <h2 className={cn('font-semibold', compacto ? 'mt-3 text-sm' : 'mt-4 text-base')}>
+        {title}
+      </h2>
+      {description && (
+        <p
+          className={cn(
+            'text-muted-foreground mt-1 max-w-sm text-pretty',
+            compacto ? 'text-xs' : 'text-sm',
+          )}
+        >
+          {description}
+        </p>
+      )}
+      {action && <div className={compacto ? 'mt-4' : 'mt-5'}>{action}</div>}
     </div>
   )
 }
@@ -81,6 +106,47 @@ export function ErrorState({ error, onRetry }: ErrorStateProps) {
         </Button>
       )}
     </div>
+  )
+}
+
+const ALTO_DE_LINEA = {
+  xs: ['h-4', 'h-3'],
+  sm: ['h-5', 'h-4'],
+  base: ['h-6', 'h-4'],
+  xl: ['h-7', 'h-5'],
+  '2xl': ['h-8', 'h-7'],
+} as const
+
+/** Alto de línea del texto real: sin salto al cargar. */
+export function LineaEsqueleto({
+  texto = 'sm',
+  className,
+}: {
+  texto?: keyof typeof ALTO_DE_LINEA
+  className?: string
+}) {
+  const [linea, barra] = ALTO_DE_LINEA[texto]
+
+  return (
+    <div className={cn('flex items-center', linea)}>
+      <Skeleton className={cn(barra, className)} />
+    </div>
+  )
+}
+
+export function ListaEsqueleto({ filas = 3 }: { filas?: number }) {
+  return (
+    <ul className="divide-y rounded-lg border" aria-hidden>
+      {Array.from({ length: filas }, (_, indice) => (
+        <li key={indice} className="flex items-center gap-3 p-4">
+          <Skeleton className="size-4 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <LineaEsqueleto className="w-32" />
+            <LineaEsqueleto texto="xs" className="w-56 max-w-full" />
+          </div>
+        </li>
+      ))}
+    </ul>
   )
 }
 
