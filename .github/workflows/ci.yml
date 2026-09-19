@@ -6,6 +6,7 @@ on:
   push:
     branches: [develop, staging, main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: web-${{ github.ref }}
@@ -28,8 +29,8 @@ jobs:
 
   desplegar:
     needs: pruebas
-    # develop no se despliega
-    if: github.event_name == 'push' && github.ref_name != 'develop'
+    # Solo staging y main despliegan; develop se queda en local
+    if: github.event_name != 'pull_request' && (github.ref_name == 'staging' || github.ref_name == 'main')
     runs-on: ubuntu-latest
     # prd pide aprobacion
     environment: ${{ github.ref_name == 'main' && 'prd' || 'uat' }}
