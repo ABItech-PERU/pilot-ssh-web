@@ -77,6 +77,10 @@ export interface CurrentUser {
   social_accounts: SocialAccount[]
   onboarding: OnboardingState
   two_factor_enabled: boolean
+  /** Solo cuenta si `two_factor_enabled`. */
+  two_factor_method: TwoFactorMethod
+  /** Con la app; `null` con el correo o sin dos pasos. */
+  recovery_codes_left: number | null
   avatar_url: string | null
   /** Sin confirmar no hay bono de bienvenida ni cuota gratuita diaria. */
   has_verified_email: boolean
@@ -97,10 +101,13 @@ export interface SessionTokens {
   user: CurrentUser
 }
 
+export type TwoFactorMethod = 'email' | 'app'
+
 /** Con dos pasos el login no entrega tokens: entrega un desafio de cinco
- *  minutos que solo sirve para canjear el codigo del correo. */
+ *  minutos que solo sirve para canjear el segundo codigo. */
 export interface TwoFactorChallenge {
   two_factor_required: true
+  method: TwoFactorMethod
   challenge: string
   /** Enmascarado: confirma a donde fue el codigo sin publicarlo entero. */
   email: string
@@ -651,6 +658,7 @@ export interface PlatformPerson {
   is_active: boolean
   has_verified_email: boolean
   two_factor_enabled: boolean
+  two_factor_method: TwoFactorMethod
   is_platform_staff: boolean
 }
 

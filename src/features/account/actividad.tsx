@@ -32,6 +32,8 @@ const ICONOS: Record<string, React.ElementType> = {
   'account.sessions_revoked': LaptopIcon,
   'account.two_factor_enabled': ShieldCheckIcon,
   'account.two_factor_disabled': ShieldCheckIcon,
+  'account.recovery_codes_regenerated': KeyRoundIcon,
+  'account.recovery_code_used': KeyRoundIcon,
   'account.email_changed': MailIcon,
   'account.email_verified': MailIcon,
   // Acciones del personal sobre la cuenta; muestran quién las hizo

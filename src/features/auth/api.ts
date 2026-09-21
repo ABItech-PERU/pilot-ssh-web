@@ -32,7 +32,8 @@ export async function login(credentials: Credentials) {
   return data
 }
 
-/** Segundo paso: desafío del login más el código del correo. */
+/** Segundo paso: desafío del login más el código del correo, de la app o de
+ *  respaldo. */
 export async function verifyTwoFactor(input: { challenge: string; code: string }) {
   const { data } = await http.post<SessionTokens>('/auth/two-factor', input)
   return data
@@ -48,6 +49,34 @@ export async function enableTwoFactor(code: string) {
   const { data } = await http.post<{ two_factor_enabled: boolean }>(
     '/auth/two-factor/settings',
     { code },
+  )
+  return data
+}
+
+/** Clave y enlace `otpauth://` para el QR. Con la contraseña: una sesión
+ *  ajena abierta no cambia la segunda llave. */
+export async function startAuthenticatorSetup(currentPassword: string) {
+  const { data } = await http.post<{ secret: string; uri: string }>(
+    '/auth/two-factor/app',
+    { current_password: currentPassword },
+  )
+  return data
+}
+
+/** El primer código de la app la activa y trae los códigos de respaldo. */
+export async function confirmAuthenticator(code: string) {
+  const { data } = await http.post<{ recovery_codes: string[] }>(
+    '/auth/two-factor/app/confirm',
+    { code },
+  )
+  return data
+}
+
+/** Los anteriores dejan de servir. */
+export async function regenerateRecoveryCodes(currentPassword: string) {
+  const { data } = await http.post<{ recovery_codes: string[] }>(
+    '/auth/two-factor/recovery-codes',
+    { current_password: currentPassword },
   )
   return data
 }

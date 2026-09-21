@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label'
 import { AuthFormSkeleton } from '@/features/auth/AuthFormSkeleton'
 import { SubmitConEspera } from '@/features/auth/SubmitConEspera'
 import { TwoFactorStep } from '@/features/auth/TwoFactorStep'
-import { useSession } from '@/features/auth/session'
+import { type LoginResult, useSession } from '@/features/auth/session'
 import {
   conInvitacion,
   useInvitacionDeLaUrl,
@@ -35,10 +35,7 @@ type Formulario = z.infer<typeof esquema>
 const CAMPOS = ['email', 'password'] as const
 
 /** Contraseña aceptada; falta el código del correo. */
-interface Pendiente {
-  challenge: string
-  email: string
-}
+type Pendiente = Omit<Extract<LoginResult, { estado: 'dos_pasos' }>, 'estado'>
 
 export function LoginPage() {
   const { invitacion, cargando } = useInvitacionDeLaUrl()
@@ -87,7 +84,11 @@ function FormularioDeAcceso({ invitacion }: { invitacion: InvitacionPendiente | 
       const resultado = await signIn(valores)
 
       if (resultado.estado === 'dos_pasos') {
-        setPendiente({ challenge: resultado.challenge, email: resultado.email })
+        setPendiente({
+          challenge: resultado.challenge,
+          email: resultado.email,
+          metodo: resultado.metodo,
+        })
         return
       }
       continuar(resultado.user)
@@ -109,6 +110,7 @@ function FormularioDeAcceso({ invitacion }: { invitacion: InvitacionPendiente | 
       <TwoFactorStep
         challenge={pendiente.challenge}
         email={pendiente.email}
+        metodo={pendiente.metodo}
         onVerificado={continuar}
         onCancelar={() => setPendiente(null)}
       />

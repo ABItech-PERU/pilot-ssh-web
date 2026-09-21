@@ -25,14 +25,18 @@ import {
 } from '@/features/account/AccountFieldDialog'
 import { OpenSessions } from '@/features/account/OpenSessions'
 import { TimeZoneSettings } from '@/features/account/TimeZoneSettings'
-import {
-  TwoFactorDisableDialog,
-  TwoFactorEnableDialog,
-} from '@/features/account/TwoFactorDialog'
+import { describirDosPasos, quedanPocosRespaldos } from '@/features/account/dos-pasos'
+import { TwoFactorDialog } from '@/features/account/TwoFactorDialog'
 import { useSession } from '@/features/auth/session'
 import { formatearTelefono } from '@/lib/telefonos'
 
 type Ajustable = 'nombre' | 'telefono' | 'correo' | 'clave' | 'dos-pasos'
+
+const PISTA_DE_DOS_PASOS = {
+  desactivada: 'Un código además de la contraseña en cada inicio de sesión.',
+  correo: 'Un código al correo en cada inicio de sesión.',
+  app: 'El código de su app en cada inicio de sesión.',
+} as const
 
 /** Datos de la cuenta y forma de acceso; cada dato se cambia por separado. */
 export function AccountPage() {
@@ -47,6 +51,7 @@ export function AccountPage() {
 
   const alCerrar = (clave: Ajustable) => (abierto: boolean) =>
     setEditando(abierto ? clave : null)
+  const dosPasos = describirDosPasos(user)
 
   return (
     <div className="space-y-6">
@@ -127,19 +132,24 @@ export function AccountPage() {
         <SettingsRow
           icono={ShieldCheckIcon}
           etiqueta="Verificación en dos pasos"
-          pista="Un código al correo en cada inicio de sesión."
-          accion={user.two_factor_enabled ? 'Desactivar' : 'Activar'}
+          pista={PISTA_DE_DOS_PASOS[dosPasos]}
+          accion={dosPasos === 'desactivada' ? 'Activar' : 'Gestionar'}
           onEditar={() => setEditando('dos-pasos')}
         >
-          {user.two_factor_enabled ? (
-            <span className="text-success inline-flex items-center gap-1.5">
-              <ShieldCheckIcon className="size-4" />
-              Activada
-            </span>
-          ) : (
+          {dosPasos === 'desactivada' ? (
             <span className="text-warning inline-flex items-center gap-1.5">
               <ShieldAlertIcon className="size-4" />
               Desactivada
+            </span>
+          ) : quedanPocosRespaldos(user.recovery_codes_left) ? (
+            <span className="text-warning inline-flex items-center gap-1.5">
+              <ShieldAlertIcon className="size-4" />
+              Pocos códigos de respaldo
+            </span>
+          ) : (
+            <span className="text-success inline-flex items-center gap-1.5">
+              <ShieldCheckIcon className="size-4" />
+              {dosPasos === 'app' ? 'App autenticadora' : 'Código por correo'}
             </span>
           )}
         </SettingsRow>
@@ -178,13 +188,9 @@ export function AccountPage() {
         open={editando === 'clave'}
         onOpenChange={alCerrar('clave')}
       />
-      <TwoFactorEnableDialog
-        email={user.email}
-        open={editando === 'dos-pasos' && !user.two_factor_enabled}
-        onOpenChange={alCerrar('dos-pasos')}
-      />
-      <TwoFactorDisableDialog
-        open={editando === 'dos-pasos' && user.two_factor_enabled}
+      <TwoFactorDialog
+        user={user}
+        open={editando === 'dos-pasos'}
         onOpenChange={alCerrar('dos-pasos')}
       />
     </div>
