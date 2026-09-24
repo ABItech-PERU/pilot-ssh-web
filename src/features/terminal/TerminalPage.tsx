@@ -91,16 +91,22 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
   const [pestanas, setPestanas] = useState<Pestana[]>([inicial])
   const [activa, setActiva] = useState(inicial)
   const [estados, setEstados] = useState<Record<string, EstadoTerminal>>({})
+  const [latencias, setLatencias] = useState<Record<string, number>>({})
 
   // La credencial puede haberse borrado con la shell abierta
   const credencialDelante =
     server.users.find((una) => una.id === activa.credentialId) ?? credencial
   const estado = estados[activa.id]
+  const latencia = latencias[activa.id]
   const { icono: IconoDeEntrada, etiqueta: comoEntra } =
     FORMAS_DE_ENTRAR[credencialDelante.auth_type]
 
   const anotarEstado = useCallback((id: string, suyo: EstadoTerminal) => {
     setEstados((actuales) => ({ ...actuales, [id]: suyo }))
+  }, [])
+
+  const anotarLatencia = useCallback((id: string, ms: number) => {
+    setLatencias((actuales) => ({ ...actuales, [id]: ms }))
   }, [])
 
   const abrir = (credentialId: string) => {
@@ -118,11 +124,8 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
     }
     setActiva(fetchActivaTrasCerrar(pestanas, cerrada, activa))
     setPestanas(pestanas.filter((una) => una.id !== cerrada.id))
-    setEstados((actuales) =>
-      Object.fromEntries(
-        Object.entries(actuales).filter(([clave]) => clave !== cerrada.id),
-      ),
-    )
+    setEstados((actuales) => fetchSinLa(actuales, cerrada.id))
+    setLatencias((actuales) => fetchSinLa(actuales, cerrada.id))
   }
 
   // La direccion sigue a lo que se ve: recargar vuelve a esta credencial
@@ -198,7 +201,8 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
             />
             <span className="text-term-dim hidden sm:inline">
               {!estado || estado.fase === 'conectando' ? 'Conectando' : null}
-              {estado?.fase === 'conectada' && 'Conectado'}
+              {estado?.fase === 'conectada' &&
+                (latencia ? `Conectado · ${latencia} ms` : 'Conectado')}
               {estado?.fase === 'cerrada' && estado.motivo}
             </span>
           </span>
@@ -236,11 +240,20 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
             credencial={suya}
             visible={pestana.id === activa.id}
             onEstado={anotarEstado}
+            onLatencia={anotarLatencia}
           />
         )
       })}
     </div>
   )
+}
+
+/** Lo anotado, menos lo de una pestaña que ya se cerró. */
+function fetchSinLa<Dato>(
+  anotado: Record<string, Dato>,
+  id: string,
+): Record<string, Dato> {
+  return Object.fromEntries(Object.entries(anotado).filter(([clave]) => clave !== id))
 }
 
 function PantallaDeAviso({ texto }: { texto: string }) {

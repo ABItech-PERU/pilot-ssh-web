@@ -1,12 +1,17 @@
 import { FitAddon } from '@xterm/addon-fit'
+import { SearchAddon } from '@xterm/addon-search'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal } from '@xterm/xterm'
 import { cn } from 'cn'
 import { CoinsIcon, RotateCwIcon } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/button'
+import {
+  BuscadorEnTerminal,
+  type Coincidencias,
+} from '@/features/terminal/BuscadorEnTerminal'
 import { CIERRE, type EstadoTerminal } from '@/features/terminal/socket'
 import { useTerminalSocket } from '@/features/terminal/use-terminal-socket'
 import type { Server, ServerUser } from '@/types/api'
@@ -40,6 +45,19 @@ const TEMA = {
 /** Alt+número es de las pestañas; abajo llegaría como un escape suelto. */
 const CAMBIA_DE_PESTANA = /^[1-9]$/
 
+/** Ctrl+F lo usa la shell para avanzar el cursor: la búsqueda lleva Shift. */
+const ABRE_LA_BUSQUEDA = (evento: KeyboardEvent) =>
+  evento.ctrlKey && evento.shiftKey && evento.key.toLowerCase() === 'f'
+
+const RESALTADO = {
+  matchBackground: '#3f4a5c',
+  matchOverviewRuler: '#5fd4c8',
+  activeMatchBackground: '#5fd4c8',
+  activeMatchColorOverviewRuler: '#5fd4c8',
+}
+
+const SIN_COINCIDENCIAS: Coincidencias = { actual: 0, total: 0 }
+
 interface PanelProps {
   id: string
   server: Server
@@ -47,6 +65,7 @@ interface PanelProps {
   /** Las de atrás siguen conectadas y recibiendo: solo dejan de verse. */
   visible: boolean
   onEstado: (id: string, estado: EstadoTerminal) => void
+  onLatencia: (id: string, ms: number) => void
 }
 
 /** Monta xterm una vez y le ata la shell; al reconectar, lo escrito sigue
@@ -57,16 +76,23 @@ export function PanelDeTerminal({
   credencial,
   visible,
   onEstado,
+  onLatencia,
 }: PanelProps) {
   const contenedor = useRef<HTMLDivElement | null>(null)
   const terminal = useRef<Terminal | null>(null)
+  const buscador = useRef<SearchAddon | null>(null)
   const [estado, setEstado] = useState<EstadoTerminal>({ fase: 'conectando' })
+  const [buscando, setBuscando] = useState(false)
+  const [coincidencias, setCoincidencias] = useState<Coincidencias>(SIN_COINCIDENCIAS)
+
+  const avisarLatencia = useCallback((ms: number) => onLatencia(id, ms), [id, onLatencia])
 
   const { enviarTamano, reconectar, teclear } = useTerminalSocket({
     server,
     credencial,
     terminal,
     onEstado: setEstado,
+    onLatencia: avisarLatencia,
   })
 
   useEffect(() => {
@@ -87,13 +113,23 @@ export function PanelDeTerminal({
       allowProposedApi: true,
     })
     const ajuste = new FitAddon()
+    const busqueda = new SearchAddon()
     vista.loadAddon(ajuste)
+    vista.loadAddon(busqueda)
     vista.loadAddon(new WebLinksAddon())
     vista.open(nodo)
-    vista.attachCustomKeyEventHandler(
-      (evento) => !(evento.altKey && CAMBIA_DE_PESTANA.test(evento.key)),
-    )
+    vista.attachCustomKeyEventHandler((evento) => {
+      if (evento.altKey && CAMBIA_DE_PESTANA.test(evento.key)) return false
+      if (!ABRE_LA_BUSQUEDA(evento)) return true
+      if (evento.type === 'keydown') setBuscando(true)
+      return false
+    })
     terminal.current = vista
+    buscador.current = busqueda
+
+    const cuenta = busqueda.onDidChangeResults(({ resultIndex, resultCount }) =>
+      setCoincidencias({ actual: resultIndex + 1, total: resultCount }),
+    )
 
     // Oculta mide cero y xterm quedaria en una fila; el ajuste espera a que
     // se vea. Y tras open el contenedor aun no tiene tamaño: va en el frame
@@ -115,15 +151,30 @@ export function PanelDeTerminal({
     return () => {
       cancelAnimationFrame(marco)
       observador.disconnect()
+      cuenta.dispose()
       teclado.dispose()
       vista.dispose()
       terminal.current = null
+      buscador.current = null
     }
   }, [enviarTamano, teclear])
 
   useEffect(() => {
-    if (visible) terminal.current?.focus()
-  }, [visible])
+    if (visible && !buscando) terminal.current?.focus()
+  }, [visible, buscando])
+
+  const buscar = (texto: string, haciaAtras: boolean) => {
+    const opciones = { decorations: RESALTADO }
+    if (haciaAtras) buscador.current?.findPrevious(texto, opciones)
+    else buscador.current?.findNext(texto, opciones)
+  }
+
+  const cerrarBusqueda = () => {
+    buscador.current?.clearDecorations()
+    setCoincidencias(SIN_COINCIDENCIAS)
+    setBuscando(false)
+    terminal.current?.focus()
+  }
 
   return (
     <div
@@ -132,6 +183,14 @@ export function PanelDeTerminal({
       aria-label={`Terminal de ${credencial.username}`}
     >
       <div ref={contenedor} className="size-full" />
+
+      {buscando && (
+        <BuscadorEnTerminal
+          coincidencias={coincidencias}
+          onBuscar={buscar}
+          onCerrar={cerrarBusqueda}
+        />
+      )}
 
       {estado.fase === 'cerrada' && (
         <div className="absolute inset-0 grid place-items-center bg-term-bg/80">

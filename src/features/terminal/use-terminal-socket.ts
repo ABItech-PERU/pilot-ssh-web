@@ -24,17 +24,27 @@ const LATENCIA_PARA_ADELANTAR_MS = 90
 /** Media que sigue a la red sin saltar con una medida suelta. */
 const PESO_DE_LA_ULTIMA = 0.25
 
+/** Se avisa por tramos: al ojo no le dice nada un milisegundo arriba. */
+const TRAMO_DE_LATENCIA_MS = 10
+
 interface Opciones {
   server: Server
   credencial: ServerUser
   /** xterm ya montado: el socket escribe en él y lee su tamaño. */
   terminal: React.RefObject<Terminal | null>
   onEstado: (estado: EstadoTerminal) => void
+  onLatencia: (ms: number) => void
 }
 
 /** Ata una shell a un xterm: la abre, vuelve sola tras un corte y retoma la
  *  que quedó viva en el servidor, que reenvía lo salido sin nadie mirando. */
-export function useTerminalSocket({ server, credencial, terminal, onEstado }: Opciones) {
+export function useTerminalSocket({
+  server,
+  credencial,
+  terminal,
+  onEstado,
+  onLatencia,
+}: Opciones) {
   const socket = useRef<WebSocket | null>(null)
   const sesion = useRef<string | null>(null)
   const reconexiones = useRef(0)
@@ -42,6 +52,11 @@ export function useTerminalSocket({ server, credencial, terminal, onEstado }: Op
   const eco = useRef(crearEcoPredictivo())
   const tecleadoEn = useRef<number | null>(null)
   const latencia = useRef(0)
+  const avisada = useRef(0)
+
+  // Por referencia: cambiar de aviso no reabre el socket
+  const avisar = useRef(onLatencia)
+  avisar.current = onLatencia
 
   const enviar = useCallback((carga: object) => {
     if (socket.current?.readyState === WebSocket.OPEN) {
@@ -162,6 +177,13 @@ export function useTerminalSocket({ server, credencial, terminal, onEstado }: Op
           latencia.current =
             latencia.current * (1 - PESO_DE_LA_ULTIMA) + ida * PESO_DE_LA_ULTIMA
           eco.current.activar(latencia.current > LATENCIA_PARA_ADELANTAR_MS)
+
+          const tramo =
+            Math.round(latencia.current / TRAMO_DE_LATENCIA_MS) * TRAMO_DE_LATENCIA_MS
+          if (tramo !== avisada.current) {
+            avisada.current = tramo
+            avisar.current(tramo)
+          }
         }
         escribir(eco.current.reconciliar(mensaje.message))
 
