@@ -12,7 +12,8 @@ import {
   BuscadorEnTerminal,
   type Coincidencias,
 } from '@/features/terminal/BuscadorEnTerminal'
-import { DialogoDeSubida } from '@/features/terminal/DialogoDeSubida'
+import { leerDelPrompt, leerOsc7 } from '@/features/terminal/carpeta-actual'
+import { SelectorDeCarpeta } from '@/features/terminal/SelectorDeCarpeta'
 import { CIERRE, type EstadoTerminal } from '@/features/terminal/socket'
 import { fetchPorcentaje } from '@/features/terminal/subida'
 import { useTerminalSocket } from '@/features/terminal/use-terminal-socket'
@@ -47,9 +48,12 @@ const TEMA = {
 /** Alt+número es de las pestañas; abajo llegaría como un escape suelto. */
 const CAMBIA_DE_PESTANA = /^[1-9]$/
 
-/** Ctrl+F lo usa la shell para avanzar el cursor: la búsqueda lleva Shift. */
-const ABRE_LA_BUSQUEDA = (evento: KeyboardEvent) =>
-  evento.ctrlKey && evento.shiftKey && evento.key.toLowerCase() === 'f'
+/** Ctrl+C corta el proceso y Ctrl+F mueve el cursor: con Shift son de la
+ *  ventana, como en cualquier terminal. */
+const ATAJOS_DE_LA_VENTANA = 'fcv'
+
+const fetchAtajo = (evento: KeyboardEvent) =>
+  evento.ctrlKey && evento.shiftKey ? evento.key.toLowerCase() : ''
 
 const RESALTADO = {
   matchBackground: '#3f4a5c',
@@ -68,8 +72,13 @@ interface PanelProps {
   visible: boolean
   onEstado: (id: string, estado: EstadoTerminal) => void
   onLatencia: (id: string, ms: number) => void
-  /** Deja su subida a mano: el botón de la barra sube a la que se ve. */
-  onSubidor: (id: string, elegir: (archivo: File) => void) => void
+  /** Sus subidas, a mano de la barra: manda a la terminal que se ve. */
+  onSubidor: (id: string, mando: MandoDeSubida) => void
+}
+
+export interface MandoDeSubida {
+  subir: (archivo: File) => void
+  elegirCarpeta: () => void
 }
 
 /** Monta xterm una vez y le ata la shell; al reconectar, lo escrito sigue
@@ -89,29 +98,56 @@ export function PanelDeTerminal({
   const [estado, setEstado] = useState<EstadoTerminal>({ fase: 'conectando' })
   const [buscando, setBuscando] = useState(false)
   const [arrastrando, setArrastrando] = useState(false)
-  const [porSubir, setPorSubir] = useState<File | null>(null)
-  // Se recuerda la última: se suele subir varias veces al mismo sitio
-  const [carpeta, setCarpeta] = useState(credencial.working_directory || '~')
+  const [eligiendo, setEligiendo] = useState(false)
+  const entrada = useRef<HTMLInputElement | null>(null)
+  // La que anuncia el shell (OSC 7); el prompt es el plan B
+  const anunciada = useRef('')
+  const elegida = useRef('')
   const [coincidencias, setCoincidencias] = useState<Coincidencias>(SIN_COINCIDENCIAS)
 
   const avisarLatencia = useCallback((ms: number) => onLatencia(id, ms), [id, onLatencia])
 
-  const { cancelarSubida, enviarTamano, reconectar, subida, subir, teclear } =
-    useTerminalSocket({
-      server,
-      credencial,
-      terminal,
-      onEstado: setEstado,
-      onLatencia: avisarLatencia,
-    })
+  const {
+    cancelarSubida,
+    enviarTamano,
+    pedirCarpetas,
+    reconectar,
+    subida,
+    subir,
+    teclear,
+  } = useTerminalSocket({
+    server,
+    credencial,
+    terminal,
+    onEstado: setEstado,
+    onLatencia: avisarLatencia,
+  })
 
   useEffect(() => {
     onEstado(id, estado)
   }, [id, estado, onEstado])
 
+  /** Donde está parada la shell: lo que anuncia, o lo que muestra el prompt. */
+  const fetchDestino = useCallback(() => {
+    const vista = terminal.current
+    const activa = vista?.buffer.active
+    const prompt = activa?.getLine(activa.baseY + activa.cursorY)?.translateToString(true)
+    return (
+      anunciada.current ||
+      (prompt ? leerDelPrompt(prompt) : null) ||
+      credencial.working_directory ||
+      '~'
+    )
+  }, [credencial.working_directory, terminal])
+
+  const subirAlDestino = useCallback(
+    (archivo: File) => void subir(archivo, fetchDestino()),
+    [fetchDestino, subir],
+  )
+
   useEffect(() => {
-    onSubidor(id, setPorSubir)
-  }, [id, onSubidor])
+    onSubidor(id, { subir: subirAlDestino, elegirCarpeta: () => setEligiendo(true) })
+  }, [id, onSubidor, subirAlDestino])
 
   useEffect(() => {
     const nodo = contenedor.current
@@ -134,8 +170,18 @@ export function PanelDeTerminal({
     vista.open(nodo)
     vista.attachCustomKeyEventHandler((evento) => {
       if (evento.altKey && CAMBIA_DE_PESTANA.test(evento.key)) return false
-      if (!ABRE_LA_BUSQUEDA(evento)) return true
-      if (evento.type === 'keydown') setBuscando(true)
+
+      const atajo = fetchAtajo(evento)
+      if (!atajo || !ATAJOS_DE_LA_VENTANA.includes(atajo)) return true
+      if (evento.type === 'keydown') {
+        if (atajo === 'f') setBuscando(true)
+        if (atajo === 'c') void copiarLoSeleccionado(vista)
+        if (atajo === 'v') void pegarDelPortapapeles(teclear)
+      }
+      return false
+    })
+    vista.parser.registerOscHandler(7, (carga) => {
+      anunciada.current = leerOsc7(carga) ?? anunciada.current
       return false
     })
     terminal.current = vista
@@ -209,7 +255,7 @@ export function PanelDeTerminal({
         evento.preventDefault()
         setArrastrando(false)
         const archivo = evento.dataTransfer.files[0]
-        if (archivo) setPorSubir(archivo)
+        if (archivo) subirAlDestino(archivo)
       }}
     >
       <div ref={contenedor} className="size-full" />
@@ -233,7 +279,9 @@ export function PanelDeTerminal({
       {subida && (
         <div className="border-term-border bg-term-bg absolute inset-x-4 bottom-3 rounded-md border px-3 py-2">
           <div className="flex items-center justify-between gap-3 text-xs">
-            <span className="font-machine truncate">{subida.nombre}</span>
+            <span className="font-machine truncate">
+              {subida.nombre} <span className="text-term-dim">→ {subida.carpeta}</span>
+            </span>
             <span className="text-term-dim ml-auto tabular-nums">
               {fetchPorcentaje(subida)} %
             </span>
@@ -256,16 +304,27 @@ export function PanelDeTerminal({
         </div>
       )}
 
-      <DialogoDeSubida
-        archivo={porSubir}
-        carpeta={carpeta}
-        onCerrar={() => setPorSubir(null)}
-        onFocoDeVuelta={() => terminal.current?.focus()}
-        onConfirmar={(destino) => {
-          const archivo = porSubir
-          setPorSubir(null)
-          setCarpeta(destino)
-          if (archivo) void subir(archivo, destino)
+      <SelectorDeCarpeta
+        abierto={eligiendo}
+        carpeta={fetchDestino()}
+        pedirCarpetas={pedirCarpetas}
+        onCerrar={() => setEligiendo(false)}
+        onElegir={(destino) => {
+          setEligiendo(false)
+          elegida.current = destino
+          entrada.current?.click()
+        }}
+      />
+
+      <input
+        ref={entrada}
+        type="file"
+        className="hidden"
+        onChange={(evento) => {
+          const archivo = evento.target.files?.[0]
+          if (archivo) void subir(archivo, elegida.current)
+          // Repetir el mismo archivo tambien cuenta como cambio
+          evento.target.value = ''
         }}
       />
 
@@ -304,4 +363,23 @@ export function PanelDeTerminal({
       )}
     </div>
   )
+}
+
+async function copiarLoSeleccionado(vista: Terminal) {
+  const elegido = vista.getSelection()
+  if (!elegido) return
+  try {
+    await navigator.clipboard.writeText(elegido)
+  } catch {
+    // Sin permiso queda la selección: se copia con el menú del navegador
+  }
+}
+
+async function pegarDelPortapapeles(teclear: (datos: string) => void) {
+  try {
+    const texto = await navigator.clipboard.readText()
+    if (texto) teclear(texto)
+  } catch {
+    // Sin permiso no se pega; Ctrl+V del navegador sigue funcionando
+  }
 }

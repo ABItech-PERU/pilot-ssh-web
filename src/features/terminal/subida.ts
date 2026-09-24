@@ -10,6 +10,7 @@ const ESPERA_DE_COLA_MS = 20
 
 export interface AvanceDeSubida {
   nombre: string
+  carpeta: string
   enviado: number
   total: number
 }

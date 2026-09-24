@@ -1,9 +1,11 @@
 import type { Terminal } from '@xterm/xterm'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 import { getAccessToken } from '@/features/auth/token-store'
 import { crearEcoPredictivo } from '@/features/terminal/eco-predictivo'
 import * as serversApi from '@/features/servers/api'
+import { avisarSubida } from '@/features/terminal/AvisoDeSubida'
 import {
   buildInitialCommand,
   buildTerminalUrl,
@@ -11,8 +13,10 @@ import {
   describeClose,
   type EstadoTerminal,
   fetchEsperaDeReconexion,
+  type MensajeDeCarpetas,
   type MensajeDeSubida,
   parseIncoming,
+  quoteForShell,
   RECONEXION,
   reconnectsAutomatically,
 } from '@/features/terminal/socket'
@@ -28,6 +32,9 @@ const PESO_DE_LA_ULTIMA = 0.25
 
 /** Se avisa por tramos: al ojo no le dice nada un milisegundo arriba. */
 const TRAMO_DE_LATENCIA_MS = 10
+
+/** Más tarde no es el eco de la tecla: falsearía la media. */
+const LATENCIA_CREIBLE_MS = 1500
 
 interface Opciones {
   server: Server
@@ -57,6 +64,7 @@ export function useTerminalSocket({
   const avisada = useRef(0)
   const [subida, setSubida] = useState<AvanceDeSubida | null>(null)
   const respuesta = useRef<((suya: MensajeDeSubida) => void) | null>(null)
+  const listado = useRef<((suyo: MensajeDeCarpetas) => void) | null>(null)
   const cancelada = useRef(false)
 
   // Por referencia: cambiar de aviso no reabre el socket
@@ -97,15 +105,24 @@ export function useTerminalSocket({
       respuesta.current = contestar
     })
 
+  /** Carpetas de un nivel del servidor: se eligen, no se teclean. */
+  const pedirCarpetas = useCallback(
+    (ruta: string) =>
+      new Promise<MensajeDeCarpetas>((contestar) => {
+        listado.current = contestar
+        enviar({ carpetas: { ruta } })
+      }),
+    [enviar],
+  )
+
   /** Copia un archivo a la carpeta pedida y avisa cómo terminó. */
   const subir = useCallback(
     async (archivo: File, carpeta: string) => {
       const abierto = socket.current
       if (!abierto || abierto.readyState !== WebSocket.OPEN || subida) return
 
-      const escribir = (texto: string) => terminal.current?.write(texto)
       cancelada.current = false
-      setSubida({ nombre: archivo.name, enviado: 0, total: archivo.size })
+      setSubida({ nombre: archivo.name, carpeta, enviado: 0, total: archivo.size })
 
       try {
         enviar({ subida: { nombre: archivo.name, tamano: archivo.size, carpeta } })
@@ -115,17 +132,25 @@ export function useTerminalSocket({
         await enviarPorTramos(
           abierto,
           archivo,
-          (enviado) => setSubida({ nombre: archivo.name, enviado, total: archivo.size }),
+          (enviado) =>
+            setSubida({ nombre: archivo.name, carpeta, enviado, total: archivo.size }),
           () => !cancelada.current,
         )
         enviar({ subida: { fin: true } })
         const guardada = await esperarRespuesta()
         if (guardada.estado === 'error') throw new Error(guardada.message)
 
-        escribir(`\r\n\x1b[2m— Se subió ${guardada.ruta} —\x1b[0m\r\n`)
+        const ruta = guardada.ruta ?? ''
+        avisarSubida(ruta, () =>
+          enviar({
+            command: `cd ${quoteForShell(carpeta)} && ls -l ${quoteForShell(archivo.name)}\r`,
+          }),
+        )
       } catch (error) {
         const motivo = error instanceof Error ? error.message : 'No se pudo subir.'
-        escribir(`\r\n\x1b[31m— ${motivo} —\x1b[0m\r\n`)
+        // Cancelar es una decisión, no un fallo
+        if (cancelada.current) toast('Copia cancelada.')
+        else toast.error(motivo)
       } finally {
         setSubida(null)
         // El foco vuelve de la barra o del botón: se sigue tecleando
@@ -231,18 +256,26 @@ export function useTerminalSocket({
           contestar?.(mensaje)
           return
         }
+        if (mensaje.type === 'carpetas') {
+          const contestar = listado.current
+          listado.current = null
+          contestar?.(mensaje)
+          return
+        }
         if (tecleadoEn.current !== null) {
           const ida = performance.now() - tecleadoEn.current
           tecleadoEn.current = null
-          latencia.current =
-            latencia.current * (1 - PESO_DE_LA_ULTIMA) + ida * PESO_DE_LA_ULTIMA
-          eco.current.activar(latencia.current > LATENCIA_PARA_ADELANTAR_MS)
+          if (ida <= LATENCIA_CREIBLE_MS) {
+            latencia.current =
+              latencia.current * (1 - PESO_DE_LA_ULTIMA) + ida * PESO_DE_LA_ULTIMA
+            eco.current.activar(latencia.current > LATENCIA_PARA_ADELANTAR_MS)
 
-          const tramo =
-            Math.round(latencia.current / TRAMO_DE_LATENCIA_MS) * TRAMO_DE_LATENCIA_MS
-          if (tramo !== avisada.current) {
-            avisada.current = tramo
-            avisar.current(tramo)
+            const tramo =
+              Math.round(latencia.current / TRAMO_DE_LATENCIA_MS) * TRAMO_DE_LATENCIA_MS
+            if (tramo !== avisada.current) {
+              avisada.current = tramo
+              avisar.current(tramo)
+            }
           }
         }
         escribir(eco.current.reconciliar(mensaje.message))
@@ -314,5 +347,13 @@ export function useTerminalSocket({
     terminal,
   ])
 
-  return { cancelarSubida, enviarTamano, reconectar, subida, subir, teclear }
+  return {
+    cancelarSubida,
+    enviarTamano,
+    pedirCarpetas,
+    reconectar,
+    subida,
+    subir,
+    teclear,
+  }
 }

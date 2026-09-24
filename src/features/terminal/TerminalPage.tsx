@@ -13,7 +13,7 @@ import * as serversApi from '@/features/servers/api'
 import { FORMAS_DE_ENTRAR } from '@/features/servers/auth-type'
 import { buildServerPath } from '@/features/servers/paths'
 import { BarraDePestanas } from '@/features/terminal/BarraDePestanas'
-import { PanelDeTerminal } from '@/features/terminal/PanelDeTerminal'
+import { type MandoDeSubida, PanelDeTerminal } from '@/features/terminal/PanelDeTerminal'
 import {
   buildPestana,
   fetchActivaTrasCerrar,
@@ -109,10 +109,10 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
     setLatencias((actuales) => ({ ...actuales, [id]: ms }))
   }, [])
 
-  // El archivo va a la shell que se ve, la pida el botón o el arrastre
-  const subidores = useRef<Record<string, (archivo: File) => void>>({})
-  const anotarSubidor = useCallback((id: string, subir: (archivo: File) => void) => {
-    subidores.current[id] = subir
+  // Lo que pide la barra va a la shell que se ve, no a las de atrás
+  const subidores = useRef<Record<string, MandoDeSubida>>({})
+  const anotarSubidor = useCallback((id: string, mando: MandoDeSubida) => {
+    subidores.current[id] = mando
   }, [])
 
   const abrir = (credentialId: string) => {
@@ -234,7 +234,8 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
         onActivar={setActiva}
         onCerrar={cerrar}
         onAbrir={abrir}
-        onSubir={(archivo) => subidores.current[activa.id]?.(archivo)}
+        onSubir={(archivo) => subidores.current[activa.id]?.subir(archivo)}
+        onElegirCarpeta={() => subidores.current[activa.id]?.elegirCarpeta()}
       />
 
       {pestanas.map((pestana) => {

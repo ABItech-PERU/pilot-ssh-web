@@ -25,11 +25,13 @@ const buildArchivo = (bytes: number) =>
 
 describe('fetchPorcentaje', () => {
   it('cuenta lo que ya salió', () => {
-    expect(fetchPorcentaje({ nombre: 'x', enviado: 25, total: 100 })).toBe(25)
+    expect(fetchPorcentaje({ nombre: 'x', carpeta: '~', enviado: 25, total: 100 })).toBe(
+      25,
+    )
   })
 
   it('un archivo vacío no divide entre cero', () => {
-    expect(fetchPorcentaje({ nombre: 'x', enviado: 0, total: 0 })).toBe(0)
+    expect(fetchPorcentaje({ nombre: 'x', carpeta: '~', enviado: 0, total: 0 })).toBe(0)
   })
 })
 

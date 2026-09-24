@@ -1,6 +1,13 @@
 import { cn } from 'cn'
-import { PlusIcon, UploadIcon, XIcon } from 'lucide-react'
-import { useRef } from 'react'
+import {
+  ChevronDownIcon,
+  CircleQuestionMarkIcon,
+  FolderIcon,
+  PlusIcon,
+  UploadIcon,
+  XIcon,
+} from 'lucide-react'
+import { useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -10,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { FORMAS_DE_ENTRAR } from '@/features/servers/auth-type'
+import { AtajosDeTerminal } from '@/features/terminal/AtajosDeTerminal'
 import {
   fetchOrdinales,
   MAXIMO_DE_PESTANAS,
@@ -27,6 +35,7 @@ interface BarraProps {
   onCerrar: (pestana: Pestana) => void
   onAbrir: (credentialId: string) => void
   onSubir: (archivo: File) => void
+  onElegirCarpeta: () => void
 }
 
 export function BarraDePestanas({
@@ -38,8 +47,10 @@ export function BarraDePestanas({
   onCerrar,
   onAbrir,
   onSubir,
+  onElegirCarpeta,
 }: BarraProps) {
   const archivo = useRef<HTMLInputElement | null>(null)
+  const [viendoAtajos, setViendoAtajos] = useState(false)
   const ordinales = fetchOrdinales(pestanas)
   const hayCupo = pestanas.length < MAXIMO_DE_PESTANAS
 
@@ -128,16 +139,55 @@ export function BarraDePestanas({
         }}
       />
 
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Subir un archivo"
-        title="Subir un archivo a la terminal que se ve"
-        onClick={() => archivo.current?.click()}
-        className="text-term-dim hover:text-term-text my-auto ml-auto size-6 hover:bg-white/5"
-      >
-        <UploadIcon className="size-4" />
-      </Button>
+      <div className="my-auto ml-auto flex items-center">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Ver los atajos"
+          onClick={() => setViendoAtajos(true)}
+          className="text-term-dim hover:text-term-text mr-1 size-6 hover:bg-white/5"
+        >
+          <CircleQuestionMarkIcon className="size-4" />
+        </Button>
+        <AtajosDeTerminal
+          abierto={viendoAtajos}
+          onCerrar={() => setViendoAtajos(false)}
+        />
+
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Subir un archivo"
+          title="Subir un archivo a la carpeta en la que está la terminal"
+          onClick={() => archivo.current?.click()}
+          className="text-term-dim hover:text-term-text size-6 hover:bg-white/5"
+        >
+          <UploadIcon className="size-4" />
+        </Button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Más opciones para subir"
+              className="text-term-dim hover:text-term-text size-5 hover:bg-white/5"
+            >
+              <ChevronDownIcon className="size-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => archivo.current?.click()}>
+              <UploadIcon />
+              Subir aquí
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onElegirCarpeta}>
+              <FolderIcon />
+              Subir a otra carpeta…
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   )
 }

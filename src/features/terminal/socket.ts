@@ -26,11 +26,23 @@ export type MensajeDeSubida = {
   message?: string
 }
 
+/** Carpetas de un nivel del servidor, para elegir destino sin teclear. */
+export type MensajeDeCarpetas = {
+  type: 'carpetas'
+  ruta: string
+  inicio: string
+  padre: string
+  carpetas: string[]
+  recortada: boolean
+  error?: string
+}
+
 /** La shell vive en el servidor: su id permite volver a ella tras un corte. */
 export type MensajeEntrante =
   | { type: 'output' | 'error'; message: string }
   | { type: 'sesion'; id: string }
   | MensajeDeSubida
+  | MensajeDeCarpetas
 
 /** Token en la query: el handshake del navegador no admite cabeceras.
  *  Dura 30 minutos y produccion exige wss. Con `sesion`, retoma la shell
@@ -138,10 +150,26 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
       message?: string
       id?: string
       estado?: string
+      error?: string
       ruta?: string
+      inicio?: string
+      padre?: string
+      carpetas?: unknown
+      recortada?: boolean
     }
     if (dato.type === 'sesion') {
       return typeof dato.id === 'string' ? { type: 'sesion', id: dato.id } : null
+    }
+    if (dato.type === 'carpetas') {
+      return {
+        type: 'carpetas',
+        ruta: String(dato.ruta ?? ''),
+        inicio: String(dato.inicio ?? ''),
+        padre: String(dato.padre ?? ''),
+        carpetas: Array.isArray(dato.carpetas) ? dato.carpetas.map(String) : [],
+        recortada: Boolean(dato.recortada),
+        error: dato.error,
+      }
     }
     if (dato.type === 'subida') {
       if (!ESTADOS_DE_SUBIDA.includes(dato.estado ?? '')) return null
