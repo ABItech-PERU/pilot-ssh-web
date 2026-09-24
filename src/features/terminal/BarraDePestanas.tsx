@@ -55,92 +55,94 @@ export function BarraDePestanas({
   const hayCupo = pestanas.length < MAXIMO_DE_PESTANAS
 
   return (
-    <div
-      role="tablist"
-      aria-label="Terminales abiertas"
-      className="border-term-border flex h-9 shrink-0 items-stretch gap-px overflow-x-auto border-b px-1"
-    >
-      {pestanas.map((pestana, posicion) => {
-        const credencial = credenciales.find((una) => una.id === pestana.credentialId)
-        const ordinal = ordinales[pestana.id]
-        const delante = pestana.id === activa
-        const nombre = `${credencial?.username ?? 'sin credencial'}${ordinal ? ` ${ordinal}` : ''}`
+    <div className="border-term-border flex h-9 shrink-0 items-stretch border-b px-1">
+      <div
+        role="tablist"
+        aria-label="Terminales abiertas"
+        className="flex min-w-0 flex-1 items-stretch gap-px overflow-x-auto"
+      >
+        {pestanas.map((pestana, posicion) => {
+          const credencial = credenciales.find((una) => una.id === pestana.credentialId)
+          const ordinal = ordinales[pestana.id]
+          const delante = pestana.id === activa
+          const nombre = `${credencial?.username ?? 'sin credencial'}${ordinal ? ` ${ordinal}` : ''}`
 
-        return (
-          <div
-            key={pestana.id}
-            className={cn(
-              'flex min-w-0 items-center gap-1.5 rounded-t-md px-2 text-xs',
-              delante ? 'bg-white/8 text-term-text' : 'text-term-dim hover:bg-white/5',
-            )}
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={delante}
-              onClick={() => onActivar(pestana)}
-              className="flex min-w-0 items-center gap-1.5 py-1"
+          return (
+            <div
+              key={pestana.id}
+              className={cn(
+                'flex max-w-36 shrink-0 items-center gap-1.5 rounded-t-md px-2 text-xs',
+                delante ? 'bg-white/8 text-term-text' : 'text-term-dim hover:bg-white/5',
+              )}
             >
-              <Punto estado={estados[pestana.id]} />
-              <span className="font-machine truncate">{nombre}</span>
-              <span className="sr-only">Alt+{posicion + 1}</span>
-            </button>
-
-            <button
-              type="button"
-              aria-label={`Cerrar ${nombre}`}
-              onClick={() => onCerrar(pestana)}
-              className="hover:text-term-text text-term-dim rounded-sm p-0.5"
-            >
-              <XIcon className="size-3" />
-            </button>
-          </div>
-        )
-      })}
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            disabled={!hayCupo}
-            aria-label="Abrir otra terminal"
-            title={hayCupo ? undefined : `Hasta ${MAXIMO_DE_PESTANAS} a la vez`}
-            className="text-term-dim hover:text-term-text my-auto size-6 hover:bg-white/5"
-          >
-            <PlusIcon className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          {credenciales.map((credencial) => {
-            const { icono: Icono } = FORMAS_DE_ENTRAR[credencial.auth_type]
-            return (
-              <DropdownMenuItem
-                key={credencial.id}
-                onSelect={() => onAbrir(credencial.id)}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={delante}
+                onClick={() => onActivar(pestana)}
+                className="flex min-w-0 items-center gap-1.5 py-1"
               >
-                <Icono />
-                <span className="font-machine">{credencial.username}</span>
-              </DropdownMenuItem>
-            )
-          })}
-        </DropdownMenuContent>
-      </DropdownMenu>
+                <Punto estado={estados[pestana.id]} />
+                <span className="font-machine truncate">{nombre}</span>
+                <span className="sr-only">Alt+{posicion + 1}</span>
+              </button>
 
-      <input
-        ref={archivo}
-        type="file"
-        multiple
-        className="hidden"
-        onChange={(evento) => {
-          const elegidos = [...(evento.target.files ?? [])]
-          if (elegidos.length) onSubir(elegidos)
-          // Repetir el mismo archivo tambien cuenta como cambio
-          evento.target.value = ''
-        }}
-      />
+              <button
+                type="button"
+                aria-label={`Cerrar ${nombre}`}
+                onClick={() => onCerrar(pestana)}
+                className="hover:text-term-text text-term-dim rounded-sm p-0.5"
+              >
+                <XIcon className="size-3" />
+              </button>
+            </div>
+          )
+        })}
 
-      <div className="my-auto ml-auto flex items-center">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={!hayCupo}
+              aria-label="Abrir otra terminal"
+              title={hayCupo ? undefined : `Hasta ${MAXIMO_DE_PESTANAS} a la vez`}
+              className="text-term-dim hover:text-term-text my-auto size-6 hover:bg-white/5"
+            >
+              <PlusIcon className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {credenciales.map((credencial) => {
+              const { icono: Icono } = FORMAS_DE_ENTRAR[credencial.auth_type]
+              return (
+                <DropdownMenuItem
+                  key={credencial.id}
+                  onSelect={() => onAbrir(credencial.id)}
+                >
+                  <Icono />
+                  <span className="font-machine">{credencial.username}</span>
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <input
+          ref={archivo}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(evento) => {
+            const elegidos = [...(evento.target.files ?? [])]
+            if (elegidos.length) onSubir(elegidos)
+            // Repetir el mismo archivo tambien cuenta como cambio
+            evento.target.value = ''
+          }}
+        />
+      </div>
+
+      <div className="my-auto flex shrink-0 items-center pl-1">
         <Button
           variant="ghost"
           size="icon-sm"

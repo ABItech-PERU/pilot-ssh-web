@@ -87,6 +87,9 @@ xterm una sola vez y `useTerminalSocket` lleva el WebSocket.
 - **Cuando la shell termina, el texto sigue ahí.** En vez de taparlo con un
   cartel, una barra sobre la terminal ofrece volver a conectar, cerrar esa
   pestaña o salir; lo escrito se puede leer y copiar.
+- **En el móvil cabe todo.** Las pestañas se desplazan pero los botones de
+  la ventana se quedan fijos, y la barra de sesión cerrada apila sus acciones
+  en vez de salirse.
 - **Atajos de terminal de siempre.** `Ctrl+Shift+C` y `Ctrl+Shift+V` copian y
   pegan sin robarle `Ctrl+C` a la shell; el botón de ayuda los lista.
 - **La letra no espera a la red.** Con más de 90 ms de ida y vuelta,

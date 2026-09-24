@@ -28,7 +28,7 @@ export function BuscadorEnTerminal({ coincidencias, onBuscar, onCerrar }: Buscad
   return (
     <form
       role="search"
-      className="border-term-border bg-term-bg absolute top-3 right-4 flex items-center gap-1 rounded-md border px-2 py-1"
+      className="border-term-border bg-term-bg absolute inset-x-4 top-3 flex items-center gap-1 rounded-md border px-2 py-1 sm:inset-x-auto sm:right-4"
       onSubmit={(evento) => {
         evento.preventDefault()
         onBuscar(texto, false)
@@ -44,7 +44,7 @@ export function BuscadorEnTerminal({ coincidencias, onBuscar, onCerrar }: Buscad
         value={texto}
         aria-label="Buscar en la terminal"
         placeholder="Buscar"
-        className="placeholder:text-term-dim w-40 bg-transparent py-0.5 text-xs outline-none"
+        className="placeholder:text-term-dim min-w-0 flex-1 bg-transparent py-0.5 text-xs outline-none sm:w-40 sm:flex-none"
         onChange={(evento) => {
           setTexto(evento.target.value)
           onBuscar(evento.target.value, false)

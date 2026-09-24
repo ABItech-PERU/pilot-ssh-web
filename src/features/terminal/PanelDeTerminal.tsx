@@ -271,25 +271,25 @@ export function PanelDeTerminal({
       {estado.fase === 'cerrada' && (
         <div className="border-term-border bg-term-bg relative z-10 mt-2 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
           <span className="bg-term-root size-2 shrink-0 rounded-full" aria-hidden />
-          <span className="text-sm">{estado.motivo}</span>
-          <div className="ml-auto flex gap-2">
+          <span className="min-w-0 flex-1 text-sm">{estado.motivo}</span>
+          <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row">
             {estado.reintentable && (
-              <BotonDeCierre onClick={reconectar}>
+              <BotonDeCierre className="flex-1 sm:flex-none" onClick={reconectar}>
                 <RotateCwIcon />
                 Volver a conectar
               </BotonDeCierre>
             )}
             {estado.codigo === CIERRE.SIN_SALDO && (
-              <BotonDeCierre asChild>
+              <BotonDeCierre className="flex-1 sm:flex-none" asChild>
                 <Link to="/app/credits">
                   <CoinsIcon />
                   Ver créditos
                 </Link>
               </BotonDeCierre>
             )}
-            <BotonDeCierre onClick={onCerrar}>
+            <BotonDeCierre className="flex-1 sm:flex-none" onClick={onCerrar}>
               <XIcon />
-              {esLaUnica ? 'Salir de la terminal' : 'Cerrar esta pestaña'}
+              {esLaUnica ? 'Salir de la terminal' : 'Cerrar pestaña'}
             </BotonDeCierre>
           </div>
         </div>
@@ -384,12 +384,15 @@ async function pegarDelPortapapeles(teclear: (datos: string) => void) {
   }
 }
 
-function BotonDeCierre(props: React.ComponentProps<typeof Button>) {
+function BotonDeCierre({ className, ...props }: React.ComponentProps<typeof Button>) {
   return (
     <Button
       variant="outline"
       size="sm"
-      className="border-term-border text-term-text bg-transparent hover:bg-white/5"
+      className={cn(
+        'border-term-border text-term-text bg-transparent hover:bg-white/5',
+        className,
+      )}
       {...props}
     />
   )
