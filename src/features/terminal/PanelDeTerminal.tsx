@@ -72,6 +72,9 @@ interface PanelProps {
   visible: boolean
   onEstado: (id: string, estado: EstadoTerminal) => void
   onLatencia: (id: string, ms: number) => void
+  /** Cerrar la que acabó: si es la única, se sale de la terminal. */
+  onCerrar: () => void
+  esLaUnica: boolean
   /** Sus subidas, a mano de la barra: manda a la terminal que se ve. */
   onSubidor: (id: string, mando: MandoDeSubida) => void
 }
@@ -90,6 +93,8 @@ export function PanelDeTerminal({
   visible,
   onEstado,
   onLatencia,
+  onCerrar,
+  esLaUnica,
   onSubidor,
 }: PanelProps) {
   const contenedor = useRef<HTMLDivElement | null>(null)
@@ -238,7 +243,10 @@ export function PanelDeTerminal({
 
   return (
     <div
-      className={cn('relative min-h-0 flex-1 overflow-hidden p-2', !visible && 'hidden')}
+      className={cn(
+        'relative flex min-h-0 flex-1 flex-col overflow-hidden p-2',
+        !visible && 'hidden',
+      )}
       role="tabpanel"
       aria-label={`Terminal de ${credencial.username}`}
       onDragOver={(evento) => {
@@ -258,7 +266,33 @@ export function PanelDeTerminal({
         if (archivo) subirAlDestino(archivo)
       }}
     >
-      <div ref={contenedor} className="size-full" />
+      {estado.fase === 'cerrada' && (
+        <div className="border-term-border bg-term-bg mb-2 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
+          <span className="text-sm">{estado.motivo}</span>
+          <div className="ml-auto flex gap-2">
+            {estado.reintentable && (
+              <BotonDeCierre onClick={reconectar}>
+                <RotateCwIcon />
+                Volver a conectar
+              </BotonDeCierre>
+            )}
+            {estado.codigo === CIERRE.SIN_SALDO && (
+              <BotonDeCierre asChild>
+                <Link to="/app/credits">
+                  <CoinsIcon />
+                  Ver créditos
+                </Link>
+              </BotonDeCierre>
+            )}
+            <BotonDeCierre onClick={onCerrar}>
+              <XIcon />
+              {esLaUnica ? 'Salir de la terminal' : 'Cerrar esta pestaña'}
+            </BotonDeCierre>
+          </div>
+        </div>
+      )}
+
+      <div ref={contenedor} className="min-h-0 flex-1" />
 
       {buscando && (
         <BuscadorEnTerminal
@@ -270,9 +304,7 @@ export function PanelDeTerminal({
 
       {arrastrando && (
         <div className="bg-term-bg/85 absolute inset-2 grid place-items-center rounded-md border border-dashed border-white/25">
-          <p className="text-sm">
-            Suelte el archivo para copiarlo a la carpeta de trabajo
-          </p>
+          <p className="text-sm">Suelte el archivo para subirlo a esta carpeta</p>
         </div>
       )}
 
@@ -327,40 +359,6 @@ export function PanelDeTerminal({
           evento.target.value = ''
         }}
       />
-
-      {estado.fase === 'cerrada' && (
-        <div className="absolute inset-0 grid place-items-center bg-term-bg/80">
-          <div className="border-term-border bg-term-bg rounded-md border px-6 py-5 text-center">
-            <p className="text-sm">{estado.motivo}</p>
-            <div className="mt-4 flex justify-center gap-2">
-              {estado.reintentable && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={reconectar}
-                  className="border-term-border text-term-text bg-transparent hover:bg-white/5"
-                >
-                  <RotateCwIcon />
-                  Volver a conectar
-                </Button>
-              )}
-              {estado.codigo === CIERRE.SIN_SALDO && (
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  className="border-term-border text-term-text bg-transparent hover:bg-white/5"
-                >
-                  <Link to="/app/credits">
-                    <CoinsIcon />
-                    Ver créditos
-                  </Link>
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -382,4 +380,15 @@ async function pegarDelPortapapeles(teclear: (datos: string) => void) {
   } catch {
     // Sin permiso no se pega; Ctrl+V del navegador sigue funcionando
   }
+}
+
+function BotonDeCierre(props: React.ComponentProps<typeof Button>) {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="border-term-border text-term-text bg-transparent hover:bg-white/5"
+      {...props}
+    />
+  )
 }

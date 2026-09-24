@@ -83,6 +83,9 @@ xterm una sola vez y `useTerminalSocket` lleva el WebSocket.
 - **Al terminar, el aviso queda con la ruta**, y con copiarla o ir a la
   carpeta: escribirlo en la shell dejaba el prompt a medias. Para otra
   carpeta, el menú de la barra abre un selector que se navega a clics.
+- **Cuando la shell termina, el texto sigue ahí.** En vez de taparlo con un
+  cartel, una barra sobre la terminal ofrece volver a conectar, cerrar esa
+  pestaña o salir; lo escrito se puede leer y copiar.
 - **Atajos de terminal de siempre.** `Ctrl+Shift+C` y `Ctrl+Shift+V` copian y
   pegan sin robarle `Ctrl+C` a la shell; el botón de ayuda los lista.
 - **La letra no espera a la red.** Con más de 90 ms de ida y vuelta,

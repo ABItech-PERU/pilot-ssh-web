@@ -250,6 +250,8 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
             visible={pestana.id === activa.id}
             onEstado={anotarEstado}
             onLatencia={anotarLatencia}
+            onCerrar={() => cerrar(pestana)}
+            esLaUnica={pestanas.length === 1}
             onSubidor={anotarSubidor}
           />
         )
