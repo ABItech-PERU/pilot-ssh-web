@@ -80,7 +80,7 @@ interface PanelProps {
 }
 
 export interface MandoDeSubida {
-  subir: (archivo: File) => void
+  subir: (archivos: File[]) => void
   elegirCarpeta: () => void
 }
 
@@ -118,7 +118,7 @@ export function PanelDeTerminal({
     pedirCarpetas,
     reconectar,
     subida,
-    subir,
+    subirVarios,
     teclear,
   } = useTerminalSocket({
     server,
@@ -146,8 +146,8 @@ export function PanelDeTerminal({
   }, [credencial.working_directory, terminal])
 
   const subirAlDestino = useCallback(
-    (archivo: File) => void subir(archivo, fetchDestino()),
-    [fetchDestino, subir],
+    (archivos: File[]) => void subirVarios(archivos, fetchDestino()),
+    [fetchDestino, subirVarios],
   )
 
   useEffect(() => {
@@ -262,8 +262,8 @@ export function PanelDeTerminal({
       onDrop={(evento) => {
         evento.preventDefault()
         setArrastrando(false)
-        const archivo = evento.dataTransfer.files[0]
-        if (archivo) subirAlDestino(archivo)
+        const soltados = [...evento.dataTransfer.files]
+        if (soltados.length) subirAlDestino(soltados)
       }}
     >
       <div ref={contenedor} className="min-h-0 flex-1 overflow-hidden" />
@@ -353,9 +353,10 @@ export function PanelDeTerminal({
         ref={entrada}
         type="file"
         className="hidden"
+        multiple
         onChange={(evento) => {
-          const archivo = evento.target.files?.[0]
-          if (archivo) void subir(archivo, elegida.current)
+          const elegidos = [...(evento.target.files ?? [])]
+          if (elegidos.length) void subirVarios(elegidos, elegida.current)
           // Repetir el mismo archivo tambien cuenta como cambio
           evento.target.value = ''
         }}

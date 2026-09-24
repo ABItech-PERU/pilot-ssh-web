@@ -8,6 +8,7 @@ import {
   describeClose,
   fetchEsperaDeReconexion,
   parseIncoming,
+  quotePath,
   quoteForShell,
   RECONEXION,
   reconnectsAutomatically,
@@ -92,6 +93,17 @@ describe('quoteForShell', () => {
   })
 })
 
+describe('quotePath', () => {
+  it('deja la tilde fuera: entre comillas no se expande', () => {
+    expect(quotePath('~')).toBe('~')
+    expect(quotePath('~/mi sitio')).toBe("~/'mi sitio'")
+  })
+
+  it('lo demás va entrecomillado', () => {
+    expect(quotePath('/var/www')).toBe("'/var/www'")
+  })
+})
+
 describe('buildInitialCommand', () => {
   it('sin ruta no teclea nada', () => {
     expect(buildInitialCommand('   ')).toBeNull()
@@ -99,6 +111,10 @@ describe('buildInitialCommand', () => {
 
   it('con ruta hace cd y pulsa Enter', () => {
     expect(buildInitialCommand('/home/deploy/htdocs')).toBe("cd '/home/deploy/htdocs'\r")
+  })
+
+  it('con tilde, el cd la expande', () => {
+    expect(buildInitialCommand('~/app')).toBe("cd ~/'app'\r")
   })
 })
 

@@ -234,7 +234,7 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
         onActivar={setActiva}
         onCerrar={cerrar}
         onAbrir={abrir}
-        onSubir={(archivo) => subidores.current[activa.id]?.subir(archivo)}
+        onSubir={(archivos) => subidores.current[activa.id]?.subir(archivos)}
         onElegirCarpeta={() => subidores.current[activa.id]?.elegirCarpeta()}
       />
 

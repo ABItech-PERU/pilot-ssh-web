@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   enviarPorTramos,
+  fetchCarpetaDeLaRuta,
   fetchPorcentaje,
   TAMANO_DE_TRAMO,
 } from '@/features/terminal/subida'
@@ -22,6 +23,16 @@ const buildSocket = (readyState?: number) =>
 
 const buildArchivo = (bytes: number) =>
   new File([new Uint8Array(bytes)], 'deploy.bin') as File
+
+describe('fetchCarpetaDeLaRuta', () => {
+  it('se queda con la carpeta', () => {
+    expect(fetchCarpetaDeLaRuta('/tmp/deposito/plan.txt')).toBe('/tmp/deposito')
+  })
+
+  it('en la raíz no se queda sin barra', () => {
+    expect(fetchCarpetaDeLaRuta('/plan.txt')).toBe('/')
+  })
+})
 
 describe('fetchPorcentaje', () => {
   it('cuenta lo que ya salió', () => {

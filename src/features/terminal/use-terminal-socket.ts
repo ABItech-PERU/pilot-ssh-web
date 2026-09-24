@@ -16,11 +16,15 @@ import {
   type MensajeDeCarpetas,
   type MensajeDeSubida,
   parseIncoming,
-  quoteForShell,
+  quotePath,
   RECONEXION,
   reconnectsAutomatically,
 } from '@/features/terminal/socket'
-import { type AvanceDeSubida, enviarPorTramos } from '@/features/terminal/subida'
+import {
+  type AvanceDeSubida,
+  enviarPorTramos,
+  fetchCarpetaDeLaRuta,
+} from '@/features/terminal/subida'
 import { env } from '@/lib/env'
 import type { Server, ServerUser } from '@/types/api'
 
@@ -66,6 +70,7 @@ export function useTerminalSocket({
   const respuesta = useRef<((suya: MensajeDeSubida) => void) | null>(null)
   const listado = useRef<((suyo: MensajeDeCarpetas) => void) | null>(null)
   const cancelada = useRef(false)
+  const enCurso = useRef(false)
   const enVuelo = useRef(0)
   const turnos = useRef<(() => void)[]>([])
 
@@ -133,15 +138,28 @@ export function useTerminalSocket({
     turnos.current.shift()?.()
   }
 
+  /** Sin turnos que esperar: un corte dejaría la copia colgada. */
+  const soltarTurnos = () => {
+    enVuelo.current = 0
+    for (const seguir of turnos.current.splice(0)) seguir()
+  }
+
   /** Copia un archivo a la carpeta pedida y avisa cómo terminó. */
   const subir = useCallback(
     async (archivo: File, carpeta: string) => {
       const abierto = socket.current
-      if (!abierto || abierto.readyState !== WebSocket.OPEN || subida) return
+      if (!abierto || abierto.readyState !== WebSocket.OPEN) {
+        toast.error('La terminal no está conectada.')
+        return
+      }
+      if (enCurso.current) {
+        toast('Los archivos suben de uno en uno.')
+        return
+      }
 
+      enCurso.current = true
       cancelada.current = false
-      enVuelo.current = 0
-      turnos.current = []
+      soltarTurnos()
       setSubida({ nombre: archivo.name, carpeta, enviado: 0, total: archivo.size })
 
       try {
@@ -160,10 +178,10 @@ export function useTerminalSocket({
         if (guardada.estado === 'error') throw new Error(guardada.message)
 
         const ruta = guardada.ruta ?? ''
+        // La del servidor, ya resuelta: la pedida puede ser `~` o relativa
+        const donde = fetchCarpetaDeLaRuta(ruta)
         avisarSubida(ruta, () =>
-          enviar({
-            command: `cd ${quoteForShell(carpeta)} && ls -l ${quoteForShell(archivo.name)}\r`,
-          }),
+          enviar({ command: `cd ${quotePath(donde)} && ls -l ${quotePath(ruta)}\r` }),
         )
       } catch (error) {
         const motivo = error instanceof Error ? error.message : 'No se pudo subir.'
@@ -171,12 +189,22 @@ export function useTerminalSocket({
         if (cancelada.current) toast('Copia cancelada.')
         else toast.error(motivo)
       } finally {
+        enCurso.current = false
+        soltarTurnos()
         setSubida(null)
         // El foco vuelve de la barra o del botón: se sigue tecleando
         terminal.current?.focus()
       }
     },
-    [enviar, subida, terminal],
+    [enviar, terminal],
+  )
+
+  /** De uno en uno: el servidor solo atiende una copia por sesión. */
+  const subirVarios = useCallback(
+    async (archivos: File[], carpeta: string) => {
+      for (const archivo of archivos) await subir(archivo, carpeta)
+    },
+    [subir],
   )
 
   /** Lo que ya se escribió en el servidor lo borra él. */
@@ -314,6 +342,7 @@ export function useTerminalSocket({
       abierto.onclose = (evento) => {
         escribir(eco.current.limpiar())
         tecleadoEn.current = null
+        soltarTurnos()
         const contestar = respuesta.current
         respuesta.current = null
         contestar?.({
@@ -376,7 +405,7 @@ export function useTerminalSocket({
     pedirCarpetas,
     reconectar,
     subida,
-    subir,
+    subirVarios,
     teclear,
   }
 }

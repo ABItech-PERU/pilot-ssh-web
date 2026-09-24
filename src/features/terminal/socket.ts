@@ -133,12 +133,19 @@ export function quoteForShell(valor: string): string {
   return `'${valor.replaceAll("'", "'\\''")}'`
 }
 
+/** `~` fuera de comillas: dentro, la shell no lo expande. */
+export function quotePath(ruta: string): string {
+  if (ruta === '~') return '~'
+  if (ruta.startsWith('~/')) return `~/${quoteForShell(ruta.slice(2))}`
+  return quoteForShell(ruta)
+}
+
 /** `cd` a la carpeta de trabajo, tecleado a la vista como lo haria la
  *  persona. */
 export function buildInitialCommand(path: string): string | null {
   const limpio = path.trim()
   if (!limpio) return null
-  return `cd ${quoteForShell(limpio)}\r`
+  return `cd ${quotePath(limpio)}\r`
 }
 
 const ESTADOS_DE_SUBIDA = ['preparada', 'sigue', 'guardada', 'error']

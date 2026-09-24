@@ -15,6 +15,12 @@ export interface AvanceDeSubida {
   total: number
 }
 
+/** La carpeta de una ruta ya resuelta por el servidor. */
+export function fetchCarpetaDeLaRuta(ruta: string): string {
+  const corte = ruta.lastIndexOf('/')
+  return corte > 0 ? ruta.slice(0, corte) : '/'
+}
+
 export function fetchPorcentaje({ enviado, total }: AvanceDeSubida): number {
   return total ? Math.min(100, Math.round((enviado / total) * 100)) : 0
 }
@@ -42,7 +48,7 @@ export async function enviarPorTramos(
     await pedirTurno()
 
     const tramo = archivo.slice(enviado, enviado + TAMANO_DE_TRAMO)
-    socket.send(await tramo.arrayBuffer())
+    socket.send(await fetchDatos(tramo))
     enviado += tramo.size
     onAvance(enviado)
     await esperarALaCola(socket)
@@ -53,5 +59,14 @@ export async function enviarPorTramos(
 async function esperarALaCola(socket: WebSocket): Promise<void> {
   while (socket.bufferedAmount > COLA_MAXIMA && socket.readyState === WebSocket.OPEN) {
     await new Promise((seguir) => setTimeout(seguir, ESPERA_DE_COLA_MS))
+  }
+}
+
+/** Una carpeta soltada, o un archivo que se movió, no se dejan leer. */
+async function fetchDatos(tramo: Blob): Promise<ArrayBuffer> {
+  try {
+    return await tramo.arrayBuffer()
+  } catch {
+    throw new Error('No se pudo leer el archivo. ¿Era una carpeta?')
   }
 }

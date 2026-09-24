@@ -34,7 +34,7 @@ interface BarraProps {
   onActivar: (pestana: Pestana) => void
   onCerrar: (pestana: Pestana) => void
   onAbrir: (credentialId: string) => void
-  onSubir: (archivo: File) => void
+  onSubir: (archivos: File[]) => void
   onElegirCarpeta: () => void
 }
 
@@ -130,10 +130,11 @@ export function BarraDePestanas({
       <input
         ref={archivo}
         type="file"
+        multiple
         className="hidden"
         onChange={(evento) => {
-          const elegido = evento.target.files?.[0]
-          if (elegido) onSubir(elegido)
+          const elegidos = [...(evento.target.files ?? [])]
+          if (elegidos.length) onSubir(elegidos)
           // Repetir el mismo archivo tambien cuenta como cambio
           evento.target.value = ''
         }}
