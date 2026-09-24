@@ -132,7 +132,7 @@ export function BarraDePestanas({
         variant="ghost"
         size="icon-sm"
         aria-label="Subir un archivo"
-        title="Subir un archivo a la carpeta de trabajo"
+        title="Subir un archivo a la terminal que se ve"
         onClick={() => archivo.current?.click()}
         className="text-term-dim hover:text-term-text my-auto ml-auto size-6 hover:bg-white/5"
       >

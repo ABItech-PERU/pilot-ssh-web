@@ -76,9 +76,9 @@ xterm una sola vez y `useTerminalSocket` lleva el WebSocket.
 - **La cabecera dice cuánto tarda la red.** Junto a «Conectado», la ida y
   vuelta de la última tecla, en tramos de 10 ms.
 - **Arrastrar un archivo lo sube.** Al soltarlo sobre la terminal (o con el
-  botón de la barra) viaja en tramos por el mismo socket hasta la carpeta de
-  trabajo de la credencial, con su avance a la vista y con cancelar a mano;
-  lo escrito a medias lo borra el servidor.
+  botón de la barra) se pregunta la carpeta —se recuerda la última— y viaja
+  en tramos por el mismo socket, con su avance a la vista y con cancelar a
+  mano; lo escrito a medias lo borra el servidor.
 - **La letra no espera a la red.** Con más de 90 ms de ida y vuelta,
   `eco-predictivo` pinta atenuado lo que se teclea y lo reemplaza por la
   respuesta del servidor en cuanto llega, como hace Mosh. En vim o htop no

@@ -12,6 +12,7 @@ import {
   BuscadorEnTerminal,
   type Coincidencias,
 } from '@/features/terminal/BuscadorEnTerminal'
+import { DialogoDeSubida } from '@/features/terminal/DialogoDeSubida'
 import { CIERRE, type EstadoTerminal } from '@/features/terminal/socket'
 import { fetchPorcentaje } from '@/features/terminal/subida'
 import { useTerminalSocket } from '@/features/terminal/use-terminal-socket'
@@ -68,7 +69,7 @@ interface PanelProps {
   onEstado: (id: string, estado: EstadoTerminal) => void
   onLatencia: (id: string, ms: number) => void
   /** Deja su subida a mano: el botón de la barra sube a la que se ve. */
-  onSubidor: (id: string, subir: (archivo: File) => void) => void
+  onSubidor: (id: string, elegir: (archivo: File) => void) => void
 }
 
 /** Monta xterm una vez y le ata la shell; al reconectar, lo escrito sigue
@@ -88,6 +89,9 @@ export function PanelDeTerminal({
   const [estado, setEstado] = useState<EstadoTerminal>({ fase: 'conectando' })
   const [buscando, setBuscando] = useState(false)
   const [arrastrando, setArrastrando] = useState(false)
+  const [porSubir, setPorSubir] = useState<File | null>(null)
+  // Se recuerda la última: se suele subir varias veces al mismo sitio
+  const [carpeta, setCarpeta] = useState(credencial.working_directory || '~')
   const [coincidencias, setCoincidencias] = useState<Coincidencias>(SIN_COINCIDENCIAS)
 
   const avisarLatencia = useCallback((ms: number) => onLatencia(id, ms), [id, onLatencia])
@@ -106,8 +110,8 @@ export function PanelDeTerminal({
   }, [id, estado, onEstado])
 
   useEffect(() => {
-    onSubidor(id, subir)
-  }, [id, onSubidor, subir])
+    onSubidor(id, setPorSubir)
+  }, [id, onSubidor])
 
   useEffect(() => {
     const nodo = contenedor.current
@@ -205,7 +209,7 @@ export function PanelDeTerminal({
         evento.preventDefault()
         setArrastrando(false)
         const archivo = evento.dataTransfer.files[0]
-        if (archivo) void subir(archivo)
+        if (archivo) setPorSubir(archivo)
       }}
     >
       <div ref={contenedor} className="size-full" />
@@ -251,6 +255,19 @@ export function PanelDeTerminal({
           </div>
         </div>
       )}
+
+      <DialogoDeSubida
+        archivo={porSubir}
+        carpeta={carpeta}
+        onCerrar={() => setPorSubir(null)}
+        onFocoDeVuelta={() => terminal.current?.focus()}
+        onConfirmar={(destino) => {
+          const archivo = porSubir
+          setPorSubir(null)
+          setCarpeta(destino)
+          if (archivo) void subir(archivo, destino)
+        }}
+      />
 
       {estado.fase === 'cerrada' && (
         <div className="absolute inset-0 grid place-items-center bg-term-bg/80">

@@ -97,9 +97,9 @@ export function useTerminalSocket({
       respuesta.current = contestar
     })
 
-  /** Copia un archivo a la carpeta de trabajo y avisa cómo terminó. */
+  /** Copia un archivo a la carpeta pedida y avisa cómo terminó. */
   const subir = useCallback(
-    async (archivo: File) => {
+    async (archivo: File, carpeta: string) => {
       const abierto = socket.current
       if (!abierto || abierto.readyState !== WebSocket.OPEN || subida) return
 
@@ -108,7 +108,7 @@ export function useTerminalSocket({
       setSubida({ nombre: archivo.name, enviado: 0, total: archivo.size })
 
       try {
-        enviar({ subida: { nombre: archivo.name, tamano: archivo.size } })
+        enviar({ subida: { nombre: archivo.name, tamano: archivo.size, carpeta } })
         const preparada = await esperarRespuesta()
         if (preparada.estado === 'error') throw new Error(preparada.message)
 
