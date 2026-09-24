@@ -57,6 +57,7 @@ export function useTerminalSocket({
   const avisada = useRef(0)
   const [subida, setSubida] = useState<AvanceDeSubida | null>(null)
   const respuesta = useRef<((suya: MensajeDeSubida) => void) | null>(null)
+  const cancelada = useRef(false)
 
   // Por referencia: cambiar de aviso no reabre el socket
   const avisar = useRef(onLatencia)
@@ -103,6 +104,7 @@ export function useTerminalSocket({
       if (!abierto || abierto.readyState !== WebSocket.OPEN || subida) return
 
       const escribir = (texto: string) => terminal.current?.write(texto)
+      cancelada.current = false
       setSubida({ nombre: archivo.name, enviado: 0, total: archivo.size })
 
       try {
@@ -110,8 +112,11 @@ export function useTerminalSocket({
         const preparada = await esperarRespuesta()
         if (preparada.estado === 'error') throw new Error(preparada.message)
 
-        await enviarPorTramos(abierto, archivo, (enviado) =>
-          setSubida({ nombre: archivo.name, enviado, total: archivo.size }),
+        await enviarPorTramos(
+          abierto,
+          archivo,
+          (enviado) => setSubida({ nombre: archivo.name, enviado, total: archivo.size }),
+          () => !cancelada.current,
         )
         enviar({ subida: { fin: true } })
         const guardada = await esperarRespuesta()
@@ -123,10 +128,18 @@ export function useTerminalSocket({
         escribir(`\r\n\x1b[31m— ${motivo} —\x1b[0m\r\n`)
       } finally {
         setSubida(null)
+        // El foco vuelve de la barra o del botón: se sigue tecleando
+        terminal.current?.focus()
       }
     },
     [enviar, subida, terminal],
   )
+
+  /** Lo que ya se escribió en el servidor lo borra él. */
+  const cancelarSubida = useCallback(() => {
+    cancelada.current = true
+    enviar({ subida: { cancelar: true } })
+  }, [enviar])
 
   const reconectar = useCallback(() => {
     onEstado({ fase: 'conectando' })
@@ -301,5 +314,5 @@ export function useTerminalSocket({
     terminal,
   ])
 
-  return { enviarTamano, reconectar, subida, subir, teclear }
+  return { cancelarSubida, enviarTamano, reconectar, subida, subir, teclear }
 }

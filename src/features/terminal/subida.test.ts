@@ -48,6 +48,23 @@ describe('enviarPorTramos', () => {
     expect(avances).toEqual([TAMANO_DE_TRAMO, TAMANO_DE_TRAMO + 10])
   })
 
+  it('al cancelar deja de mandar tramos', async () => {
+    const socket = buildSocket()
+    let sigue = true
+
+    const copia = enviarPorTramos(
+      socket,
+      buildArchivo(TAMANO_DE_TRAMO * 3),
+      () => {
+        sigue = false
+      },
+      () => sigue,
+    )
+
+    await expect(copia).rejects.toThrow(/cancel/)
+    expect((socket as unknown as SocketDePrueba).enviados).toHaveLength(1)
+  })
+
   it('con el socket caído no manda nada a ciegas', async () => {
     const socket = buildSocket(WebSocket.CLOSED)
 

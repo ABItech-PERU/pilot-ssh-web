@@ -23,10 +23,12 @@ export async function enviarPorTramos(
   socket: WebSocket,
   archivo: File,
   onAvance: (enviado: number) => void,
+  sigueViva: () => boolean = () => true,
 ): Promise<void> {
   let enviado = 0
 
   while (enviado < archivo.size) {
+    if (!sigueViva()) throw new Error('Se canceló la copia.')
     if (socket.readyState !== WebSocket.OPEN) {
       throw new Error('Se perdió la conexión durante la copia.')
     }

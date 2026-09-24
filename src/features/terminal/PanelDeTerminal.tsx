@@ -3,7 +3,7 @@ import { SearchAddon } from '@xterm/addon-search'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal } from '@xterm/xterm'
 import { cn } from 'cn'
-import { CoinsIcon, RotateCwIcon } from 'lucide-react'
+import { CoinsIcon, RotateCwIcon, XIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 
@@ -92,13 +92,14 @@ export function PanelDeTerminal({
 
   const avisarLatencia = useCallback((ms: number) => onLatencia(id, ms), [id, onLatencia])
 
-  const { enviarTamano, reconectar, subida, subir, teclear } = useTerminalSocket({
-    server,
-    credencial,
-    terminal,
-    onEstado: setEstado,
-    onLatencia: avisarLatencia,
-  })
+  const { cancelarSubida, enviarTamano, reconectar, subida, subir, teclear } =
+    useTerminalSocket({
+      server,
+      credencial,
+      terminal,
+      onEstado: setEstado,
+      onLatencia: avisarLatencia,
+    })
 
   useEffect(() => {
     onEstado(id, estado)
@@ -194,7 +195,12 @@ export function PanelDeTerminal({
         evento.preventDefault()
         setArrastrando(true)
       }}
-      onDragLeave={() => setArrastrando(false)}
+      onDragLeave={(evento) => {
+        // Pasar sobre xterm tambien dispara leave: solo cuenta salir del panel
+        if (!evento.currentTarget.contains(evento.relatedTarget as Node)) {
+          setArrastrando(false)
+        }
+      }}
       onDrop={(evento) => {
         evento.preventDefault()
         setArrastrando(false)
@@ -224,9 +230,18 @@ export function PanelDeTerminal({
         <div className="border-term-border bg-term-bg absolute inset-x-4 bottom-3 rounded-md border px-3 py-2">
           <div className="flex items-center justify-between gap-3 text-xs">
             <span className="font-machine truncate">{subida.nombre}</span>
-            <span className="text-term-dim tabular-nums">
+            <span className="text-term-dim ml-auto tabular-nums">
               {fetchPorcentaje(subida)} %
             </span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Cancelar la subida"
+              onClick={cancelarSubida}
+              className="text-term-dim hover:text-term-text size-5 hover:bg-white/5"
+            >
+              <XIcon className="size-3.5" />
+            </Button>
           </div>
           <div className="mt-1.5 h-1 rounded-full bg-white/10">
             <div
