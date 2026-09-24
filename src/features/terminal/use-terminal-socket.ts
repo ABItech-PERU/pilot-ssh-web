@@ -11,10 +11,12 @@ import {
   describeClose,
   type EstadoTerminal,
   fetchEsperaDeReconexion,
+  type MensajeDeSubida,
   parseIncoming,
   RECONEXION,
   reconnectsAutomatically,
 } from '@/features/terminal/socket'
+import { type AvanceDeSubida, enviarPorTramos } from '@/features/terminal/subida'
 import { env } from '@/lib/env'
 import type { Server, ServerUser } from '@/types/api'
 
@@ -53,6 +55,8 @@ export function useTerminalSocket({
   const tecleadoEn = useRef<number | null>(null)
   const latencia = useRef(0)
   const avisada = useRef(0)
+  const [subida, setSubida] = useState<AvanceDeSubida | null>(null)
+  const respuesta = useRef<((suya: MensajeDeSubida) => void) | null>(null)
 
   // Por referencia: cambiar de aviso no reabre el socket
   const avisar = useRef(onLatencia)
@@ -85,6 +89,43 @@ export function useTerminalSocket({
       enviar({ command: datos })
     },
     [enviar, terminal],
+  )
+
+  const esperarRespuesta = () =>
+    new Promise<MensajeDeSubida>((contestar) => {
+      respuesta.current = contestar
+    })
+
+  /** Copia un archivo a la carpeta de trabajo y avisa cómo terminó. */
+  const subir = useCallback(
+    async (archivo: File) => {
+      const abierto = socket.current
+      if (!abierto || abierto.readyState !== WebSocket.OPEN || subida) return
+
+      const escribir = (texto: string) => terminal.current?.write(texto)
+      setSubida({ nombre: archivo.name, enviado: 0, total: archivo.size })
+
+      try {
+        enviar({ subida: { nombre: archivo.name, tamano: archivo.size } })
+        const preparada = await esperarRespuesta()
+        if (preparada.estado === 'error') throw new Error(preparada.message)
+
+        await enviarPorTramos(abierto, archivo, (enviado) =>
+          setSubida({ nombre: archivo.name, enviado, total: archivo.size }),
+        )
+        enviar({ subida: { fin: true } })
+        const guardada = await esperarRespuesta()
+        if (guardada.estado === 'error') throw new Error(guardada.message)
+
+        escribir(`\r\n\x1b[2m— Se subió ${guardada.ruta} —\x1b[0m\r\n`)
+      } catch (error) {
+        const motivo = error instanceof Error ? error.message : 'No se pudo subir.'
+        escribir(`\r\n\x1b[31m— ${motivo} —\x1b[0m\r\n`)
+      } finally {
+        setSubida(null)
+      }
+    },
+    [enviar, subida, terminal],
   )
 
   const reconectar = useCallback(() => {
@@ -171,6 +212,12 @@ export function useTerminalSocket({
           sesion.current = mensaje.id
           return
         }
+        if (mensaje.type === 'subida') {
+          const contestar = respuesta.current
+          respuesta.current = null
+          contestar?.(mensaje)
+          return
+        }
         if (tecleadoEn.current !== null) {
           const ida = performance.now() - tecleadoEn.current
           tecleadoEn.current = null
@@ -198,6 +245,13 @@ export function useTerminalSocket({
       abierto.onclose = (evento) => {
         escribir(eco.current.limpiar())
         tecleadoEn.current = null
+        const contestar = respuesta.current
+        respuesta.current = null
+        contestar?.({
+          type: 'subida',
+          estado: 'error',
+          message: 'Se perdió la conexión durante la copia.',
+        })
         if (reconnectsAutomatically(evento.code, reconexiones.current)) {
           if (reconexiones.current === 0) {
             escribir('\r\n\x1b[2m— Se perdió la conexión. Reconectando… —\x1b[0m\r\n')
@@ -247,5 +301,5 @@ export function useTerminalSocket({
     terminal,
   ])
 
-  return { enviarTamano, reconectar, teclear }
+  return { enviarTamano, reconectar, subida, subir, teclear }
 }

@@ -18,9 +18,19 @@ export type EstadoTerminal =
   | { fase: 'conectada' }
   | { fase: 'cerrada'; codigo: number; motivo: string; reintentable: boolean }
 
+/** Cómo va el archivo que se está copiando al servidor. */
+export type MensajeDeSubida = {
+  type: 'subida'
+  estado: 'preparada' | 'guardada' | 'error'
+  ruta?: string
+  message?: string
+}
+
 /** La shell vive en el servidor: su id permite volver a ella tras un corte. */
 export type MensajeEntrante =
-  { type: 'output' | 'error'; message: string } | { type: 'sesion'; id: string }
+  | { type: 'output' | 'error'; message: string }
+  | { type: 'sesion'; id: string }
+  | MensajeDeSubida
 
 /** Token en la query: el handshake del navegador no admite cabeceras.
  *  Dura 30 minutos y produccion exige wss. Con `sesion`, retoma la shell
@@ -119,11 +129,28 @@ export function buildInitialCommand(path: string): string | null {
   return `cd ${quoteForShell(limpio)}\r`
 }
 
+const ESTADOS_DE_SUBIDA = ['preparada', 'guardada', 'error']
+
 export function parseIncoming(raw: string): MensajeEntrante | null {
   try {
-    const dato = JSON.parse(raw) as { type?: string; message?: string; id?: string }
+    const dato = JSON.parse(raw) as {
+      type?: string
+      message?: string
+      id?: string
+      estado?: string
+      ruta?: string
+    }
     if (dato.type === 'sesion') {
       return typeof dato.id === 'string' ? { type: 'sesion', id: dato.id } : null
+    }
+    if (dato.type === 'subida') {
+      if (!ESTADOS_DE_SUBIDA.includes(dato.estado ?? '')) return null
+      return {
+        type: 'subida',
+        estado: dato.estado as MensajeDeSubida['estado'],
+        ruta: dato.ruta,
+        message: dato.message,
+      }
     }
     if (typeof dato.message !== 'string') return null
     return { type: dato.type === 'error' ? 'error' : 'output', message: dato.message }

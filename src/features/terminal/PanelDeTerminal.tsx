@@ -13,6 +13,7 @@ import {
   type Coincidencias,
 } from '@/features/terminal/BuscadorEnTerminal'
 import { CIERRE, type EstadoTerminal } from '@/features/terminal/socket'
+import { fetchPorcentaje } from '@/features/terminal/subida'
 import { useTerminalSocket } from '@/features/terminal/use-terminal-socket'
 import type { Server, ServerUser } from '@/types/api'
 
@@ -66,6 +67,8 @@ interface PanelProps {
   visible: boolean
   onEstado: (id: string, estado: EstadoTerminal) => void
   onLatencia: (id: string, ms: number) => void
+  /** Deja su subida a mano: el botón de la barra sube a la que se ve. */
+  onSubidor: (id: string, subir: (archivo: File) => void) => void
 }
 
 /** Monta xterm una vez y le ata la shell; al reconectar, lo escrito sigue
@@ -77,17 +80,19 @@ export function PanelDeTerminal({
   visible,
   onEstado,
   onLatencia,
+  onSubidor,
 }: PanelProps) {
   const contenedor = useRef<HTMLDivElement | null>(null)
   const terminal = useRef<Terminal | null>(null)
   const buscador = useRef<SearchAddon | null>(null)
   const [estado, setEstado] = useState<EstadoTerminal>({ fase: 'conectando' })
   const [buscando, setBuscando] = useState(false)
+  const [arrastrando, setArrastrando] = useState(false)
   const [coincidencias, setCoincidencias] = useState<Coincidencias>(SIN_COINCIDENCIAS)
 
   const avisarLatencia = useCallback((ms: number) => onLatencia(id, ms), [id, onLatencia])
 
-  const { enviarTamano, reconectar, teclear } = useTerminalSocket({
+  const { enviarTamano, reconectar, subida, subir, teclear } = useTerminalSocket({
     server,
     credencial,
     terminal,
@@ -98,6 +103,10 @@ export function PanelDeTerminal({
   useEffect(() => {
     onEstado(id, estado)
   }, [id, estado, onEstado])
+
+  useEffect(() => {
+    onSubidor(id, subir)
+  }, [id, onSubidor, subir])
 
   useEffect(() => {
     const nodo = contenedor.current
@@ -181,6 +190,17 @@ export function PanelDeTerminal({
       className={cn('relative min-h-0 flex-1 overflow-hidden p-2', !visible && 'hidden')}
       role="tabpanel"
       aria-label={`Terminal de ${credencial.username}`}
+      onDragOver={(evento) => {
+        evento.preventDefault()
+        setArrastrando(true)
+      }}
+      onDragLeave={() => setArrastrando(false)}
+      onDrop={(evento) => {
+        evento.preventDefault()
+        setArrastrando(false)
+        const archivo = evento.dataTransfer.files[0]
+        if (archivo) void subir(archivo)
+      }}
     >
       <div ref={contenedor} className="size-full" />
 
@@ -190,6 +210,31 @@ export function PanelDeTerminal({
           onBuscar={buscar}
           onCerrar={cerrarBusqueda}
         />
+      )}
+
+      {arrastrando && (
+        <div className="bg-term-bg/85 absolute inset-2 grid place-items-center rounded-md border border-dashed border-white/25">
+          <p className="text-sm">
+            Suelte el archivo para copiarlo a la carpeta de trabajo
+          </p>
+        </div>
+      )}
+
+      {subida && (
+        <div className="border-term-border bg-term-bg absolute inset-x-4 bottom-3 rounded-md border px-3 py-2">
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <span className="font-machine truncate">{subida.nombre}</span>
+            <span className="text-term-dim tabular-nums">
+              {fetchPorcentaje(subida)} %
+            </span>
+          </div>
+          <div className="mt-1.5 h-1 rounded-full bg-white/10">
+            <div
+              className="bg-term-ok h-1 rounded-full transition-[width]"
+              style={{ width: `${fetchPorcentaje(subida)}%` }}
+            />
+          </div>
+        </div>
       )}
 
       {estado.fase === 'cerrada' && (

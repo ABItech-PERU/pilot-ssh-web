@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { cn } from 'cn'
 import { ArrowLeftIcon, Loader2Icon, XIcon } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
 import '@xterm/xterm/css/xterm.css'
@@ -109,6 +109,12 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
     setLatencias((actuales) => ({ ...actuales, [id]: ms }))
   }, [])
 
+  // El archivo va a la shell que se ve, la pida el botón o el arrastre
+  const subidores = useRef<Record<string, (archivo: File) => void>>({})
+  const anotarSubidor = useCallback((id: string, subir: (archivo: File) => void) => {
+    subidores.current[id] = subir
+  }, [])
+
   const abrir = (credentialId: string) => {
     if (pestanas.length >= MAXIMO_DE_PESTANAS) return
     const nueva = buildPestana(credentialId)
@@ -126,6 +132,7 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
     setPestanas(pestanas.filter((una) => una.id !== cerrada.id))
     setEstados((actuales) => fetchSinLa(actuales, cerrada.id))
     setLatencias((actuales) => fetchSinLa(actuales, cerrada.id))
+    subidores.current = fetchSinLa(subidores.current, cerrada.id)
   }
 
   // La direccion sigue a lo que se ve: recargar vuelve a esta credencial
@@ -227,6 +234,7 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
         onActivar={setActiva}
         onCerrar={cerrar}
         onAbrir={abrir}
+        onSubir={(archivo) => subidores.current[activa.id]?.(archivo)}
       />
 
       {pestanas.map((pestana) => {
@@ -241,6 +249,7 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
             visible={pestana.id === activa.id}
             onEstado={anotarEstado}
             onLatencia={anotarLatencia}
+            onSubidor={anotarSubidor}
           />
         )
       })}

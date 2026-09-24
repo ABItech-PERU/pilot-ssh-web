@@ -1,5 +1,6 @@
 import { cn } from 'cn'
-import { PlusIcon, XIcon } from 'lucide-react'
+import { PlusIcon, UploadIcon, XIcon } from 'lucide-react'
+import { useRef } from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -25,6 +26,7 @@ interface BarraProps {
   onActivar: (pestana: Pestana) => void
   onCerrar: (pestana: Pestana) => void
   onAbrir: (credentialId: string) => void
+  onSubir: (archivo: File) => void
 }
 
 export function BarraDePestanas({
@@ -35,7 +37,9 @@ export function BarraDePestanas({
   onActivar,
   onCerrar,
   onAbrir,
+  onSubir,
 }: BarraProps) {
+  const archivo = useRef<HTMLInputElement | null>(null)
   const ordinales = fetchOrdinales(pestanas)
   const hayCupo = pestanas.length < MAXIMO_DE_PESTANAS
 
@@ -111,6 +115,29 @@ export function BarraDePestanas({
           })}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <input
+        ref={archivo}
+        type="file"
+        className="hidden"
+        onChange={(evento) => {
+          const elegido = evento.target.files?.[0]
+          if (elegido) onSubir(elegido)
+          // Repetir el mismo archivo tambien cuenta como cambio
+          evento.target.value = ''
+        }}
+      />
+
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Subir un archivo"
+        title="Subir un archivo a la carpeta de trabajo"
+        onClick={() => archivo.current?.click()}
+        className="text-term-dim hover:text-term-text my-auto ml-auto size-6 hover:bg-white/5"
+      >
+        <UploadIcon className="size-4" />
+      </Button>
     </div>
   )
 }
