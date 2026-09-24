@@ -1,10 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { FitAddon } from '@xterm/addon-fit'
-import { WebLinksAddon } from '@xterm/addon-web-links'
-import { Terminal } from '@xterm/xterm'
 import { cn } from 'cn'
-import { ArrowLeftIcon, CoinsIcon, Loader2Icon, RotateCwIcon, XIcon } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { ArrowLeftIcon, Loader2Icon, XIcon } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
 import '@xterm/xterm/css/xterm.css'
@@ -13,39 +10,20 @@ import '@/features/terminal/terminal.css'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import * as serversApi from '@/features/servers/api'
-import { CIERRE, type EstadoTerminal } from '@/features/terminal/socket'
-import { useTerminalSocket } from '@/features/terminal/use-terminal-socket'
 import { FORMAS_DE_ENTRAR } from '@/features/servers/auth-type'
 import { buildServerPath } from '@/features/servers/paths'
-import { useVolver } from '@/lib/use-volver'
+import { BarraDePestanas } from '@/features/terminal/BarraDePestanas'
+import { PanelDeTerminal } from '@/features/terminal/PanelDeTerminal'
+import {
+  buildPestana,
+  fetchActivaTrasCerrar,
+  MAXIMO_DE_PESTANAS,
+  type Pestana,
+} from '@/features/terminal/pestanas'
+import type { EstadoTerminal } from '@/features/terminal/socket'
 import { isUuid } from '@/lib/ids'
+import { useVolver } from '@/lib/use-volver'
 import type { Server, ServerUser } from '@/types/api'
-
-/** Hex: xterm no entiende oklch(). Copia de los tokens `--term-*` de
- *  index.css; cambian juntos. */
-const TEMA = {
-  background: '#141922',
-  foreground: '#ecedf1',
-  cursor: '#5fd4c8',
-  cursorAccent: '#141922',
-  selectionBackground: 'rgba(95, 212, 200, 0.28)',
-  black: '#1c222c',
-  red: '#ef7272',
-  green: '#63d68f',
-  yellow: '#e8c86a',
-  blue: '#74acf2',
-  magenta: '#c896ea',
-  cyan: '#5fd4c8',
-  white: '#d7dae0',
-  brightBlack: '#5b6270',
-  brightRed: '#f78c8c',
-  brightGreen: '#7fe3a6',
-  brightYellow: '#f0d68a',
-  brightBlue: '#94c0f7',
-  brightMagenta: '#d7aef2',
-  brightCyan: '#84e2d8',
-  brightWhite: '#f5f6f8',
-}
 
 /** No monta la sesion sin servidor y credencial: el socket nace con el
  *  token ya refrescado. */
@@ -94,32 +72,75 @@ export function TerminalPage() {
     )
   }
 
-  return <SesionDeTerminal server={servidor.data} credencial={credencial} />
+  return <EspacioDeTerminales server={servidor.data} credencial={credencial} />
 }
 
-interface SesionProps {
+interface EspacioProps {
   server: Server
   credencial: ServerUser
 }
 
-/** Monta xterm una vez y le ata la shell; al reconectar, lo escrito sigue
- *  en pantalla. */
-function SesionDeTerminal({ server, credencial }: SesionProps) {
+/** Ventana con varias shells del mismo servidor: las de atrás siguen
+ *  corriendo mientras se mira otra. */
+function EspacioDeTerminales({ server, credencial }: EspacioProps) {
   const volver = useVolver(buildServerPath(server.id))
   const cliente = useQueryClient()
-  const { icono: IconoDeEntrada, etiqueta: comoEntra } =
-    FORMAS_DE_ENTRAR[credencial.auth_type]
-  const contenedor = useRef<HTMLDivElement | null>(null)
-  const terminal = useRef<Terminal | null>(null)
-  const [estado, setEstado] = useState<EstadoTerminal>({ fase: 'conectando' })
-  const rutaInicial = credencial.working_directory
+  const [, setParametros] = useSearchParams()
 
-  const { enviarTamano, reconectar, teclear } = useTerminalSocket({
-    server,
-    credencial,
-    terminal,
-    onEstado: setEstado,
-  })
+  const [inicial] = useState(() => buildPestana(credencial.id))
+  const [pestanas, setPestanas] = useState<Pestana[]>([inicial])
+  const [activa, setActiva] = useState(inicial)
+  const [estados, setEstados] = useState<Record<string, EstadoTerminal>>({})
+
+  // La credencial puede haberse borrado con la shell abierta
+  const credencialDelante =
+    server.users.find((una) => una.id === activa.credentialId) ?? credencial
+  const estado = estados[activa.id]
+  const { icono: IconoDeEntrada, etiqueta: comoEntra } =
+    FORMAS_DE_ENTRAR[credencialDelante.auth_type]
+
+  const anotarEstado = useCallback((id: string, suyo: EstadoTerminal) => {
+    setEstados((actuales) => ({ ...actuales, [id]: suyo }))
+  }, [])
+
+  const abrir = (credentialId: string) => {
+    if (pestanas.length >= MAXIMO_DE_PESTANAS) return
+    const nueva = buildPestana(credentialId)
+    setPestanas([...pestanas, nueva])
+    setActiva(nueva)
+  }
+
+  const cerrar = (cerrada: Pestana) => {
+    // Cerrar la única es cerrar la ventana
+    if (pestanas.length === 1) {
+      volver()
+      return
+    }
+    setActiva(fetchActivaTrasCerrar(pestanas, cerrada, activa))
+    setPestanas(pestanas.filter((una) => una.id !== cerrada.id))
+    setEstados((actuales) =>
+      Object.fromEntries(
+        Object.entries(actuales).filter(([clave]) => clave !== cerrada.id),
+      ),
+    )
+  }
+
+  // La direccion sigue a lo que se ve: recargar vuelve a esta credencial
+  useEffect(() => {
+    setParametros({ credential: credencialDelante.id }, { replace: true })
+  }, [credencialDelante.id, setParametros])
+
+  useEffect(() => {
+    const cambiarDePestana = (evento: KeyboardEvent) => {
+      if (!evento.altKey || evento.ctrlKey || evento.metaKey) return
+      const destino = pestanas[Number(evento.key) - 1]
+      if (!destino) return
+      evento.preventDefault()
+      setActiva(destino)
+    }
+    window.addEventListener('keydown', cambiarDePestana)
+    return () => window.removeEventListener('keydown', cambiarDePestana)
+  }, [pestanas])
 
   // La sesion cambia el ultimo uso de credencial y servidor: al salir se
   // invalidan sus listas, «Usadas hace poco» incluida
@@ -130,49 +151,6 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
     },
     [cliente],
   )
-
-  useEffect(() => {
-    const nodo = contenedor.current
-    if (!nodo) return
-
-    const vista = new Terminal({
-      theme: TEMA,
-      fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-      fontSize: 13,
-      lineHeight: 1.25,
-      cursorBlink: true,
-      scrollback: 5000,
-      allowProposedApi: true,
-    })
-    const ajuste = new FitAddon()
-    vista.loadAddon(ajuste)
-    vista.loadAddon(new WebLinksAddon())
-    vista.open(nodo)
-    terminal.current = vista
-
-    // Ajuste en el siguiente frame: tras open el contenedor aun mide cero
-    // y xterm quedaria en 80x24
-    let marco = requestAnimationFrame(() => ajuste.fit())
-
-    const teclado = vista.onData(teclear)
-
-    const observador = new ResizeObserver(() => {
-      cancelAnimationFrame(marco)
-      marco = requestAnimationFrame(() => {
-        ajuste.fit()
-        enviarTamano()
-      })
-    })
-    observador.observe(nodo)
-
-    return () => {
-      cancelAnimationFrame(marco)
-      observador.disconnect()
-      teclado.dispose()
-      vista.dispose()
-      terminal.current = null
-    }
-  }, [enviarTamano, teclear])
 
   return (
     // Sin scroll de pagina: desplaza xterm por dentro. El recorte absorbe los
@@ -193,12 +171,12 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
           <span className="truncate font-medium">{server.name}</span>
           <Badge className="bg-white/8 text-term-text gap-1 border-transparent font-normal">
             <IconoDeEntrada className="size-3" />
-            <span className="font-machine">{credencial.username}</span>
+            <span className="font-machine">{credencialDelante.username}</span>
             <span className="sr-only">{comoEntra}</span>
           </Badge>
-          {rutaInicial && (
+          {credencialDelante.working_directory && (
             <span className="text-term-dim font-machine hidden truncate sm:inline">
-              · {rutaInicial}
+              · {credencialDelante.working_directory}
             </span>
           )}
         </div>
@@ -212,44 +190,18 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
             <span
               className={cn(
                 'size-2 rounded-full',
-                estado.fase === 'conectada' && 'bg-term-ok',
-                estado.fase === 'conectando' && 'bg-term-arg animate-pulse',
-                estado.fase === 'cerrada' && 'bg-term-root',
+                estado?.fase === 'conectada' && 'bg-term-ok',
+                estado?.fase === 'cerrada' && 'bg-term-root',
+                (!estado || estado.fase === 'conectando') && 'bg-term-arg animate-pulse',
               )}
               aria-hidden
             />
             <span className="text-term-dim hidden sm:inline">
-              {estado.fase === 'conectada' && 'Conectado'}
-              {estado.fase === 'conectando' && 'Conectando'}
-              {estado.fase === 'cerrada' && estado.motivo}
+              {!estado || estado.fase === 'conectando' ? 'Conectando' : null}
+              {estado?.fase === 'conectada' && 'Conectado'}
+              {estado?.fase === 'cerrada' && estado.motivo}
             </span>
           </span>
-
-          {estado.fase === 'cerrada' && estado.reintentable && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={reconectar}
-              className="border-term-border text-term-text bg-transparent hover:bg-white/5"
-            >
-              <RotateCwIcon />
-              Volver a conectar
-            </Button>
-          )}
-
-          {estado.fase === 'cerrada' && estado.codigo === CIERRE.SIN_SALDO && (
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="border-term-border text-term-text bg-transparent hover:bg-white/5"
-            >
-              <Link to="/app/credits">
-                <CoinsIcon />
-                Ver créditos
-              </Link>
-            </Button>
-          )}
 
           <Button
             variant="ghost"
@@ -263,11 +215,30 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
         </div>
       </header>
 
-      <main
-        ref={contenedor}
-        className="min-h-0 flex-1 overflow-hidden p-2"
-        aria-label="Terminal"
+      <BarraDePestanas
+        pestanas={pestanas}
+        activa={activa.id}
+        estados={estados}
+        credenciales={server.users}
+        onActivar={setActiva}
+        onCerrar={cerrar}
+        onAbrir={abrir}
       />
+
+      {pestanas.map((pestana) => {
+        const suya = server.users.find((una) => una.id === pestana.credentialId)
+        if (!suya) return null
+        return (
+          <PanelDeTerminal
+            key={pestana.id}
+            id={pestana.id}
+            server={server}
+            credencial={suya}
+            visible={pestana.id === activa.id}
+            onEstado={anotarEstado}
+          />
+        )
+      })}
     </div>
   )
 }

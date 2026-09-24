@@ -67,6 +67,10 @@ xterm una sola vez y `useTerminalSocket` lleva el WebSocket.
   dos minutos, y antes del reloj si vuelve la red o la pestaña. Como xterm no
   se desmonta, lo escrito sigue en pantalla; la API devuelve la misma sesión
   y reenvía lo que salió mientras tanto.
+- **Varias shells en pestañas.** Hasta seis por ventana, con cualquier
+  credencial del servidor; `Alt+1`…`Alt+9` cambia de una a otra. Las de atrás
+  siguen conectadas y recibiendo. Abrir más no cuesta más: el cobro cuenta
+  servidores y personas por día.
 - **La letra no espera a la red.** Con más de 90 ms de ida y vuelta,
   `eco-predictivo` pinta atenuado lo que se teclea y lo reemplaza por la
   respuesta del servidor en cuanto llega, como hace Mosh. En vim o htop no
