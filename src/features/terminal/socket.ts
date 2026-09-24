@@ -2,7 +2,9 @@
 
 export const CIERRE = {
   NORMAL: 1000,
+  SE_VA: 1001,
   ANORMAL: 1006,
+  SERVIDOR: 1011,
   REINICIO: 1012,
   NO_AUTENTICADO: 4401,
   ORGANIZACION_SUSPENDIDA: 4402,
@@ -16,20 +18,22 @@ export type EstadoTerminal =
   | { fase: 'conectada' }
   | { fase: 'cerrada'; codigo: number; motivo: string; reintentable: boolean }
 
-export interface MensajeEntrante {
-  type: 'output' | 'error'
-  message: string
-}
+/** La shell vive en el servidor: su id permite volver a ella tras un corte. */
+export type MensajeEntrante =
+  { type: 'output' | 'error'; message: string } | { type: 'sesion'; id: string }
 
 /** Token en la query: el handshake del navegador no admite cabeceras.
- *  Dura 30 minutos y produccion exige wss. */
+ *  Dura 30 minutos y produccion exige wss. Con `sesion`, retoma la shell
+ *  que quedó abierta en el servidor. */
 export function buildTerminalUrl(
   base: string,
   serverId: string,
   credentialId: string,
   token: string,
+  sesion?: string | null,
 ): string {
-  return `${base}/ws/terminal/${serverId}/${credentialId}?token=${encodeURIComponent(token)}`
+  const url = `${base}/ws/terminal/${serverId}/${credentialId}?token=${encodeURIComponent(token)}`
+  return sesion ? `${url}&sesion=${encodeURIComponent(sesion)}` : url
 }
 
 export function buildTerminalPath(serverId: string, credentialId: string): string {
@@ -74,11 +78,31 @@ export function describeClose(codigo: number): {
   }
 }
 
-/** Un relevo de versión cierra con 1012: se reconecta solo, pocas veces. */
-export const RECONEXION = { intentos: 3, esperaMs: 1500 } as const
+/** Esperas que se doblan: una caída breve se recupera enseguida y una
+ *  larga no martillea al servidor. Los intentos cubren los dos minutos que
+ *  la shell aguanta viva sin nadie. */
+export const RECONEXION = {
+  intentos: 12,
+  esperaBaseMs: 500,
+  esperaMaximaMs: 15_000,
+} as const
+
+/** Cortes que no decide el usuario: red, relevo de versión o fallo del
+ *  servidor. La shell sigue viva un par de minutos, así que se vuelve. */
+const CIERRES_QUE_VUELVEN: number[] = [
+  CIERRE.ANORMAL,
+  CIERRE.REINICIO,
+  CIERRE.SERVIDOR,
+  CIERRE.SE_VA,
+]
 
 export function reconnectsAutomatically(codigo: number, intentosHechos: number): boolean {
-  return codigo === CIERRE.REINICIO && intentosHechos < RECONEXION.intentos
+  return CIERRES_QUE_VUELVEN.includes(codigo) && intentosHechos < RECONEXION.intentos
+}
+
+export function fetchEsperaDeReconexion(intentosHechos: number): number {
+  const { esperaBaseMs, esperaMaximaMs } = RECONEXION
+  return Math.min(esperaBaseMs * 2 ** intentosHechos, esperaMaximaMs)
 }
 
 /** Comillas simples: la shell no interpreta nada dentro. Una comilla
@@ -97,7 +121,10 @@ export function buildInitialCommand(path: string): string | null {
 
 export function parseIncoming(raw: string): MensajeEntrante | null {
   try {
-    const dato = JSON.parse(raw) as Partial<MensajeEntrante>
+    const dato = JSON.parse(raw) as { type?: string; message?: string; id?: string }
+    if (dato.type === 'sesion') {
+      return typeof dato.id === 'string' ? { type: 'sesion', id: dato.id } : null
+    }
     if (typeof dato.message !== 'string') return null
     return { type: dato.type === 'error' ? 'error' : 'output', message: dato.message }
   } catch {

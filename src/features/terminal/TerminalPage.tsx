@@ -4,7 +4,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal } from '@xterm/xterm'
 import { cn } from 'cn'
 import { ArrowLeftIcon, CoinsIcon, Loader2Icon, RotateCwIcon, XIcon } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
 import '@xterm/xterm/css/xterm.css'
@@ -12,21 +12,11 @@ import '@/features/terminal/terminal.css'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { getAccessToken } from '@/features/auth/token-store'
 import * as serversApi from '@/features/servers/api'
-import {
-  buildInitialCommand,
-  buildTerminalUrl,
-  CIERRE,
-  describeClose,
-  parseIncoming,
-  RECONEXION,
-  reconnectsAutomatically,
-  type EstadoTerminal,
-} from '@/features/terminal/socket'
+import { CIERRE, type EstadoTerminal } from '@/features/terminal/socket'
+import { useTerminalSocket } from '@/features/terminal/use-terminal-socket'
 import { FORMAS_DE_ENTRAR } from '@/features/servers/auth-type'
 import { buildServerPath } from '@/features/servers/paths'
-import { env } from '@/lib/env'
 import { useVolver } from '@/lib/use-volver'
 import { isUuid } from '@/lib/ids'
 import type { Server, ServerUser } from '@/types/api'
@@ -112,21 +102,24 @@ interface SesionProps {
   credencial: ServerUser
 }
 
-/** Monta xterm y el WebSocket; los desmonta enteros al salir. */
+/** Monta xterm una vez y le ata la shell; al reconectar, lo escrito sigue
+ *  en pantalla. */
 function SesionDeTerminal({ server, credencial }: SesionProps) {
   const volver = useVolver(buildServerPath(server.id))
   const cliente = useQueryClient()
   const { icono: IconoDeEntrada, etiqueta: comoEntra } =
     FORMAS_DE_ENTRAR[credencial.auth_type]
   const contenedor = useRef<HTMLDivElement | null>(null)
+  const terminal = useRef<Terminal | null>(null)
   const [estado, setEstado] = useState<EstadoTerminal>({ fase: 'conectando' })
-  const [intento, setIntento] = useState(0)
-  const reconexiones = useRef(0)
+  const rutaInicial = credencial.working_directory
 
-  const reconectar = useCallback(() => {
-    setEstado({ fase: 'conectando' })
-    setIntento((actual) => actual + 1)
-  }, [])
+  const { enviar, enviarTamano, reconectar } = useTerminalSocket({
+    server,
+    credencial,
+    terminal,
+    onEstado: setEstado,
+  })
 
   // La sesion cambia el ultimo uso de credencial y servidor: al salir se
   // invalidan sus listas, «Usadas hace poco» incluida
@@ -138,13 +131,11 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
     [cliente],
   )
 
-  const rutaInicial = credencial.working_directory
-
   useEffect(() => {
     const nodo = contenedor.current
     if (!nodo) return
 
-    const terminal = new Terminal({
+    const vista = new Terminal({
       theme: TEMA,
       fontFamily: "'JetBrains Mono', ui-monospace, monospace",
       fontSize: 13,
@@ -154,83 +145,16 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
       allowProposedApi: true,
     })
     const ajuste = new FitAddon()
-    terminal.loadAddon(ajuste)
-    terminal.loadAddon(new WebLinksAddon())
-    terminal.open(nodo)
+    vista.loadAddon(ajuste)
+    vista.loadAddon(new WebLinksAddon())
+    vista.open(nodo)
+    terminal.current = vista
 
     // Ajuste en el siguiente frame: tras open el contenedor aun mide cero
     // y xterm quedaria en 80x24
     let marco = requestAnimationFrame(() => ajuste.fit())
 
-    let socket: WebSocket | null = null
-    let inicialPendiente = buildInitialCommand(rutaInicial)
-    let reintento: number | undefined
-    let vigente = true
-
-    const enviar = (carga: object) => {
-      if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(carga))
-    }
-    const enviarTamano = () =>
-      enviar({ resize: { cols: terminal.cols, rows: terminal.rows } })
-
-    // Diferido un tick: StrictMode monta, limpia y remonta en el mismo tick;
-    // un socket sincrono arrancaria y abortaria un intento SSH en el backend
-    const apertura = window.setTimeout(() => {
-      socket = new WebSocket(
-        buildTerminalUrl(env.socketUrl, server.id, credencial.id, getAccessToken() ?? ''),
-      )
-
-      socket.onopen = () => {
-        reconexiones.current = 0
-        setEstado({ fase: 'conectada' })
-        terminal.focus()
-        enviarTamano()
-      }
-
-      socket.onmessage = (evento) => {
-        const mensaje = parseIncoming(String(evento.data))
-        if (!mensaje) return
-        terminal.write(mensaje.message)
-
-        // El cd espera a la primera salida (el prompt): en onopen la shell
-        // remota aun no existe
-        if (inicialPendiente && mensaje.type === 'output') {
-          enviar({ command: inicialPendiente })
-          inicialPendiente = null
-        }
-      }
-
-      socket.onclose = (evento) => {
-        const { motivo, reintentable } = describeClose(evento.code)
-        terminal.write(`\r\n\x1b[2m— ${motivo} —\x1b[0m\r\n`)
-
-        if (reconnectsAutomatically(evento.code, reconexiones.current)) {
-          reconexiones.current += 1
-          setEstado({ fase: 'conectando' })
-          // Pasa por el interceptor: renueva el token que lleva la query
-          reintento = window.setTimeout(() => {
-            serversApi.fetchServer(server.id).then(
-              () => {
-                if (vigente) reconectar()
-              },
-              () => {
-                if (vigente)
-                  setEstado({
-                    fase: 'cerrada',
-                    codigo: CIERRE.ANORMAL,
-                    ...describeClose(CIERRE.ANORMAL),
-                  })
-              },
-            )
-          }, RECONEXION.esperaMs)
-          return
-        }
-
-        setEstado({ fase: 'cerrada', codigo: evento.code, motivo, reintentable })
-      }
-    }, 0)
-
-    const teclado = terminal.onData((datos) => enviar({ command: datos }))
+    const teclado = vista.onData((datos) => enviar({ command: datos }))
 
     const observador = new ResizeObserver(() => {
       cancelAnimationFrame(marco)
@@ -242,29 +166,13 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
     observador.observe(nodo)
 
     return () => {
-      vigente = false
-      window.clearTimeout(apertura)
-      window.clearTimeout(reintento)
       cancelAnimationFrame(marco)
       observador.disconnect()
       teclado.dispose()
-      if (socket) {
-        // Manejadores fuera antes de cerrar: este cierre no marca como caida
-        // la sesion del siguiente montaje
-        socket.onopen = null
-        socket.onmessage = null
-        socket.onclose = null
-        // Cerrar el socket libera la sesion SSH remota
-        if (
-          socket.readyState === WebSocket.OPEN ||
-          socket.readyState === WebSocket.CONNECTING
-        ) {
-          socket.close(1000)
-        }
-      }
-      terminal.dispose()
+      vista.dispose()
+      terminal.current = null
     }
-  }, [server.id, credencial.id, rutaInicial, intento])
+  }, [enviar, enviarTamano])
 
   return (
     // Sin scroll de pagina: desplaza xterm por dentro. El recorte absorbe los

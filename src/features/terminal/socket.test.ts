@@ -6,6 +6,7 @@ import {
   buildTerminalUrl,
   CIERRE,
   describeClose,
+  fetchEsperaDeReconexion,
   parseIncoming,
   quoteForShell,
   RECONEXION,
@@ -122,6 +123,41 @@ describe('parseIncoming', () => {
   })
 })
 
+describe('buildTerminalUrl con sesión', () => {
+  it('lleva la sesión que se retoma', () => {
+    expect(
+      buildTerminalUrl('ws://x', SERVIDOR, CREDENCIAL, 'abc', 'se-sion-1'),
+    ).toContain('&sesion=se-sion-1')
+  })
+
+  it('sin sesión, no la nombra', () => {
+    expect(buildTerminalUrl('ws://x', SERVIDOR, CREDENCIAL, 'abc')).not.toContain(
+      'sesion=',
+    )
+  })
+})
+
+describe('parseIncoming del id de sesión', () => {
+  it('reconoce el id con el que se vuelve a la shell', () => {
+    expect(parseIncoming('{"type":"sesion","id":"abc"}')).toEqual({
+      type: 'sesion',
+      id: 'abc',
+    })
+  })
+
+  it('sin id no es un mensaje de sesión', () => {
+    expect(parseIncoming('{"type":"sesion"}')).toBeNull()
+  })
+})
+
+describe('fetchEsperaDeReconexion', () => {
+  it('dobla la espera y se detiene en el tope', () => {
+    expect(fetchEsperaDeReconexion(0)).toBe(RECONEXION.esperaBaseMs)
+    expect(fetchEsperaDeReconexion(1)).toBe(RECONEXION.esperaBaseMs * 2)
+    expect(fetchEsperaDeReconexion(20)).toBe(RECONEXION.esperaMaximaMs)
+  })
+})
+
 describe('reconnectsAutomatically', () => {
   it('un relevo de versión reconecta solo y lo dice', () => {
     expect(reconnectsAutomatically(CIERRE.REINICIO, 0)).toBe(true)
@@ -132,8 +168,13 @@ describe('reconnectsAutomatically', () => {
     expect(reconnectsAutomatically(CIERRE.REINICIO, RECONEXION.intentos)).toBe(false)
   })
 
-  it('otros cierres esperan a la persona', () => {
-    for (const codigo of [CIERRE.NORMAL, CIERRE.ANORMAL, CIERRE.SIN_PERMISO]) {
+  it('un corte de red vuelve solo: la shell sigue viva', () => {
+    expect(reconnectsAutomatically(CIERRE.ANORMAL, 0)).toBe(true)
+    expect(reconnectsAutomatically(CIERRE.SERVIDOR, 0)).toBe(true)
+  })
+
+  it('lo que decide la persona o el permiso no vuelve solo', () => {
+    for (const codigo of [CIERRE.NORMAL, CIERRE.SIN_PERMISO, CIERRE.SIN_SALDO]) {
       expect(reconnectsAutomatically(codigo, 0)).toBe(false)
     }
   })
