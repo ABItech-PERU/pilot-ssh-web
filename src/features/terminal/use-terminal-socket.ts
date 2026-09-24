@@ -66,6 +66,8 @@ export function useTerminalSocket({
   const respuesta = useRef<((suya: MensajeDeSubida) => void) | null>(null)
   const listado = useRef<((suyo: MensajeDeCarpetas) => void) | null>(null)
   const cancelada = useRef(false)
+  const enVuelo = useRef(0)
+  const turnos = useRef<(() => void)[]>([])
 
   // Por referencia: cambiar de aviso no reabre el socket
   const avisar = useRef(onLatencia)
@@ -115,6 +117,22 @@ export function useTerminalSocket({
     [enviar],
   )
 
+  /** Tramos sin confirmar. Dos mantienen el canal lleno sin encolar tanto
+   *  que la tecla siguiente espere. */
+  const VENTANA = 2
+
+  const pedirTurno = async () => {
+    if (enVuelo.current >= VENTANA) {
+      await new Promise<void>((seguir) => turnos.current.push(seguir))
+    }
+    enVuelo.current += 1
+  }
+
+  const darTurno = () => {
+    enVuelo.current = Math.max(0, enVuelo.current - 1)
+    turnos.current.shift()?.()
+  }
+
   /** Copia un archivo a la carpeta pedida y avisa cómo terminó. */
   const subir = useCallback(
     async (archivo: File, carpeta: string) => {
@@ -122,6 +140,8 @@ export function useTerminalSocket({
       if (!abierto || abierto.readyState !== WebSocket.OPEN || subida) return
 
       cancelada.current = false
+      enVuelo.current = 0
+      turnos.current = []
       setSubida({ nombre: archivo.name, carpeta, enviado: 0, total: archivo.size })
 
       try {
@@ -129,13 +149,12 @@ export function useTerminalSocket({
         const preparada = await esperarRespuesta()
         if (preparada.estado === 'error') throw new Error(preparada.message)
 
-        await enviarPorTramos(
-          abierto,
-          archivo,
-          (enviado) =>
+        await enviarPorTramos(abierto, archivo, {
+          onAvance: (enviado) =>
             setSubida({ nombre: archivo.name, carpeta, enviado, total: archivo.size }),
-          () => !cancelada.current,
-        )
+          sigueViva: () => !cancelada.current,
+          pedirTurno,
+        })
         enviar({ subida: { fin: true } })
         const guardada = await esperarRespuesta()
         if (guardada.estado === 'error') throw new Error(guardada.message)
@@ -251,6 +270,10 @@ export function useTerminalSocket({
           return
         }
         if (mensaje.type === 'subida') {
+          if (mensaje.estado === 'sigue') {
+            darTurno()
+            return
+          }
           const contestar = respuesta.current
           respuesta.current = null
           contestar?.(mensaje)

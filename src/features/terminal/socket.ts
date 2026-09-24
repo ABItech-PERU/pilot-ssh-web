@@ -21,7 +21,7 @@ export type EstadoTerminal =
 /** Cómo va el archivo que se está copiando al servidor. */
 export type MensajeDeSubida = {
   type: 'subida'
-  estado: 'preparada' | 'guardada' | 'error'
+  estado: 'preparada' | 'sigue' | 'guardada' | 'error'
   ruta?: string
   message?: string
 }
@@ -141,7 +141,7 @@ export function buildInitialCommand(path: string): string | null {
   return `cd ${quoteForShell(limpio)}\r`
 }
 
-const ESTADOS_DE_SUBIDA = ['preparada', 'guardada', 'error']
+const ESTADOS_DE_SUBIDA = ['preparada', 'sigue', 'guardada', 'error']
 
 export function parseIncoming(raw: string): MensajeEntrante | null {
   try {

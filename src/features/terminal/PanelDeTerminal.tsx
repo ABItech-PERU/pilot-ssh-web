@@ -266,8 +266,11 @@ export function PanelDeTerminal({
         if (archivo) subirAlDestino(archivo)
       }}
     >
+      <div ref={contenedor} className="min-h-0 flex-1 overflow-hidden" />
+
       {estado.fase === 'cerrada' && (
-        <div className="border-term-border bg-term-bg mb-2 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
+        <div className="border-term-border bg-term-bg relative z-10 mt-2 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
+          <span className="bg-term-root size-2 shrink-0 rounded-full" aria-hidden />
           <span className="text-sm">{estado.motivo}</span>
           <div className="ml-auto flex gap-2">
             {estado.reintentable && (
@@ -291,8 +294,6 @@ export function PanelDeTerminal({
           </div>
         </div>
       )}
-
-      <div ref={contenedor} className="min-h-0 flex-1" />
 
       {buscando && (
         <BuscadorEnTerminal

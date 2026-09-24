@@ -78,8 +78,9 @@ xterm una sola vez y `useTerminalSocket` lleva el WebSocket.
 - **Arrastrar un archivo lo sube donde está parado.** El destino sale del
   `cd` de la shell, leído de lo que anuncia (OSC 7) o de su prompt; si no se
   sabe, la carpeta de trabajo de la credencial. Viaja en tramos por el mismo
-  socket, con el destino y el avance a la vista y con cancelar a mano; lo
-  escrito a medias lo borra el servidor.
+  socket, por turnos para que teclear no espere detrás del archivo, con el
+  destino y el avance a la vista y con cancelar a mano; lo escrito a medias
+  lo borra el servidor.
 - **Al terminar, el aviso queda con la ruta**, y con copiarla o ir a la
   carpeta: escribirlo en la shell dejaba el prompt a medias. Para otra
   carpeta, el menú de la barra abre un selector que se navega a clics.

@@ -40,9 +40,11 @@ describe('enviarPorTramos', () => {
     const socket = buildSocket()
     const avances: number[] = []
 
-    await enviarPorTramos(socket, buildArchivo(TAMANO_DE_TRAMO + 10), (enviado) =>
-      avances.push(enviado),
-    )
+    await enviarPorTramos(socket, buildArchivo(TAMANO_DE_TRAMO + 10), {
+      onAvance: (enviado) => avances.push(enviado),
+      sigueViva: () => true,
+      pedirTurno: async () => {},
+    })
 
     const enviados = (socket as unknown as SocketDePrueba).enviados
     expect(enviados).toHaveLength(2)
@@ -54,14 +56,13 @@ describe('enviarPorTramos', () => {
     const socket = buildSocket()
     let sigue = true
 
-    const copia = enviarPorTramos(
-      socket,
-      buildArchivo(TAMANO_DE_TRAMO * 3),
-      () => {
+    const copia = enviarPorTramos(socket, buildArchivo(TAMANO_DE_TRAMO * 3), {
+      onAvance: () => {
         sigue = false
       },
-      () => sigue,
-    )
+      sigueViva: () => sigue,
+      pedirTurno: async () => {},
+    })
 
     await expect(copia).rejects.toThrow(/cancel/)
     expect((socket as unknown as SocketDePrueba).enviados).toHaveLength(1)
@@ -70,8 +71,12 @@ describe('enviarPorTramos', () => {
   it('con el socket caído no manda nada a ciegas', async () => {
     const socket = buildSocket(WebSocket.CLOSED)
 
-    await expect(enviarPorTramos(socket, buildArchivo(10), () => {})).rejects.toThrow(
-      /conexión/,
-    )
+    const copia = enviarPorTramos(socket, buildArchivo(10), {
+      onAvance: () => {},
+      sigueViva: () => true,
+      pedirTurno: async () => {},
+    })
+
+    await expect(copia).rejects.toThrow(/conexión/)
   })
 })
