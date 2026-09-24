@@ -2,6 +2,7 @@ import type { Terminal } from '@xterm/xterm'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { getAccessToken } from '@/features/auth/token-store'
+import { crearEcoPredictivo } from '@/features/terminal/eco-predictivo'
 import * as serversApi from '@/features/servers/api'
 import {
   buildInitialCommand,
@@ -16,6 +17,12 @@ import {
 } from '@/features/terminal/socket'
 import { env } from '@/lib/env'
 import type { Server, ServerUser } from '@/types/api'
+
+/** Por encima, la letra tarda en aparecer y conviene adelantarla. */
+const LATENCIA_PARA_ADELANTAR_MS = 90
+
+/** Media que sigue a la red sin saltar con una medida suelta. */
+const PESO_DE_LA_ULTIMA = 0.25
 
 interface Opciones {
   server: Server
@@ -32,6 +39,9 @@ export function useTerminalSocket({ server, credencial, terminal, onEstado }: Op
   const sesion = useRef<string | null>(null)
   const reconexiones = useRef(0)
   const [intento, setIntento] = useState(0)
+  const eco = useRef(crearEcoPredictivo())
+  const tecleadoEn = useRef<number | null>(null)
+  const latencia = useRef(0)
 
   const enviar = useCallback((carga: object) => {
     if (socket.current?.readyState === WebSocket.OPEN) {
@@ -43,6 +53,24 @@ export function useTerminalSocket({ server, credencial, terminal, onEstado }: Op
     const vista = terminal.current
     if (vista) enviar({ resize: { cols: vista.cols, rows: vista.rows } })
   }, [enviar, terminal])
+
+  /** Escribe en la shell y, si la red es lenta, adelanta la letra. */
+  const teclear = useCallback(
+    (datos: string) => {
+      const vista = terminal.current
+      if (vista) {
+        const adelanto = eco.current.predecir(datos, {
+          cols: vista.cols,
+          cursorX: vista.buffer.active.cursorX,
+          enPantallaAlterna: vista.buffer.active.type === 'alternate',
+        })
+        if (adelanto) vista.write(adelanto)
+      }
+      if (tecleadoEn.current === null) tecleadoEn.current = performance.now()
+      enviar({ command: datos })
+    },
+    [enviar, terminal],
+  )
 
   const reconectar = useCallback(() => {
     onEstado({ fase: 'conectando' })
@@ -128,7 +156,14 @@ export function useTerminalSocket({ server, credencial, terminal, onEstado }: Op
           sesion.current = mensaje.id
           return
         }
-        escribir(mensaje.message)
+        if (tecleadoEn.current !== null) {
+          const ida = performance.now() - tecleadoEn.current
+          tecleadoEn.current = null
+          latencia.current =
+            latencia.current * (1 - PESO_DE_LA_ULTIMA) + ida * PESO_DE_LA_ULTIMA
+          eco.current.activar(latencia.current > LATENCIA_PARA_ADELANTAR_MS)
+        }
+        escribir(eco.current.reconciliar(mensaje.message))
 
         // El cd espera a la primera salida (el prompt): en onopen la shell
         // remota aun no existe
@@ -139,6 +174,8 @@ export function useTerminalSocket({ server, credencial, terminal, onEstado }: Op
       }
 
       abierto.onclose = (evento) => {
+        escribir(eco.current.limpiar())
+        tecleadoEn.current = null
         if (reconnectsAutomatically(evento.code, reconexiones.current)) {
           if (reconexiones.current === 0) {
             escribir('\r\n\x1b[2m— Se perdió la conexión. Reconectando… —\x1b[0m\r\n')
@@ -188,5 +225,5 @@ export function useTerminalSocket({ server, credencial, terminal, onEstado }: Op
     terminal,
   ])
 
-  return { enviar, enviarTamano, reconectar }
+  return { enviarTamano, reconectar, teclear }
 }

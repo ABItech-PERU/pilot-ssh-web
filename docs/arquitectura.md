@@ -58,6 +58,20 @@ vuelve a pedir al cargar; Google los ve en el siguiente arranque.
 - Vista previa al compartir: [depurador de Facebook](https://developers.facebook.com/tools/debug/).
   Datos estructurados: [prueba de resultados enriquecidos](https://search.google.com/test/rich-results).
 
+## La terminal
+
+`src/features/terminal` separa la pantalla del enlace: `TerminalPage` monta
+xterm una sola vez y `useTerminalSocket` lleva el WebSocket.
+
+- **Un corte no borra nada.** El hook reintenta con espera creciente hasta
+  dos minutos, y antes del reloj si vuelve la red o la pestaña. Como xterm no
+  se desmonta, lo escrito sigue en pantalla; la API devuelve la misma sesión
+  y reenvía lo que salió mientras tanto.
+- **La letra no espera a la red.** Con más de 90 ms de ida y vuelta,
+  `eco-predictivo` pinta atenuado lo que se teclea y lo reemplaza por la
+  respuesta del servidor en cuanto llega, como hace Mosh. En vim o htop no
+  adivina: una letra de más descuadraría la pantalla.
+
 ## Cabeceras de seguridad
 
 Las pone el nginx del contenedor (`deploy/docker/nginx.conf`):

@@ -114,7 +114,7 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
   const [estado, setEstado] = useState<EstadoTerminal>({ fase: 'conectando' })
   const rutaInicial = credencial.working_directory
 
-  const { enviar, enviarTamano, reconectar } = useTerminalSocket({
+  const { enviarTamano, reconectar, teclear } = useTerminalSocket({
     server,
     credencial,
     terminal,
@@ -154,7 +154,7 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
     // y xterm quedaria en 80x24
     let marco = requestAnimationFrame(() => ajuste.fit())
 
-    const teclado = vista.onData((datos) => enviar({ command: datos }))
+    const teclado = vista.onData(teclear)
 
     const observador = new ResizeObserver(() => {
       cancelAnimationFrame(marco)
@@ -172,7 +172,7 @@ function SesionDeTerminal({ server, credencial }: SesionProps) {
       vista.dispose()
       terminal.current = null
     }
-  }, [enviar, enviarTamano])
+  }, [enviarTamano, teclear])
 
   return (
     // Sin scroll de pagina: desplaza xterm por dentro. El recorte absorbe los
