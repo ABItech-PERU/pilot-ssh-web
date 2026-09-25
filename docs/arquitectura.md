@@ -94,10 +94,10 @@ xterm una sola vez y `useTerminalSocket` lleva el WebSocket.
   pegan sin robarle `Ctrl+C` a la shell; el botón de ayuda los lista.
 - **La letra no espera a la red.** Con más de 90 ms de ida y vuelta,
   `eco-predictivo` pinta la letra al instante, igual que la pintará el
-  servidor, y la reemplaza por la suya al llegar, como hace Mosh. Marcarla
-  de otro color delataba la espera que se quiere disimular. En vim o htop no
-  adivina, y si la shell deja de repetir lo tecleado —pide una contraseña—
-  borra lo adelantado y deja de adivinar.
+  servidor, y cuando el eco confirma lo mismo no la repinta: marcarla de
+  otro color o borrarla y reescribirla delataba la espera que se quiere
+  disimular. En vim o htop no adivina, y si la shell deja de repetir lo
+  tecleado —pide una contraseña— borra lo adelantado y deja de adivinar.
 
 ## Cabeceras de seguridad
 

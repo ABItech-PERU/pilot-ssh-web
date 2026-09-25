@@ -1,8 +1,8 @@
 /** Eco local mientras llega el del servidor.
  *
  *  Con 200 ms de ida y vuelta, la letra aparece cuando ya se tecleó la
- *  siguiente. Aquí se pinta al instante, igual que la pintará el servidor, y
- *  se reemplaza por la suya al llegar. Es lo que hace Mosh.
+ *  siguiente. Aquí se pinta al instante, igual que la pintará el servidor;
+ *  cuando su eco confirma lo mismo, no se repinta. Es lo que hace Mosh.
  */
 
 export interface VistaDeTerminal {
@@ -56,10 +56,24 @@ export function crearEcoPredictivo() {
       return datos
     },
 
-    /** Lo que se pinta por la salida del servidor: antes borra lo predicho,
-     *  que esa salida ya trae. */
+    /** Lo que se pinta por la salida del servidor. Si confirma lo adelantado,
+     *  no se repinta: borrar y volver a escribir lo mismo se ve parpadear. */
     reconciliar(salida: string): string {
-      return pendiente ? borrarPendiente() + salida : salida
+      if (!pendiente) return salida
+
+      if (pendiente.startsWith(salida)) {
+        pendiente = pendiente.slice(salida.length)
+        return ''
+      }
+
+      if (salida.startsWith(pendiente)) {
+        const resto = salida.slice(pendiente.length)
+        pendiente = ''
+        return resto
+      }
+
+      // La shell escribió otra cosa: manda ella
+      return borrarPendiente() + salida
     },
 
     /** Al cerrar o reconectar: la pantalla queda como la dejó el servidor. */

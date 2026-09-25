@@ -60,12 +60,35 @@ describe('predecir', () => {
 })
 
 describe('reconciliar', () => {
-  it('borra lo predicho antes de pintar lo que llega', () => {
+  it('lo que confirma lo adivinado no se repinta', () => {
     eco.predecir('l', VISTA)
     eco.predecir('s', VISTA)
 
-    expect(eco.reconciliar('ls')).toBe(BORRAR.repeat(2) + 'ls')
+    expect(eco.reconciliar('ls')).toBe('')
     expect(eco.hayPendiente).toBe(false)
+  })
+
+  it('el eco partido en dos confirma de a poco', () => {
+    eco.predecir('l', VISTA)
+    eco.predecir('s', VISTA)
+
+    expect(eco.reconciliar('l')).toBe('')
+    expect(eco.hayPendiente).toBe(true)
+    expect(eco.reconciliar('s')).toBe('')
+    expect(eco.hayPendiente).toBe(false)
+  })
+
+  it('lo que el eco trae de más sí se pinta', () => {
+    eco.predecir('l', VISTA)
+    eco.predecir('s', VISTA)
+
+    expect(eco.reconciliar('ls y su salida')).toBe(' y su salida')
+  })
+
+  it('si la shell escribe otra cosa, se borra lo adivinado', () => {
+    eco.predecir('a', VISTA)
+
+    expect(eco.reconciliar('zzz')).toBe(BORRAR + 'zzz')
   })
 
   it('sin nada predicho, la salida pasa tal cual', () => {
