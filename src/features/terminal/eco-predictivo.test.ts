@@ -17,8 +17,8 @@ beforeEach(() => {
 })
 
 describe('predecir', () => {
-  it('pinta la letra atenuada antes de que llegue el eco', () => {
-    expect(eco.predecir('a', VISTA)).toBe('\x1b[2ma\x1b[0m')
+  it('pinta la letra igual que lo hará el servidor', () => {
+    expect(eco.predecir('a', VISTA)).toBe('a')
     expect(eco.hayPendiente).toBe(true)
   })
 

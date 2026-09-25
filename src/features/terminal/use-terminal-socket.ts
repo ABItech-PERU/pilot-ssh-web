@@ -40,6 +40,10 @@ const TRAMO_DE_LATENCIA_MS = 10
 /** Más tarde no es el eco de la tecla: falsearía la media. */
 const LATENCIA_CREIBLE_MS = 1500
 
+/** Sin respuesta en este tiempo, la shell no repite lo tecleado (pide una
+ *  contraseña): se borra lo adelantado y se deja de adivinar. */
+const SIN_ECO_MS = 600
+
 interface Opciones {
   server: Server
   credencial: ServerUser
@@ -64,6 +68,7 @@ export function useTerminalSocket({
   const [intento, setIntento] = useState(0)
   const eco = useRef(crearEcoPredictivo())
   const tecleadoEn = useRef<number | null>(null)
+  const esperaDeEco = useRef<number | undefined>(undefined)
   const latencia = useRef(0)
   const avisada = useRef(0)
   const [subida, setSubida] = useState<AvanceDeSubida | null>(null)
@@ -100,6 +105,13 @@ export function useTerminalSocket({
           enPantallaAlterna: vista.buffer.active.type === 'alternate',
         })
         if (adelanto) vista.write(adelanto)
+        if (eco.current.hayPendiente && esperaDeEco.current === undefined) {
+          esperaDeEco.current = window.setTimeout(() => {
+            esperaDeEco.current = undefined
+            vista.write(eco.current.limpiar())
+            eco.current.activar(false)
+          }, SIN_ECO_MS)
+        }
       }
       if (tecleadoEn.current === null) tecleadoEn.current = performance.now()
       enviar({ command: datos })
@@ -313,6 +325,9 @@ export function useTerminalSocket({
           contestar?.(mensaje)
           return
         }
+        window.clearTimeout(esperaDeEco.current)
+        esperaDeEco.current = undefined
+
         if (tecleadoEn.current !== null) {
           const ida = performance.now() - tecleadoEn.current
           tecleadoEn.current = null
@@ -370,6 +385,7 @@ export function useTerminalSocket({
       document.removeEventListener('visibilitychange', reintentarYa)
       window.clearTimeout(apertura)
       window.clearTimeout(reintento)
+      window.clearTimeout(esperaDeEco.current)
 
       const abierto = socket.current
       socket.current = null

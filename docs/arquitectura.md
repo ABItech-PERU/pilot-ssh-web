@@ -93,9 +93,11 @@ xterm una sola vez y `useTerminalSocket` lleva el WebSocket.
 - **Atajos de terminal de siempre.** `Ctrl+Shift+C` y `Ctrl+Shift+V` copian y
   pegan sin robarle `Ctrl+C` a la shell; el botón de ayuda los lista.
 - **La letra no espera a la red.** Con más de 90 ms de ida y vuelta,
-  `eco-predictivo` pinta atenuado lo que se teclea y lo reemplaza por la
-  respuesta del servidor en cuanto llega, como hace Mosh. En vim o htop no
-  adivina: una letra de más descuadraría la pantalla.
+  `eco-predictivo` pinta la letra al instante, igual que la pintará el
+  servidor, y la reemplaza por la suya al llegar, como hace Mosh. Marcarla
+  de otro color delataba la espera que se quiere disimular. En vim o htop no
+  adivina, y si la shell deja de repetir lo tecleado —pide una contraseña—
+  borra lo adelantado y deja de adivinar.
 
 ## Cabeceras de seguridad
 
