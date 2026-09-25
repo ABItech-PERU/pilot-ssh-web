@@ -272,11 +272,12 @@ export function PanelDeTerminal({
         <div className="border-term-border bg-term-bg relative z-10 mt-2 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
           <span className="bg-term-root size-2 shrink-0 rounded-full" aria-hidden />
           <span className="min-w-0 flex-1 text-sm">{estado.motivo}</span>
-          <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row">
+          <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
             {estado.reintentable && (
               <BotonDeCierre className="flex-1 sm:flex-none" onClick={reconectar}>
                 <RotateCwIcon />
-                Volver a conectar
+                <span className="sm:hidden">Reconectar</span>
+                <span className="hidden sm:inline">Volver a conectar</span>
               </BotonDeCierre>
             )}
             {estado.codigo === CIERRE.SIN_SALDO && (
@@ -289,7 +290,10 @@ export function PanelDeTerminal({
             )}
             <BotonDeCierre className="flex-1 sm:flex-none" onClick={onCerrar}>
               <XIcon />
-              {esLaUnica ? 'Salir de la terminal' : 'Cerrar pestaña'}
+              <span className="sm:hidden">{esLaUnica ? 'Salir' : 'Cerrar'}</span>
+              <span className="hidden sm:inline">
+                {esLaUnica ? 'Salir de la terminal' : 'Cerrar pestaña'}
+              </span>
             </BotonDeCierre>
           </div>
         </div>
