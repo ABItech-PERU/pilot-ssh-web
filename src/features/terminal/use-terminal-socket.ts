@@ -40,8 +40,7 @@ const TRAMO_DE_LATENCIA_MS = 10
 /** Más tarde no es el eco de la tecla: falsearía la media. */
 const LATENCIA_CREIBLE_MS = 1500
 
-/** Sin respuesta en este tiempo, la shell no repite lo tecleado (pide una
- *  contraseña): se borra lo adelantado y se deja de adivinar. */
+/** Sin eco, la shell no repite lo tecleado: pide una contraseña. */
 const SIN_ECO_MS = 600
 
 interface Opciones {

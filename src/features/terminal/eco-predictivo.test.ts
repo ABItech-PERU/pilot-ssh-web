@@ -33,11 +33,19 @@ describe('predecir', () => {
     expect(eco.predecir('a', { ...VISTA, enPantallaAlterna: true })).toBe('')
   })
 
-  it('las teclas que no escriben retiran lo predicho', () => {
+  it('las teclas que mueven el cursor retiran lo predicho', () => {
     eco.predecir('a', VISTA)
 
-    expect(eco.predecir('\r', VISTA)).toBe(BORRAR)
+    expect(eco.predecir('\x1b[A', VISTA)).toBe(BORRAR)
     expect(eco.hayPendiente).toBe(false)
+  })
+
+  it('al enviar la línea, lo adivinado se queda: el eco lo confirma', () => {
+    eco.predecir('l', VISTA)
+    eco.predecir('s', VISTA)
+
+    expect(eco.predecir('\r', VISTA)).toBe('')
+    expect(eco.hayPendiente).toBe(true)
   })
 
   it('el borrado también retira lo predicho', () => {

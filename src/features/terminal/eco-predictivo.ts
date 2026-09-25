@@ -15,6 +15,9 @@ export interface VistaDeTerminal {
 /** Solo teclas que escriben; nada de flechas, control o borrado. */
 const ESCRIBE_UNA_LETRA = /^[\x20-\x7e -￿]$/u
 
+/** Enter no invalida lo tecleado: borrarlo hacía parpadear la línea. */
+const ENVIA_LA_LINEA = /^[\r\n]$/
+
 /** Cerca del borde, el salto de línea impediría borrar lo predicho. */
 const MARGEN_DERECHO = 2
 
@@ -46,6 +49,7 @@ export function crearEcoPredictivo() {
     /** Lo que se pinta por la tecla, o `''` si no hay nada que adelantar. */
     predecir(datos: string, vista: VistaDeTerminal): string {
       if (!activo || vista.enPantallaAlterna) return ''
+      if (ENVIA_LA_LINEA.test(datos)) return ''
       // Cualquier otra tecla mueve el cursor o borra: lo predicho deja de valer
       if (!ESCRIBE_UNA_LETRA.test(datos)) return borrarPendiente()
       if (pendiente.length >= MAXIMO_PENDIENTE) return ''
@@ -56,8 +60,8 @@ export function crearEcoPredictivo() {
       return datos
     },
 
-    /** Lo que se pinta por la salida del servidor. Si confirma lo adelantado,
-     *  no se repinta: borrar y volver a escribir lo mismo se ve parpadear. */
+    /** Salida del servidor. Lo que confirma lo adelantado no se repinta:
+     *  reescribir lo mismo se ve parpadear. */
     reconciliar(salida: string): string {
       if (!pendiente) return salida
 

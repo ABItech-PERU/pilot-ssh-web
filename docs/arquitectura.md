@@ -96,7 +96,8 @@ xterm una sola vez y `useTerminalSocket` lleva el WebSocket.
   `eco-predictivo` pinta la letra al instante, igual que la pintará el
   servidor, y cuando el eco confirma lo mismo no la repinta: marcarla de
   otro color o borrarla y reescribirla delataba la espera que se quiere
-  disimular. En vim o htop no adivina, y si la shell deja de repetir lo
+  disimular; Enter tampoco la borra, que hacía parpadear la línea entera al
+  enviarla. En vim o htop no adivina, y si la shell deja de repetir lo
   tecleado —pide una contraseña— borra lo adelantado y deja de adivinar.
 
 ## Cabeceras de seguridad
