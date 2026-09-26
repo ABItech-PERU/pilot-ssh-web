@@ -37,8 +37,20 @@ const MEDIDAS_A_RECORDAR = 5
 /** Se avisa por tramos: al ojo no le dice nada un milisegundo arriba. */
 const TRAMO_DE_LATENCIA_MS = 10
 
-/** Cada cuánto se mide la ida y vuelta con el servidor. */
+/** Cada cuánto se mide la ida y vuelta con el panel. */
 const PING_CADA_MS = 2000
+
+/** Al abrir se mide más seguido: la primera sale alta porque la terminal
+ *  todavía se está montando. */
+const PING_AL_ABRIR_MS = 500
+const PINGS_SEGUIDOS = 4
+
+export interface Latencias {
+  /** Navegador hasta el panel. */
+  red: number
+  /** Panel hasta el servidor, medido al conectar. */
+  salto?: number
+}
 
 /** Sin eco, la shell no repite lo tecleado: pide una contraseña. */
 const SIN_ECO_MS = 600
@@ -49,7 +61,7 @@ interface Opciones {
   /** xterm ya montado: el socket escribe en él y lee su tamaño. */
   terminal: React.RefObject<Terminal | null>
   onEstado: (estado: EstadoTerminal) => void
-  onLatencia: (ms: number) => void
+  onLatencia: (medidas: Latencias) => void
 }
 
 /** Ata una shell a un xterm: la abre, vuelve sola tras un corte y retoma la
@@ -71,6 +83,7 @@ export function useTerminalSocket({
   const medidas = useRef<number[]>([])
   const latencia = useRef(0)
   const avisada = useRef(0)
+  const salto = useRef<number | undefined>(undefined)
   const [subida, setSubida] = useState<AvanceDeSubida | null>(null)
   const respuesta = useRef<((suya: MensajeDeSubida) => void) | null>(null)
   const listado = useRef<((suyo: MensajeDeCarpetas) => void) | null>(null)
@@ -101,11 +114,14 @@ export function useTerminalSocket({
     latencia.current = Math.min(...medidas.current)
     eco.current.activar(latencia.current > LATENCIA_PARA_ADELANTAR_MS)
 
+    // La primera medida cae mientras se monta la terminal: no se enseña
+    if (medidas.current.length < 2) return
+
     const tramo =
       Math.round(latencia.current / TRAMO_DE_LATENCIA_MS) * TRAMO_DE_LATENCIA_MS
     if (tramo !== avisada.current) {
       avisada.current = tramo
-      avisar.current(tramo)
+      avisar.current({ red: tramo, salto: salto.current })
     }
   }
 
@@ -321,7 +337,14 @@ export function useTerminalSocket({
         pings.current.set(numeroDePing, performance.now())
         abierto.send(JSON.stringify({ ping: numeroDePing }))
       }
-      reloj = window.setInterval(medirLatencia, PING_CADA_MS)
+      const programarMedida = () => {
+        const espera = numeroDePing < PINGS_SEGUIDOS ? PING_AL_ABRIR_MS : PING_CADA_MS
+        reloj = window.setTimeout(() => {
+          medirLatencia()
+          programarMedida()
+        }, espera)
+      }
+      programarMedida()
 
       abierto.onopen = () => {
         if (reconexiones.current > 0) escribir('\r\n\x1b[2m— Reconectado —\x1b[0m\r\n')
@@ -337,6 +360,7 @@ export function useTerminalSocket({
         if (!mensaje) return
         if (mensaje.type === 'sesion') {
           sesion.current = mensaje.id
+          salto.current = mensaje.saltoMs
           return
         }
         if (mensaje.type === 'subida') {
@@ -403,7 +427,7 @@ export function useTerminalSocket({
       document.removeEventListener('visibilitychange', reintentarYa)
       window.clearTimeout(apertura)
       window.clearTimeout(reintento)
-      window.clearInterval(reloj)
+      window.clearTimeout(reloj)
       window.clearTimeout(esperaDeEco.current)
 
       const abierto = socket.current

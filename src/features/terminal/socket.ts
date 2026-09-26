@@ -43,7 +43,7 @@ export type MensajeDePong = { type: 'pong'; ping: number }
 /** La shell vive en el servidor: su id permite volver a ella tras un corte. */
 export type MensajeEntrante =
   | { type: 'output' | 'error'; message: string }
-  | { type: 'sesion'; id: string }
+  | { type: 'sesion'; id: string; saltoMs?: number }
   | MensajeDeSubida
   | MensajeDeCarpetas
   | MensajeDePong
@@ -163,6 +163,7 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
       estado?: string
       error?: string
       ping?: number
+      salto_ms?: number | null
       ruta?: string
       inicio?: string
       padre?: string
@@ -170,7 +171,8 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
       recortada?: boolean
     }
     if (dato.type === 'sesion') {
-      return typeof dato.id === 'string' ? { type: 'sesion', id: dato.id } : null
+      if (typeof dato.id !== 'string') return null
+      return { type: 'sesion', id: dato.id, saltoMs: dato.salto_ms ?? undefined }
     }
     if (dato.type === 'pong') {
       return typeof dato.ping === 'number' ? { type: 'pong', ping: dato.ping } : null

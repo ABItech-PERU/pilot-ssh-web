@@ -16,7 +16,10 @@ import { leerDelPrompt, leerOsc7 } from '@/features/terminal/carpeta-actual'
 import { SelectorDeCarpeta } from '@/features/terminal/SelectorDeCarpeta'
 import { CIERRE, type EstadoTerminal } from '@/features/terminal/socket'
 import { fetchPorcentaje } from '@/features/terminal/subida'
-import { useTerminalSocket } from '@/features/terminal/use-terminal-socket'
+import {
+  type Latencias,
+  useTerminalSocket,
+} from '@/features/terminal/use-terminal-socket'
 import type { Server, ServerUser } from '@/types/api'
 
 /** Hex: xterm no entiende oklch(). Copia de los tokens `--term-*` de
@@ -71,7 +74,7 @@ interface PanelProps {
   /** Las de atrás siguen conectadas y recibiendo: solo dejan de verse. */
   visible: boolean
   onEstado: (id: string, estado: EstadoTerminal) => void
-  onLatencia: (id: string, ms: number) => void
+  onLatencia: (id: string, medidas: Latencias) => void
   /** Cerrar la que acabó: si es la única, se sale de la terminal. */
   onCerrar: () => void
   esLaUnica: boolean
@@ -110,7 +113,10 @@ export function PanelDeTerminal({
   const elegida = useRef('')
   const [coincidencias, setCoincidencias] = useState<Coincidencias>(SIN_COINCIDENCIAS)
 
-  const avisarLatencia = useCallback((ms: number) => onLatencia(id, ms), [id, onLatencia])
+  const avisarLatencia = useCallback(
+    (medidas: Latencias) => onLatencia(id, medidas),
+    [id, onLatencia],
+  )
 
   const {
     cancelarSubida,

@@ -21,6 +21,7 @@ import {
   type Pestana,
 } from '@/features/terminal/pestanas'
 import type { EstadoTerminal } from '@/features/terminal/socket'
+import type { Latencias } from '@/features/terminal/use-terminal-socket'
 import { isUuid } from '@/lib/ids'
 import { useVolver } from '@/lib/use-volver'
 import type { Server, ServerUser } from '@/types/api'
@@ -91,7 +92,7 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
   const [pestanas, setPestanas] = useState<Pestana[]>([inicial])
   const [activa, setActiva] = useState(inicial)
   const [estados, setEstados] = useState<Record<string, EstadoTerminal>>({})
-  const [latencias, setLatencias] = useState<Record<string, number>>({})
+  const [latencias, setLatencias] = useState<Record<string, Latencias>>({})
 
   // La credencial puede haberse borrado con la shell abierta
   const credencialDelante =
@@ -105,8 +106,8 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
     setEstados((actuales) => ({ ...actuales, [id]: suyo }))
   }, [])
 
-  const anotarLatencia = useCallback((id: string, ms: number) => {
-    setLatencias((actuales) => ({ ...actuales, [id]: ms }))
+  const anotarLatencia = useCallback((id: string, medidas: Latencias) => {
+    setLatencias((actuales) => ({ ...actuales, [id]: medidas }))
   }, [])
 
   // Lo que pide la barra va a la shell que se ve, no a las de atrás
@@ -208,8 +209,7 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
             />
             <span className="text-term-dim hidden sm:inline">
               {!estado || estado.fase === 'conectando' ? 'Conectando' : null}
-              {estado?.fase === 'conectada' &&
-                (latencia ? `Conectado · ${latencia} ms` : 'Conectado')}
+              {estado?.fase === 'conectada' && describeLatencia(latencia)}
               {estado?.fase === 'cerrada' && estado.motivo}
             </span>
           </span>
@@ -258,6 +258,13 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
       })}
     </div>
   )
+}
+
+/** «Conectado», y lo que tarda cada tramo cuando ya se ha medido. */
+function describeLatencia(medidas: Latencias | undefined): string {
+  if (!medidas) return 'Conectado'
+  const salto = medidas.salto === undefined ? '' : ` · servidor ${medidas.salto} ms`
+  return `Conectado · red ${medidas.red} ms${salto}`
 }
 
 /** Lo anotado, menos lo de una pestaña que ya se cerró. */
