@@ -37,12 +37,16 @@ export type MensajeDeCarpetas = {
   error?: string
 }
 
+/** Respuesta al ping: con su número se mide la ida y vuelta de verdad. */
+export type MensajeDePong = { type: 'pong'; ping: number }
+
 /** La shell vive en el servidor: su id permite volver a ella tras un corte. */
 export type MensajeEntrante =
   | { type: 'output' | 'error'; message: string }
   | { type: 'sesion'; id: string }
   | MensajeDeSubida
   | MensajeDeCarpetas
+  | MensajeDePong
 
 /** Token en la query: el handshake del navegador no admite cabeceras.
  *  Dura 30 minutos y produccion exige wss. Con `sesion`, retoma la shell
@@ -158,6 +162,7 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
       id?: string
       estado?: string
       error?: string
+      ping?: number
       ruta?: string
       inicio?: string
       padre?: string
@@ -166,6 +171,9 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
     }
     if (dato.type === 'sesion') {
       return typeof dato.id === 'string' ? { type: 'sesion', id: dato.id } : null
+    }
+    if (dato.type === 'pong') {
+      return typeof dato.ping === 'number' ? { type: 'pong', ping: dato.ping } : null
     }
     if (dato.type === 'carpetas') {
       return {

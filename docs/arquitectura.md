@@ -73,8 +73,10 @@ xterm una sola vez y `useTerminalSocket` lleva el WebSocket.
   servidores y personas por día.
 - **Buscar en lo que ya pasó.** `Ctrl+Shift+F` abre la búsqueda sobre el
   historial de esa shell, con las coincidencias resaltadas.
-- **La cabecera dice cuánto tarda la red.** Junto a «Conectado», la ida y
-  vuelta de la última tecla, en tramos de 10 ms.
+- **La cabecera dice cuánto tarda la red.** Un ping cada dos segundos, y se
+  muestra el mínimo de los últimos cinco: el ruido del navegador solo suma.
+  Medir el eco de las teclas daba números falsos, porque el que llega suele
+  ser el de la tecla anterior.
 - **Arrastrar un archivo lo sube donde está parado.** El destino sale del
   `cd` de la shell, leído de lo que anuncia (OSC 7) o de su prompt; si no se
   sabe, la carpeta de trabajo de la credencial. Viaja en tramos por el mismo
@@ -99,6 +101,8 @@ xterm una sola vez y `useTerminalSocket` lleva el WebSocket.
   disimular; Enter tampoco la borra, que hacía parpadear la línea entera al
   enviarla. En vim o htop no adivina, y si la shell deja de repetir lo
   tecleado —pide una contraseña— borra lo adelantado y deja de adivinar.
+  Al borrar con retroceso tampoco se adelanta nada: el servidor hará eco de
+  la letra y mandará su propio borrado.
 
 ## Cabeceras de seguridad
 

@@ -31,14 +31,14 @@ import type { Server, ServerUser } from '@/types/api'
 /** Por encima, la letra tarda en aparecer y conviene adelantarla. */
 const LATENCIA_PARA_ADELANTAR_MS = 90
 
-/** Media que sigue a la red sin saltar con una medida suelta. */
-const PESO_DE_LA_ULTIMA = 0.25
+/** Se mira el mínimo de estas: el ruido del navegador solo suma tiempo. */
+const MEDIDAS_A_RECORDAR = 5
 
 /** Se avisa por tramos: al ojo no le dice nada un milisegundo arriba. */
 const TRAMO_DE_LATENCIA_MS = 10
 
-/** Más tarde no es el eco de la tecla: falsearía la media. */
-const LATENCIA_CREIBLE_MS = 1500
+/** Cada cuánto se mide la ida y vuelta con el servidor. */
+const PING_CADA_MS = 2000
 
 /** Sin eco, la shell no repite lo tecleado: pide una contraseña. */
 const SIN_ECO_MS = 600
@@ -66,8 +66,9 @@ export function useTerminalSocket({
   const reconexiones = useRef(0)
   const [intento, setIntento] = useState(0)
   const eco = useRef(crearEcoPredictivo())
-  const tecleadoEn = useRef<number | null>(null)
   const esperaDeEco = useRef<number | undefined>(undefined)
+  const pings = useRef(new Map<number, number>())
+  const medidas = useRef<number[]>([])
   const latencia = useRef(0)
   const avisada = useRef(0)
   const [subida, setSubida] = useState<AvanceDeSubida | null>(null)
@@ -87,6 +88,26 @@ export function useTerminalSocket({
       socket.current.send(JSON.stringify(carga))
     }
   }, [])
+
+  /** Lo mejor de las últimas medidas; decide también si conviene adelantar. */
+  const anotarLatencia = (numero: number) => {
+    const salida = pings.current.get(numero)
+    if (salida === undefined) return
+    pings.current.delete(numero)
+
+    medidas.current = [...medidas.current, performance.now() - salida].slice(
+      -MEDIDAS_A_RECORDAR,
+    )
+    latencia.current = Math.min(...medidas.current)
+    eco.current.activar(latencia.current > LATENCIA_PARA_ADELANTAR_MS)
+
+    const tramo =
+      Math.round(latencia.current / TRAMO_DE_LATENCIA_MS) * TRAMO_DE_LATENCIA_MS
+    if (tramo !== avisada.current) {
+      avisada.current = tramo
+      avisar.current(tramo)
+    }
+  }
 
   const enviarTamano = useCallback(() => {
     const vista = terminal.current
@@ -112,7 +133,6 @@ export function useTerminalSocket({
           }, SIN_ECO_MS)
         }
       }
-      if (tecleadoEn.current === null) tecleadoEn.current = performance.now()
       enviar({ command: datos })
     },
     [enviar, terminal],
@@ -234,6 +254,7 @@ export function useTerminalSocket({
   useEffect(() => {
     let vigente = true
     let reintento: number | undefined
+    let reloj: number | undefined
     let inicialPendiente = buildInitialCommand(rutaInicial)
 
     const escribir = (texto: string) => terminal.current?.write(texto)
@@ -293,12 +314,22 @@ export function useTerminalSocket({
       )
       socket.current = abierto
 
+      let numeroDePing = 0
+      const medirLatencia = () => {
+        if (abierto.readyState !== WebSocket.OPEN) return
+        numeroDePing += 1
+        pings.current.set(numeroDePing, performance.now())
+        abierto.send(JSON.stringify({ ping: numeroDePing }))
+      }
+      reloj = window.setInterval(medirLatencia, PING_CADA_MS)
+
       abierto.onopen = () => {
         if (reconexiones.current > 0) escribir('\r\n\x1b[2m— Reconectado —\x1b[0m\r\n')
         reconexiones.current = 0
         onEstado({ fase: 'conectada' })
         terminal.current?.focus()
         enviarTamano()
+        medirLatencia()
       }
 
       abierto.onmessage = (evento) => {
@@ -327,22 +358,11 @@ export function useTerminalSocket({
         window.clearTimeout(esperaDeEco.current)
         esperaDeEco.current = undefined
 
-        if (tecleadoEn.current !== null) {
-          const ida = performance.now() - tecleadoEn.current
-          tecleadoEn.current = null
-          if (ida <= LATENCIA_CREIBLE_MS) {
-            latencia.current =
-              latencia.current * (1 - PESO_DE_LA_ULTIMA) + ida * PESO_DE_LA_ULTIMA
-            eco.current.activar(latencia.current > LATENCIA_PARA_ADELANTAR_MS)
-
-            const tramo =
-              Math.round(latencia.current / TRAMO_DE_LATENCIA_MS) * TRAMO_DE_LATENCIA_MS
-            if (tramo !== avisada.current) {
-              avisada.current = tramo
-              avisar.current(tramo)
-            }
-          }
+        if (mensaje.type === 'pong') {
+          anotarLatencia(mensaje.ping)
+          return
         }
+
         escribir(eco.current.reconciliar(mensaje.message))
 
         // El cd espera a la primera salida (el prompt): en onopen la shell
@@ -355,7 +375,6 @@ export function useTerminalSocket({
 
       abierto.onclose = (evento) => {
         escribir(eco.current.limpiar())
-        tecleadoEn.current = null
         soltarTurnos()
         const contestar = respuesta.current
         respuesta.current = null
@@ -384,6 +403,7 @@ export function useTerminalSocket({
       document.removeEventListener('visibilitychange', reintentarYa)
       window.clearTimeout(apertura)
       window.clearTimeout(reintento)
+      window.clearInterval(reloj)
       window.clearTimeout(esperaDeEco.current)
 
       const abierto = socket.current
