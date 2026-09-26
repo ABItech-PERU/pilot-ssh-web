@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { cn } from 'cn'
-import { ArrowLeftIcon, Loader2Icon, XIcon } from 'lucide-react'
+import { ArrowLeftIcon, Loader2Icon, ServerIcon, WifiIcon, XIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
@@ -9,6 +9,7 @@ import '@/features/terminal/terminal.css'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import * as serversApi from '@/features/servers/api'
 import { FORMAS_DE_ENTRAR } from '@/features/servers/auth-type'
 import { buildServerPath } from '@/features/servers/paths'
@@ -209,9 +210,26 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
             />
             <span className="text-term-dim hidden sm:inline">
               {!estado || estado.fase === 'conectando' ? 'Conectando' : null}
-              {estado?.fase === 'conectada' && describeLatencia(latencia)}
+              {estado?.fase === 'conectada' && 'Conectado'}
               {estado?.fase === 'cerrada' && estado.motivo}
             </span>
+
+            {estado?.fase === 'conectada' && latencia && (
+              <span className="text-term-dim hidden items-center gap-2 sm:flex">
+                <Tramo
+                  icono={WifiIcon}
+                  ms={latencia.red}
+                  explica="Su conexión con el panel"
+                />
+                {latencia.salto !== undefined && (
+                  <Tramo
+                    icono={ServerIcon}
+                    ms={latencia.salto}
+                    explica="Del panel a este servidor"
+                  />
+                )}
+              </span>
+            )}
           </span>
 
           <Button
@@ -260,11 +278,28 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
   )
 }
 
-/** «Conectado», y lo que tarda cada tramo cuando ya se ha medido. */
-function describeLatencia(medidas: Latencias | undefined): string {
-  if (!medidas) return 'Conectado'
-  const salto = medidas.salto === undefined ? '' : ` · servidor ${medidas.salto} ms`
-  return `Conectado · red ${medidas.red} ms${salto}`
+/** Un tramo del viaje: el icono lo identifica y el rótulo lo explica. */
+function Tramo({
+  icono: Icono,
+  ms,
+  explica,
+}: {
+  icono: typeof WifiIcon
+  ms: number
+  explica: string
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="flex items-center gap-1">
+          <Icono className="size-3.5" aria-hidden />
+          <span className="tabular-nums">{ms} ms</span>
+          <span className="sr-only">{explica}</span>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{explica}</TooltipContent>
+    </Tooltip>
+  )
 }
 
 /** Lo anotado, menos lo de una pestaña que ya se cerró. */

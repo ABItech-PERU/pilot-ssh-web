@@ -73,11 +73,12 @@ xterm una sola vez y `useTerminalSocket` lleva el WebSocket.
   servidores y personas por día.
 - **Buscar en lo que ya pasó.** `Ctrl+Shift+F` abre la búsqueda sobre el
   historial de esa shell, con las coincidencias resaltadas.
-- **La cabecera separa los dos tramos:** «red», lo que tarda el navegador en
-  llegar al panel, medido con un ping cada dos segundos y quedándose con el
-  mínimo de los últimos cinco; y «servidor», lo que tarda el panel en alcanzar
-  la máquina, que la API mide al conectar. Así se distingue una conexión mala
-  de un servidor lejano, que se arreglan de formas distintas.
+- **La cabecera separa los dos tramos**, cada uno con su icono y su rótulo al
+  pasar el cursor: el de la antena es del navegador al panel, medido con un
+  ping cada dos segundos y quedándose con el mínimo de los últimos cinco; el
+  del servidor es lo que tarda el panel en alcanzar la máquina, que la API
+  mide al conectar. Así se distingue una conexión mala de un servidor lejano,
+  que se arreglan de formas distintas.
 - **Arrastrar un archivo lo sube donde está parado.** El destino sale del
   `cd` de la shell, leído de lo que anuncia (OSC 7) o de su prompt; si no se
   sabe, la carpeta de trabajo de la credencial. Viaja en tramos por el mismo
