@@ -18,6 +18,10 @@ const ESCRIBE_UNA_LETRA = /^[\x20-\x7e -￿]$/u
 /** Enter no invalida lo tecleado: borrarlo hacía parpadear la línea. */
 const ENVIA_LA_LINEA = /^[\r\n]$/
 
+/** El servidor aún hará eco de la letra borrada y luego mandará su borrado:
+ *  adelantarlo la haría reaparecer. */
+const BORRA_UNA_LETRA = /^[\x7f\b]$/
+
 /** Cerca del borde, el salto de línea impediría borrar lo predicho. */
 const MARGEN_DERECHO = 2
 
@@ -29,6 +33,7 @@ const BORRAR_UNA = '\b \b'
 export function crearEcoPredictivo() {
   let pendiente = ''
   let activo = false
+  let esperandoAlBorrado = false
 
   const borrarPendiente = () => {
     const borrado = BORRAR_UNA.repeat(pendiente.length)
@@ -50,8 +55,15 @@ export function crearEcoPredictivo() {
     predecir(datos: string, vista: VistaDeTerminal): string {
       if (!activo || vista.enPantallaAlterna) return ''
       if (ENVIA_LA_LINEA.test(datos)) return ''
-      // Cualquier otra tecla mueve el cursor o borra: lo predicho deja de valer
+
+      if (BORRA_UNA_LETRA.test(datos)) {
+        esperandoAlBorrado = pendiente.length > 0
+        return ''
+      }
+      // Cualquier otra tecla mueve el cursor: lo predicho deja de valer
       if (!ESCRIBE_UNA_LETRA.test(datos)) return borrarPendiente()
+      // Hasta que el eco se ponga al día, adivinar descolocaría la línea
+      if (esperandoAlBorrado) return ''
       if (pendiente.length >= MAXIMO_PENDIENTE) return ''
       if (vista.cursorX >= vista.cols - MARGEN_DERECHO) return borrarPendiente()
 
@@ -63,20 +75,26 @@ export function crearEcoPredictivo() {
     /** Salida del servidor. Lo que confirma lo adelantado no se repinta:
      *  reescribir lo mismo se ve parpadear. */
     reconciliar(salida: string): string {
-      if (!pendiente) return salida
+      if (!pendiente) {
+        esperandoAlBorrado = false
+        return salida
+      }
 
       if (pendiente.startsWith(salida)) {
         pendiente = pendiente.slice(salida.length)
+        esperandoAlBorrado = esperandoAlBorrado && pendiente.length > 0
         return ''
       }
 
       if (salida.startsWith(pendiente)) {
         const resto = salida.slice(pendiente.length)
         pendiente = ''
+        esperandoAlBorrado = false
         return resto
       }
 
       // La shell escribió otra cosa: manda ella
+      esperandoAlBorrado = false
       return borrarPendiente() + salida
     },
 

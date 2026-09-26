@@ -48,10 +48,21 @@ describe('predecir', () => {
     expect(eco.hayPendiente).toBe(true)
   })
 
-  it('el borrado también retira lo predicho', () => {
+  it('al borrar no se toca nada: el servidor mandará su borrado', () => {
     eco.predecir('a', VISTA)
 
-    expect(eco.predecir('\x7f', VISTA)).toBe(BORRAR)
+    expect(eco.predecir('\x7f', VISTA)).toBe('')
+    expect(eco.hayPendiente).toBe(true)
+  })
+
+  it('tras borrar no adivina hasta que el eco se pone al día', () => {
+    eco.predecir('a', VISTA)
+    eco.predecir('\x7f', VISTA)
+
+    expect(eco.predecir('b', VISTA)).toBe('')
+
+    eco.reconciliar('a')
+    expect(eco.predecir('b', VISTA)).toBe('b')
   })
 
   it('junto al borde no adivina: no podría borrarlo', () => {
