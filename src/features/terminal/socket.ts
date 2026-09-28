@@ -11,6 +11,7 @@ export const CIERRE = {
   SIN_PERMISO: 4403,
   CADUCADA: 4408,
   SIN_SALDO: 4412,
+  DEMASIADOS_INTENTOS: 4429,
 } as const
 
 export type EstadoTerminal =
@@ -97,6 +98,11 @@ export function describeClose(codigo: number): {
     case CIERRE.SIN_SALDO:
       return {
         motivo: 'Sin créditos para abrir más terminales hoy.',
+        reintentable: false,
+      }
+    case CIERRE.DEMASIADOS_INTENTOS:
+      return {
+        motivo: 'Demasiados intentos seguidos. Espere un momento.',
         reintentable: false,
       }
     default:

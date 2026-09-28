@@ -174,6 +174,12 @@ describe('fetchEsperaDeReconexion', () => {
   })
 })
 
+describe('describeClose con el tope de aperturas', () => {
+  it('no reintenta: insistir es lo que lo disparó', () => {
+    expect(describeClose(CIERRE.DEMASIADOS_INTENTOS).reintentable).toBe(false)
+  })
+})
+
 describe('reconnectsAutomatically', () => {
   it('un relevo de versión reconecta solo y lo dice', () => {
     expect(reconnectsAutomatically(CIERRE.REINICIO, 0)).toBe(true)
