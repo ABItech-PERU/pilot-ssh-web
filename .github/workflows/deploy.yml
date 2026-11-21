@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       ambiente:
-        description: uat o prod; prefija sus variables y secretos
+        description: uat o prod; su Environment de GitHub con variables y secretos
         type: string
         required: true
       arbol:
@@ -24,19 +24,12 @@ jobs:
     name: Desplegar a ${{ inputs.ambiente }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    environment: ${{ inputs.ambiente }}
     env:
       AMBIENTE: ${{ inputs.ambiente }}
       ARBOL: ${{ inputs.arbol }}
-      WEB_URL: ${{ vars[format('{0}_WEB_URL', inputs.ambiente)] }}
-      DOKPLOY_URL: ${{ vars[format('{0}_DOKPLOY_URL', inputs.ambiente)] }}
-      DOKPLOY_COMPOSE_ID: ${{ vars[format('{0}_DOKPLOY_COMPOSE_ID', inputs.ambiente)] }}
-      DOKPLOY_API_KEY: ${{ secrets[format('{0}_DOKPLOY_API_KEY', inputs.ambiente)] }}
-      DEPLOY_HOST: ${{ vars[format('{0}_DEPLOY_HOST', inputs.ambiente)] }}
-      DEPLOY_PORT: ${{ vars[format('{0}_DEPLOY_PORT', inputs.ambiente)] || '22' }}
-      DEPLOY_USER: ${{ vars[format('{0}_DEPLOY_USER', inputs.ambiente)] }}
-      DEPLOY_PATH: ${{ vars[format('{0}_DEPLOY_PATH', inputs.ambiente)] }}
-      DEPLOY_KNOWN_HOSTS: ${{ vars[format('{0}_DEPLOY_KNOWN_HOSTS', inputs.ambiente)] }}
-      DEPLOY_SSH_KEY: ${{ secrets[format('{0}_DEPLOY_SSH_KEY', inputs.ambiente)] }}
+      WEB_URL: ${{ vars.WEB_URL }}
+      DOKPLOY_WEBHOOK_URL: ${{ secrets.DOKPLOY_WEBHOOK_URL }}
     steps:
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
@@ -48,29 +41,18 @@ jobs:
       - name: Promover la imagen
         run: docker buildx imagetools create --tag "$IMAGEN:$AMBIENTE" "$IMAGEN:arbol-$ARBOL"
 
-      - name: Avisar al servidor
+      # El compose de Dokploy solo acepta el push de la rama configurada.
+      - name: Avisar a Dokploy
         run: |
-          if [ -n "$DOKPLOY_API_KEY" ]; then
-            curl -fsS --fail-with-body -X POST "$DOKPLOY_URL/api/compose.deploy" \
-              -H "x-api-key: $DOKPLOY_API_KEY" \
-              -H "Content-Type: application/json" \
-              -d "{\"composeId\": \"$DOKPLOY_COMPOSE_ID\"}"
-          elif [ -n "$DEPLOY_SSH_KEY" ]; then
-            mkdir -p ~/.ssh
-            printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/despliegue
-            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-            chmod 600 ~/.ssh/despliegue
-            ssh -i ~/.ssh/despliegue -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
-              "cd '$DEPLOY_PATH' && git fetch --quiet origin && git checkout --quiet --detach '$GITHUB_SHA' && IMAGE_TAG='arbol-$ARBOL' sh deploy/docker/desplegar.sh"
-          else
-            echo "Falta configurar Dokploy o SSH para $AMBIENTE (docs/github-actions.md)." >&2
-            exit 1
-          fi
+          : "${DOKPLOY_WEBHOOK_URL:?Falta el secreto DOKPLOY_WEBHOOK_URL en el ambiente $AMBIENTE}"
+          curl -fsS --fail-with-body -X POST "$DOKPLOY_WEBHOOK_URL" \
+            -H "Content-Type: application/json" -H "X-GitHub-Event: push" \
+            -d '{"ref": "refs/heads/main"}'
 
       # Con start-first, la versión vieja responde hasta el cambio.
       - name: Esperar la versión nueva
         run: |
-          : "${WEB_URL:?Falta la variable ${AMBIENTE^^}_WEB_URL}"
+          : "${WEB_URL:?Falta la variable WEB_URL en el ambiente $AMBIENTE}"
           until test "$(curl -fsS "$WEB_URL/version.txt")" = "$ARBOL"; do
             sleep 5
           done

@@ -32,13 +32,13 @@ workflow_, con la etiqueta anterior en _Use workflow from_.
 
 ## Workflows
 
-| Archivo           | Cuándo corre                                          | Qué hace                                                                                                               |
-| ----------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `ci.yml`          | PR a `main`; lo llaman los despliegues                | `security` (Gitleaks y `npm audit`) y `frontend` (`npm run typecheck` y `npm test`)                                    |
-| `build-image.yml` | Lo llaman los despliegues                             | Construye `pilotssh-web`, la prueba, la revisa con Trivy y la publica. Si la huella ya existe, no recompila            |
-| `deploy.yml`      | Lo llaman los despliegues                             | Pone la etiqueta del ambiente, avisa a Dokploy o entra por SSH, y espera la versión nueva y las cabeceras de seguridad |
-| `deploy-uat.yml`  | Push a `main` que no sea solo documentación, o a mano | `ci` → imagen → `uat`                                                                                                  |
-| `deploy-prod.yml` | Etiqueta `v*` de un commit de `main`, o a mano        | Busca la imagen de esa huella. Sin ella, `ci` → imagen. Luego `prod`                                                   |
+| Archivo           | Cuándo corre                                          | Qué hace                                                                                                             |
+| ----------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `ci.yml`          | PR a `main`; lo llaman los despliegues                | `security` (Gitleaks y `npm audit`) y `frontend` (`npm run typecheck` y `npm test`)                                  |
+| `build-image.yml` | Lo llaman los despliegues                             | Construye `pilotssh-web`, la prueba, la revisa con Trivy y la publica. Si la huella ya existe, no recompila          |
+| `deploy.yml`      | Lo llaman los despliegues                             | Pone la etiqueta del ambiente, avisa a Dokploy por su webhook y espera la versión nueva y las cabeceras de seguridad |
+| `deploy-uat.yml`  | Push a `main` que no sea solo documentación, o a mano | `ci` → imagen → `uat`                                                                                                |
+| `deploy-prod.yml` | Etiqueta `v*` de un commit de `main`, o a mano        | Busca la imagen de esa huella. Sin ella, `ci` → imagen. Luego `prod`                                                 |
 
 ## Imágenes
 
@@ -51,20 +51,18 @@ a la última de cada ambiente. La huella va en `/version.txt`.
 1. _Settings → General → Default branch_: `main`.
 2. _Settings → Branches_: en `main`, exigir _pull request_ y que pase la CI.
    El repositorio es público, así que el plan Free lo permite.
-3. _Settings → Secrets and variables → Actions_: las mismas variables y
-   secretos que la API, con prefijo `UAT_` o `PROD_`, salvo que la dirección
-   de la espera es `UAT_WEB_URL` · `PROD_WEB_URL`, la de la web, sin `/` al
-   final.
+3. _Settings → Environments_: `uat` (rama `main`) y `prod` (etiquetas
+   `v*`), con las mismas variables y secretos que la API, salvo que la
+   dirección de la espera es `WEB_URL`, la de la web, sin `/` al final.
 
-Dokploy y SSH se configuran igual que en la API:
-[Con Dokploy](../../pilot-ssh-api/docs/github-actions.md#con-dokploy) y
-[Por SSH](../../pilot-ssh-api/docs/github-actions.md#por-ssh), con la carpeta
-`/srv/pilotssh/web-uat` o `/srv/pilotssh/web-prod`.
+Dokploy se configura igual que en la API:
+[Con Dokploy](../../pilot-ssh-api/docs/github-actions.md#con-dokploy), con
+el secreto `DOKPLOY_WEBHOOK_URL` del servicio de la web.
 
 ## Problemas frecuentes
 
 | Síntoma                                              | Causa                                                                                       |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `Falta la variable UAT_WEB_URL`                      | Falta la dirección de la web en las variables del repositorio                               |
+| `Falta la variable WEB_URL en el ambiente uat`       | Falta la dirección de la web en el ambiente                                                 |
 | Falla `Auditar paquetes (npm audit)`                 | Una dependencia de producción tiene una vulnerabilidad alta: suba la versión que la corrige |
 | Se queda en `Esperar la versión nueva` hasta el tope | El contenedor no arrancó: sin la API no prerenderiza y Swarm mantiene la versión anterior   |
