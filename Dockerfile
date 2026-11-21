@@ -16,7 +16,7 @@ COPY package-lock.json /tmp/
 RUN version="$(node -p "require('/tmp/package-lock.json').packages['node_modules/jsdom'].version")" \
  && npm install --omit=dev --no-audit --no-fund --no-package-lock "jsdom@${version}"
 
-FROM nginx:1.30.7-alpine3.24
+FROM nginx:1.31.7-alpine3.24
 # Con los parches publicados después de la imagen base
 RUN apk upgrade --no-cache && apk add --no-cache nodejs
 WORKDIR /opt/pilotssh
