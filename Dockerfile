@@ -1,7 +1,7 @@
 # Una imagen para todos los ambientes: la configuración y las páginas
 # públicas se generan al arrancar, con el .env (deploy/docker/arranque.sh)
 
-FROM node:22.23.5-alpine3.24 AS compilacion
+FROM node:26.13.0-alpine3.24 AS compilacion
 WORKDIR /app
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 COPY package.json package-lock.json ./
@@ -10,7 +10,7 @@ COPY . .
 RUN npm run build
 
 # Solo jsdom: lo único que el prerenderizado usa fuera de su bundle
-FROM node:22.23.5-alpine3.24 AS prerenderizado
+FROM node:26.13.0-alpine3.24 AS prerenderizado
 WORKDIR /prerender
 COPY package-lock.json /tmp/
 RUN version="$(node -p "require('/tmp/package-lock.json').packages['node_modules/jsdom'].version")" \
