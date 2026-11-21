@@ -23,7 +23,7 @@ jobs:
   deploy:
     name: Desplegar a ${{ inputs.ambiente }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 15
     environment: ${{ inputs.ambiente }}
     env:
       AMBIENTE: ${{ inputs.ambiente }}
@@ -53,8 +53,13 @@ jobs:
       - name: Esperar la versión nueva
         run: |
           : "${WEB_URL:?Falta la variable WEB_URL en el ambiente $AMBIENTE}"
-          until test "$(curl -fsS "$WEB_URL/version.txt")" = "$ARBOL"; do
+          for _ in $(seq 120); do
+            if test "$(curl -fs "$WEB_URL/version.txt")" = "$ARBOL"; then
+              curl -fsSI "$WEB_URL/" | grep -qi "^content-security-policy:"
+              curl -fsSI "$WEB_URL/" | grep -qi "^strict-transport-security:"
+              exit 0
+            fi
             sleep 5
           done
-          curl -fsSI "$WEB_URL/" | grep -qi "^content-security-policy:"
-          curl -fsSI "$WEB_URL/" | grep -qi "^strict-transport-security:"
+          echo "::error::$WEB_URL no sirve $ARBOL tras 10 minutos; revise el despliegue en Dokploy."
+          exit 1

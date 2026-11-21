@@ -72,4 +72,4 @@ de la API y con estas diferencias:
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `Falta la variable WEB_URL en el ambiente uat`       | Falta la dirección de la web en el ambiente                                                 |
 | Falla `Auditar paquetes (npm audit)`                 | Una dependencia de producción tiene una vulnerabilidad alta: suba la versión que la corrige |
-| Se queda en `Esperar la versión nueva` hasta el tope | El contenedor no arrancó: sin la API no prerenderiza y Swarm mantiene la versión anterior   |
+| Falla en `Esperar la versión nueva` a los 10 minutos | El contenedor no arrancó: sin la API no prerenderiza y Swarm mantiene la versión anterior   |
