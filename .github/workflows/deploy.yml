@@ -45,7 +45,7 @@ jobs:
       - name: Avisar a Dokploy
         run: |
           : "${DOKPLOY_WEBHOOK_URL:?Falta el secreto DOKPLOY_WEBHOOK_URL en el ambiente $AMBIENTE}"
-          curl -fsS --fail-with-body -X POST "$DOKPLOY_WEBHOOK_URL" \
+          curl -sS --fail-with-body -X POST "$DOKPLOY_WEBHOOK_URL" \
             -H "Content-Type: application/json" -H "X-GitHub-Event: push" \
             -d '{"ref": "refs/heads/main"}'
 
