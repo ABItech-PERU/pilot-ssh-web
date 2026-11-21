@@ -150,33 +150,6 @@ export function ListaEsqueleto({ filas = 3 }: { filas?: number }) {
   )
 }
 
-/** Imita la forma de la tabla para que la vista no salte al cargar. */
-export function TableSkeleton({
-  rows = 4,
-  columns = 5,
-}: {
-  rows?: number
-  columns?: number
-}) {
-  return (
-    <div className="divide-border divide-y" aria-hidden>
-      {Array.from({ length: rows }, (_, fila) => (
-        <div key={fila} className="flex items-center gap-4 px-4 py-3.5">
-          {Array.from({ length: columns }, (_, columna) => (
-            <Skeleton
-              key={columna}
-              className="h-4"
-              style={{
-                width: columna === 0 ? '28%' : `${Math.max(10, 22 - columna * 3)}%`,
-              }}
-            />
-          ))}
-        </div>
-      ))}
-    </div>
-  )
-}
-
 /** Mientras llega la primera pantalla, que se descarga aparte: el router
  *  necesita algo que pintar. Discreta: suele durar un parpadeo. */
 export function LoadingScreen() {

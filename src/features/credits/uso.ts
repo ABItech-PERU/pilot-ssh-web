@@ -18,7 +18,7 @@ export interface DiaDeUso {
 }
 
 /** Un día o un mes entero. */
-export interface BarraDeUso {
+interface BarraDeUso {
   clave: string
   /** Para el globo y el lector de pantalla. */
   etiqueta: string
@@ -158,6 +158,6 @@ function describirMes(mes: string, conUso: number, creditos: number): string {
 }
 
 /** Lo gratuito se dice «gratis», no «0 créditos». */
-export function describirCoste(creditos: number): string {
+function describirCoste(creditos: number): string {
   return creditos > 0 ? `${formatCredits(creditos)} créditos` : 'gratis'
 }

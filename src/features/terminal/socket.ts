@@ -39,7 +39,7 @@ export type MensajeDeCarpetas = {
 }
 
 /** Respuesta al ping: con su número se mide la ida y vuelta de verdad. */
-export type MensajeDePong = { type: 'pong'; ping: number }
+type MensajeDePong = { type: 'pong'; ping: number }
 
 /** La shell vive en el servidor: su id permite volver a ella tras un corte. */
 export type MensajeEntrante =

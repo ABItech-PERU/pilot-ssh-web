@@ -1,24 +1,12 @@
 import { http } from '@/lib/http'
-import type { Membership, Organization, Paginated } from '@/types/api'
+import type { Organization } from '@/types/api'
 
 export const clavesOrganizacion = {
-  todas: ['organizations'] as const,
   detalle: (slug: string) => ['organizations', slug] as const,
-  miembros: (slug: string) => ['organizations', slug, 'members'] as const,
-}
-
-export async function fetchOrganizations() {
-  const { data } = await http.get<Paginated<Organization>>('/organizations')
-  return data
 }
 
 export async function fetchOrganization(slug: string) {
   const { data } = await http.get<Organization>(`/organizations/${slug}`)
-  return data
-}
-
-export async function fetchMembers(slug: string) {
-  const { data } = await http.get<Paginated<Membership>>(`/organizations/${slug}/members`)
   return data
 }
 

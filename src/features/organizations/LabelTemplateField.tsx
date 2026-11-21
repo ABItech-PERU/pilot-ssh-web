@@ -17,7 +17,7 @@ interface Plantilla {
  *  Colores fijos y sin repetir: rojo solo en criticidad («atienda esto»);
  *  en entorno, azul producción, violeta pruebas y verde desarrollo.
  *  Valores de menos a más, en el orden en que sube un cambio. */
-export const PLANTILLA: Plantilla[] = [
+const PLANTILLA: Plantilla[] = [
   {
     key: 'Entorno',
     values: ['Desarrollo', 'Pruebas', 'Producción'],

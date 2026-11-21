@@ -15,7 +15,7 @@ import type { useListado } from '@/lib/use-listado'
 
 /** Piezas comunes a las pestañas de créditos. */
 
-export const COLOR_DEL_TONO: Record<Tono, string> = {
+const COLOR_DEL_TONO: Record<Tono, string> = {
   normal: '',
   aviso: 'text-warning',
   peligro: 'text-destructive',
