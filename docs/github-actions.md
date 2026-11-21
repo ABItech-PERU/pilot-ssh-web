@@ -10,13 +10,13 @@ los detalles comunes, en su [guía](../../pilot-ssh-api/docs/github-actions.md).
 ```mermaid
 flowchart LR
   A["feature/* o fix/*"] -- "PR con CI" --> B["main"]
-  B -- "Desplegar a UAT" --> C["uat"]
-  B -- "etiqueta vX.Y.Z" --> D["Desplegar a producción"]
+  B -- "Desplegar a uat" --> C["uat"]
+  B -- "etiqueta vX.Y.Z" --> D["Desplegar a prod"]
   D -- "misma imagen" --> E["prod"]
 ```
 
 1. Cree la rama desde `main` y abra el PR a `main`. Corre la CI.
-2. Una el PR. **Desplegar a UAT** prueba otra vez, construye la imagen, la
+2. Una el PR. **Desplegar a uat** prueba otra vez, construye la imagen, la
    despliega en `uat` y espera a que `/version.txt` muestre la versión nueva.
 3. Revise el cambio en `uat`.
 4. Publíquelo con una etiqueta sobre ese commit de `main`:
@@ -25,9 +25,9 @@ flowchart LR
    git tag v1.4.0 && git push origin v1.4.0
    ```
 
-   **Desplegar a producción** promueve la imagen que ya corre en `uat`.
+   **Desplegar a prod** promueve la imagen que ya corre en `uat`.
 
-Para volver a una versión anterior: _Actions → Desplegar a producción → Run
+Para volver a una versión anterior: _Actions → Desplegar a prod → Run
 workflow_, con la etiqueta anterior en _Use workflow from_.
 
 ## Workflows
@@ -72,4 +72,4 @@ de la API y con estas diferencias:
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `Falta la variable WEB_URL en el ambiente uat`       | Falta la dirección de la web en el ambiente                                                 |
 | Falla `Auditar paquetes (npm audit)`                 | Una dependencia de producción tiene una vulnerabilidad alta: suba la versión que la corrige |
-| Se queda en `Esperar la versión nueva` hasta el tope | El contenedor no arrancó: sin la API no prerenderiza y Swarm mantiene la versión anterior   |
+| Falla en `Esperar la versión nueva` a los 10 minutos | El contenedor no arrancó: sin la API no prerenderiza y Swarm mantiene la versión anterior   |
