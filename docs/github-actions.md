@@ -1,81 +1,70 @@
 # GitHub Actions
 
-Qué hace `.github/workflows/ci.yml` y qué configurar para que la web se
-despliegue sola. La API tiene el suyo:
-[su guía](../../pilot-ssh-api/docs/github-actions.md).
+Cómo llega un cambio de la web a `uat` y a `prod`, qué corre cada workflow y qué
+hay que configurar. Es el mismo flujo que la API; la decisión está en su
+[ADR 0001](../../pilot-ssh-api/docs/decisiones/0001-ramas-y-despliegue.md) y
+los detalles comunes, en su [guía](../../pilot-ssh-api/docs/github-actions.md).
 
-## Qué hace
+## Flujo de un cambio
 
-| Paso        | Cuándo                                  | Qué hace                                                             |
-| ----------- | --------------------------------------- | -------------------------------------------------------------------- |
-| `pruebas`   | Siempre                                 | `npm run typecheck` y `npx vitest run`, sin variables de ambiente    |
-| `imagenes`  | `staging`, `main` y tags `v*`           | Publica `ghcr.io/abitech-peru/pilotssh-web`                          |
-| `desplegar` | Solo `staging` (`uat`) y `main` (`prd`) | Dokploy si hay `DOKPLOY_API_KEY`; si no, SSH si hay `DEPLOY_SSH_KEY` |
+```mermaid
+flowchart LR
+  A["feature/* o fix/*"] -- "PR con CI" --> B["main"]
+  B -- "Desplegar a UAT" --> C["uat"]
+  B -- "etiqueta vX.Y.Z" --> D["Desplegar a producción"]
+  D -- "misma imagen" --> E["prod"]
+```
 
-Etiquetas: `sha-<7 del commit>` siempre, `uat` o `prd` según la rama, y
-`X.Y.Z` con el tag `vX.Y.Z`. Un commit ya compilado se reetiqueta, no se
-recompila: `prd` corre la imagen probada en `uat`.
+1. Cree la rama desde `main` y abra el PR a `main`. Corre la CI.
+2. Una el PR. **Desplegar a UAT** prueba otra vez, construye la imagen, la
+   despliega en `uat` y espera a que `/version.txt` muestre la versión nueva.
+3. Revise el cambio en `uat`.
+4. Publíquelo con una etiqueta sobre ese commit de `main`:
 
-Las `APP_` **no** van en GitHub: van en el `.env` del servidor o en el
-_Environment_ de Dokploy.
+   ```bash
+   git tag v1.4.0 && git push origin v1.4.0
+   ```
+
+   **Desplegar a producción** promueve la imagen que ya corre en `uat`.
+
+Para volver a una versión anterior: _Actions → Desplegar a producción → Run
+workflow_, con la etiqueta anterior en _Use workflow from_.
+
+## Workflows
+
+| Archivo           | Cuándo corre                                          | Qué hace                                                                                                               |
+| ----------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `ci.yml`          | PR a `main`; lo llaman los despliegues                | `security` (Gitleaks y `npm audit`) y `frontend` (`npm run typecheck` y `npm test`)                                    |
+| `build-image.yml` | Lo llaman los despliegues                             | Construye `pilotssh-web`, la prueba, la revisa con Trivy y la publica. Si la huella ya existe, no recompila            |
+| `deploy.yml`      | Lo llaman los despliegues                             | Pone la etiqueta del ambiente, avisa a Dokploy o entra por SSH, y espera la versión nueva y las cabeceras de seguridad |
+| `deploy-uat.yml`  | Push a `main` que no sea solo documentación, o a mano | `ci` → imagen → `uat`                                                                                                  |
+| `deploy-prod.yml` | Etiqueta `v*` de un commit de `main`, o a mano        | Busca la imagen de esa huella. Sin ella, `ci` → imagen. Luego `prod`                                                   |
+
+## Imágenes
+
+`ghcr.io/abitech-peru/pilotssh-web`, con las mismas etiquetas que la API:
+`arbol-<huella>` y `sha-<commit>`, que no cambian, y `uat` · `prod`, que apuntan
+a la última de cada ambiente. La huella va en `/version.txt`.
 
 ## Configurar GitHub
 
-1. _Settings → General → Default branch_ → `develop`.
-2. _Settings → Branches_: en `staging` y `main`, _pull request_ y pruebas
-   obligatorias.
-3. _Settings → Environments_: `uat` (solo rama `staging`) y `prd` (solo
-   `main`, con _Required reviewers_). En cada uno, las variables de la forma
-   elegida, abajo.
+1. _Settings → General → Default branch_: `main`.
+2. _Settings → Branches_: en `main`, exigir _pull request_ y que pase la CI.
+   El repositorio es público, así que el plan Free lo permite.
+3. _Settings → Secrets and variables → Actions_: las mismas variables y
+   secretos que la API, con prefijo `UAT_` o `PROD_`, salvo que la dirección
+   de la espera es `UAT_WEB_URL` · `PROD_WEB_URL`, la de la web, sin `/` al
+   final.
 
-## Con Dokploy
+Dokploy y SSH se configuran igual que en la API:
+[Con Dokploy](../../pilot-ssh-api/docs/github-actions.md#con-dokploy) y
+[Por SSH](../../pilot-ssh-api/docs/github-actions.md#por-ssh), con la carpeta
+`/srv/pilotssh/web-uat` o `/srv/pilotssh/web-prod`.
 
-Un servicio **Compose de tipo Stack** por ambiente:
+## Problemas frecuentes
 
-| Campo          | Valor                                                                                                                                                                   |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _Provider_     | GitHub, `pilot-ssh-web`, rama `staging` o `main`                                                                                                                        |
-| _Compose Path_ | `./docker-compose.yml`                                                                                                                                                  |
-| _Trigger Type_ | `On Tag`, con _Autodeploy_ apagado                                                                                                                                      |
-| _Environment_  | El `.env` del ambiente, con `IMAGE_TAG=uat` o `IMAGE_TAG=prd`. Ejemplo en [deployment.md](deployment.md#paso-1--instalar-el-ambiente--una-vez-para-uat-y-otra-para-prd) |
-| _Registry_     | `ghcr.io`, con un token de GitHub con `read:packages`                                                                                                                   |
-| Dominios       | Ninguno si hay CloudPanel: el HTTPS lo pone él                                                                                                                          |
-
-En el ambiente de GitHub:
-
-| Qué      | Nombre               | Valor                                                                             |
-| -------- | -------------------- | --------------------------------------------------------------------------------- |
-| Variable | `DOKPLOY_URL`        | La dirección de Dokploy, sin `/` al final                                         |
-| Variable | `DOKPLOY_COMPOSE_ID` | Lo que va tras `/compose/` en la URL del navegador. **No** el de la _Webhook URL_ |
-| Secreto  | `DOKPLOY_API_KEY`    | _Settings → Profile → API/CLI → Generate_                                         |
-
-## Por SSH
-
-En el servidor, la carpeta del ambiente [ya creada](deployment.md#paso-1--instalar-el-ambiente--una-vez-para-uat-y-otra-para-prd),
-y un usuario que pueda usar `docker`, hacer `git pull` y con
-`docker login ghcr.io` hecho. Una llave solo para desplegar:
-
-```bash
-ssh-keygen -t ed25519 -N "" -f despliegue
-cat despliegue.pub >> ~/.ssh/authorized_keys
-ssh-keyscan -p 22 servidor.sudominio.com   # la huella, para DEPLOY_KNOWN_HOSTS
-```
-
-En el ambiente de GitHub: variables `DEPLOY_HOST`, `DEPLOY_PORT` (por defecto
-`22`), `DEPLOY_USER`, `DEPLOY_PATH` (por ejemplo `/srv/pilotssh/web-uat`) y
-`DEPLOY_KNOWN_HOSTS`; secreto `DEPLOY_SSH_KEY`, la llave privada `despliegue`.
-
-Cada despliegue corre, en esa carpeta:
-
-```bash
-git pull --ff-only origin <rama> && IMAGE_TAG=sha-<commit> sh deploy/docker/desplegar.sh
-```
-
-## Si algo falla
-
-| Síntoma                                  | Causa                                                                                |
-| ---------------------------------------- | ------------------------------------------------------------------------------------ |
-| Dokploy responde `404`                   | `DOKPLOY_COMPOSE_ID` no es el del servicio                                           |
-| No baja la imagen                        | Falta `docker login ghcr.io`, o el registro en Dokploy                               |
-| El servicio sigue en la versión anterior | La API de ese ambiente no responde. Ver [deployment.md](deployment.md#si-algo-falla) |
-| No se despliega tras un push             | Las pruebas fallaron                                                                 |
+| Síntoma                                              | Causa                                                                                       |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `Falta la variable UAT_WEB_URL`                      | Falta la dirección de la web en las variables del repositorio                               |
+| Falla `Auditar paquetes (npm audit)`                 | Una dependencia de producción tiene una vulnerabilidad alta: suba la versión que la corrige |
+| Se queda en `Esperar la versión nueva` hasta el tope | El contenedor no arrancó: sin la API no prerenderiza y Swarm mantiene la versión anterior   |

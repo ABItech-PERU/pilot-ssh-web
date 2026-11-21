@@ -952,6 +952,7 @@ export interface OperationsSummary {
 }
 
 export interface SiteInfo {
+  version: string
   support: { email: string; phone: string; whatsapp: string }
   company: { name: string; legal_name: string; ruc: string; address: string }
   social: { facebook: string; linkedin: string; github: string }

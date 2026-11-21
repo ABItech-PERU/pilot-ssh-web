@@ -1,114 +1,58 @@
-# develop: pruebas. staging -> uat, main -> prd: pruebas, imagen y despliegue
-# Guia: docs/github-actions.md
-name: Web
+name: CI
 
 on:
-  push:
-    branches: [develop, staging, main]
-    tags: ["v*"]
   pull_request:
-  workflow_dispatch:
+    branches: [main]
+    paths-ignore: ['docs/**', '**.md']
+  workflow_call:
 
 concurrency:
-  group: web-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
+env:
+  GITLEAKS: 8.30.1
+
 jobs:
-  pruebas:
-    runs-on: ubuntu-latest
+  security:
+    name: Seguridad (secretos y dependencias)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Buscar secretos (Gitleaks)
+        run: |
+          base=https://github.com/gitleaks/gitleaks/releases/download/v$GITLEAKS
+          curl -fsSLO "$base/gitleaks_${GITLEAKS}_linux_x64.tar.gz"
+          curl -fsSL "$base/gitleaks_${GITLEAKS}_checksums.txt" | sha256sum -c --ignore-missing
+          tar -xzf "gitleaks_${GITLEAKS}_linux_x64.tar.gz" gitleaks
+          ./gitleaks git --redact --no-banner
+
+      - name: Auditar paquetes (npm audit)
+        run: npm audit --omit=dev --audit-level=high
+
+  frontend:
+    name: Tipos y pruebas (TypeScript y Vitest)
+    needs: security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - name: Instalar dependencias
+        run: npm ci
         env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
-      - run: npm run typecheck
-      - run: npx vitest run
-
-  imagenes:
-    needs: pruebas
-    # staging, main y cada version vX.Y.Z publican su imagen
-    if: github.event_name != 'pull_request' && (github.ref_name == 'staging' || github.ref_name == 'main' || startsWith(github.ref, 'refs/tags/v'))
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    outputs:
-      commit: ${{ steps.etiquetas.outputs.commit }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - id: etiquetas
-        # sha-<commit> siempre; ademas uat, prd o el numero de version
-        run: |
-          echo "registro=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
-          echo "commit=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-          case "$GITHUB_REF" in
-            refs/heads/staging) echo "extra=uat" >> "$GITHUB_OUTPUT" ;;
-            refs/heads/main) echo "extra=prd" >> "$GITHUB_OUTPUT" ;;
-            refs/tags/v*) echo "extra=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT" ;;
-          esac
-      - name: Publicar
-        env:
-          REGISTRO: ${{ steps.etiquetas.outputs.registro }}
-          COMMIT: ${{ steps.etiquetas.outputs.commit }}
-          EXTRA: ${{ steps.etiquetas.outputs.extra }}
-        run: |
-          publicar() {
-            imagen="$REGISTRO/$1"
-            # Un commit ya compilado no se recompila: prd corre lo probado
-            if docker buildx imagetools inspect "$imagen:$COMMIT" > /dev/null 2>&1; then
-              docker buildx imagetools create -t "$imagen:$EXTRA" "$imagen:$COMMIT"
-            else
-              docker buildx build --push -f "$2" -t "$imagen:$COMMIT" -t "$imagen:$EXTRA" \
-                --cache-from "type=gha,scope=$1" --cache-to "type=gha,scope=$1,mode=max" .
-            fi
-          }
-          publicar pilotssh-web Dockerfile
-
-  desplegar:
-    needs: imagenes
-    # develop se queda en local; una version vX.Y.Z solo publica
-    if: github.ref_name == 'staging' || github.ref_name == 'main'
-    runs-on: ubuntu-latest
-    # prd pide aprobacion
-    environment: ${{ github.ref_name == 'main' && 'prd' || 'uat' }}
-    steps:
-      # Dokploy o SSH, segun lo configurado en el ambiente
-      - name: Desplegar
-        env:
-          RAMA: ${{ github.ref_name }}
-          IMAGE_TAG: ${{ needs.imagenes.outputs.commit }}
-          DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
-          DOKPLOY_COMPOSE_ID: ${{ vars.DOKPLOY_COMPOSE_ID }}
-          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
-          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
-          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-        run: |
-          if [ -n "$DOKPLOY_API_KEY" ]; then
-            curl -sS --fail-with-body -X POST "$DOKPLOY_URL/api/compose.deploy" \
-              -H "x-api-key: $DOKPLOY_API_KEY" \
-              -H "Content-Type: application/json" \
-              -d "{\"composeId\": \"$DOKPLOY_COMPOSE_ID\"}"
-          elif [ -n "$DEPLOY_SSH_KEY" ]; then
-            mkdir -p ~/.ssh
-            printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/despliegue
-            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-            chmod 600 ~/.ssh/despliegue
-            ssh -i ~/.ssh/despliegue -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
-              "cd '$DEPLOY_PATH' && git pull --ff-only origin '$RAMA' && IMAGE_TAG='$IMAGE_TAG' sh deploy/docker/desplegar.sh"
-          else
-            echo "Sin Dokploy ni SSH en este ambiente: no se despliega."
-          fi
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Revisar tipos
+        run: npm run typecheck
+      - name: Correr pruebas
+        run: npm test

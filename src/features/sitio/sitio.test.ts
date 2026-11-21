@@ -32,6 +32,7 @@ const PRECIOS: PublicPricing = {
 }
 
 const SITIO: SiteInfo = {
+  version: 'local',
   support: {
     email: 'soporte@pilotssh.pe',
     phone: '+51 901 231 876',
