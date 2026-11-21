@@ -1,6 +1,6 @@
 {
   "name": "pilot-ssh-web",
-  "description": "Sitio público y panel de Pilot SSH: servidores, accesos por equipo y terminal SSH en el navegador",
+  "description": "Sitio público y panel de Pilot SSH para dar acceso a servidores por equipo y abrir la terminal en el navegador",
   "license": "UNLICENSED",
   "private": true,
   "version": "0.0.0",
