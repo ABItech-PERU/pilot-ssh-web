@@ -1,4 +1,4 @@
-name: Desplegar a producción
+name: Desplegar a prod
 
 on:
   push:
