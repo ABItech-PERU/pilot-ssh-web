@@ -339,10 +339,7 @@ function Actividad() {
           cargando={actividad.isPending}
           error={actividad.error}
           onReintentar={() => actividad.refetch()}
-          filasEsperadas={Math.min(
-            porPagina,
-            actividad.data?.results.length || porPagina,
-          )}
+          filasEsperadas={Math.min(porPagina, actividad.data?.results.length || 5)}
           vacio={
             listado.hayFiltros ? (
               <EmptyState

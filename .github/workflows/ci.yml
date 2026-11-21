@@ -1,65 +1,58 @@
-# develop: pruebas. staging -> uat y main -> prd: pruebas y despliegue
-# Guia: ../pilot-ssh-api/docs/github-actions.md
-name: Web
+name: CI
 
 on:
-  push:
-    branches: [develop, staging, main]
   pull_request:
+    branches: [main]
+    paths-ignore: ['docs/**', '**.md']
+  workflow_call:
 
 concurrency:
-  group: web-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
+env:
+  GITLEAKS: 8.30.1
+
 jobs:
-  pruebas:
-    runs-on: ubuntu-latest
+  security:
+    name: Seguridad (secretos y dependencias)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Buscar secretos (Gitleaks)
+        run: |
+          base=https://github.com/gitleaks/gitleaks/releases/download/v$GITLEAKS
+          curl -fsSLO "$base/gitleaks_${GITLEAKS}_linux_x64.tar.gz"
+          curl -fsSL "$base/gitleaks_${GITLEAKS}_checksums.txt" | sha256sum -c --ignore-missing
+          tar -xzf "gitleaks_${GITLEAKS}_linux_x64.tar.gz" gitleaks
+          ./gitleaks git --redact --no-banner
+
+      - name: Auditar paquetes (npm audit)
+        run: npm audit --omit=dev --audit-level=high
+
+  frontend:
+    name: Tipos y pruebas (TypeScript y Vitest)
+    needs: security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - name: Instalar dependencias
+        run: npm ci
         env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
-      - run: npm run typecheck
-      - run: npx vitest run
-
-  desplegar:
-    needs: pruebas
-    # develop no se despliega
-    if: github.event_name == 'push' && github.ref_name != 'develop'
-    runs-on: ubuntu-latest
-    # prd pide aprobacion
-    environment: ${{ github.ref_name == 'main' && 'prd' || 'uat' }}
-    steps:
-      # Dokploy o SSH, segun lo configurado en el ambiente
-      - name: Desplegar
-        env:
-          RAMA: ${{ github.ref_name }}
-          DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
-          DOKPLOY_COMPOSE_ID: ${{ vars.DOKPLOY_COMPOSE_ID }}
-          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
-          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
-          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-        run: |
-          if [ -n "$DOKPLOY_API_KEY" ]; then
-            curl -fsS -X POST "$DOKPLOY_URL/api/compose.deploy" \
-              -H "x-api-key: $DOKPLOY_API_KEY" \
-              -H "Content-Type: application/json" \
-              -d "{\"composeId\": \"$DOKPLOY_COMPOSE_ID\"}"
-          elif [ -n "$DEPLOY_SSH_KEY" ]; then
-            mkdir -p ~/.ssh
-            printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/despliegue
-            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-            chmod 600 ~/.ssh/despliegue
-            ssh -i ~/.ssh/despliegue -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
-              "cd '$DEPLOY_PATH' && git pull --ff-only origin '$RAMA' && docker compose up -d --build"
-          else
-            echo "Sin Dokploy ni SSH en este ambiente: no se despliega."
-          fi
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Revisar tipos
+        run: npm run typecheck
+      - name: Correr pruebas
+        run: npm test

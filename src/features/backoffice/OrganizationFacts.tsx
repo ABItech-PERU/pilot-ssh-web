@@ -239,6 +239,6 @@ export function TituloDeBloque({
   )
 }
 
-export function contar(cuantos: number, uno: string, varios: string): string {
+function contar(cuantos: number, uno: string, varios: string): string {
   return `${cuantos} ${cuantos === 1 ? uno : varios}`
 }

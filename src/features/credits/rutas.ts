@@ -1,4 +1,4 @@
-export const RUTA_DE_CREDITOS = '/app/credits'
+const RUTA_DE_CREDITOS = '/app/credits'
 
 export type PestanaDeCreditos = 'transactions' | 'usage' | 'topups'
 

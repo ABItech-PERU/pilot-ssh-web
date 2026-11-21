@@ -1,0 +1,82 @@
+name: Desplegar a producción
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  IMAGEN: ghcr.io/abitech-peru/pilotssh-web
+
+jobs:
+  find:
+    name: Buscar la imagen probada en UAT
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      arbol: ${{ steps.huella.outputs.arbol }}
+      encontrada: ${{ steps.huella.outputs.encontrada }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # Sin ramas protegidas, esto impide publicar algo sin revisar.
+      - name: Exigir un commit de main
+        run: |
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "La etiqueta $GITHUB_REF_NAME no apunta a un commit de main." >&2
+            exit 1
+          fi
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calcular la huella
+        id: huella
+        run: |
+          arbol=$(git rev-parse 'HEAD^{tree}')
+          echo "arbol=$arbol" >> "$GITHUB_OUTPUT"
+          if docker buildx imagetools inspect "$IMAGEN:arbol-$arbol" > /dev/null 2>&1; then
+            echo "encontrada=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Sin imagen de UAT, se prueba y construye aquí.
+  ci:
+    needs: find
+    if: needs.find.outputs.encontrada != 'true'
+    uses: ./.github/workflows/ci.yml
+
+  image:
+    needs: ci
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-image.yml
+
+  deploy:
+    needs: [find, image]
+    if: >-
+      !cancelled() && !failure() &&
+      (needs.find.outputs.encontrada == 'true' || needs.image.result == 'success')
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      ambiente: prod
+      arbol: ${{ needs.find.outputs.arbol }}
+    secrets: inherit

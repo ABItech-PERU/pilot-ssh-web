@@ -1,7 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeftIcon, PencilIcon, PlusIcon, ServerIcon } from 'lucide-react'
+import {
+  ArrowLeftIcon,
+  KeyRoundIcon,
+  LinkIcon,
+  PencilIcon,
+  PlusIcon,
+  ServerIcon,
+} from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link } from 'react-router'
 
 import {
   SidePanelBody,
@@ -9,7 +16,8 @@ import {
   SidePanelFooter,
   SidePanelHeader,
 } from '@/components/side-panel'
-import { Bloque, VacioDeBloque, VerTodo } from '@/components/bloque'
+import { Bloque, VerTodo } from '@/components/bloque'
+import { EmptyState } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetDescription, SheetFooter, SheetTitle } from '@/components/ui/sheet'
 import { puedeGestionar } from '@/features/access/levels'
@@ -107,7 +115,6 @@ interface ResumenProps {
 }
 
 function VistaResumen({ server, acciones, onVerCredenciales }: ResumenProps) {
-  const navegar = useNavigate()
   // Anadir y editar solo quien gestiona la maquina
   const gestiona = puedeGestionar(server)
 
@@ -149,11 +156,20 @@ function VistaResumen({ server, acciones, onVerCredenciales }: ResumenProps) {
           }
         >
           {server.links.length === 0 ? (
-            <VacioDeBloque
-              texto="El panel, el monitoreo y todo lo del servidor entero."
-              accion="Añadir enlace"
-              onAccion={
-                gestiona ? () => navegar(buildServerPath(server.id, 'links')) : undefined
+            <EmptyState
+              compacto
+              icon={LinkIcon}
+              title="Sin enlaces"
+              description="El panel, el monitoreo y todo lo del servidor entero."
+              action={
+                gestiona && (
+                  <Button asChild variant="outline" size="sm">
+                    <Link to={buildServerPath(server.id, 'links')}>
+                      <PlusIcon />
+                      Añadir enlace
+                    </Link>
+                  </Button>
+                )
               }
             />
           ) : (
@@ -174,10 +190,23 @@ function VistaResumen({ server, acciones, onVerCredenciales }: ResumenProps) {
           }
         >
           {server.users.length === 0 ? (
-            <VacioDeBloque
-              texto="Sin credencial no hay terminal."
-              accion="Añadir credencial"
-              onAccion={gestiona ? acciones.onAnadirCredencial : undefined}
+            <EmptyState
+              compacto
+              icon={KeyRoundIcon}
+              title="Sin credenciales"
+              description="Sin credencial no hay terminal."
+              action={
+                gestiona && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={acciones.onAnadirCredencial}
+                  >
+                    <PlusIcon />
+                    Añadir credencial
+                  </Button>
+                )
+              }
             />
           ) : (
             <ul className="divide-y">

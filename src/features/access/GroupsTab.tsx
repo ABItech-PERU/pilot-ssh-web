@@ -5,9 +5,8 @@ import { useOutletContext } from 'react-router'
 import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
-import { EmptyState } from '@/components/states'
+import { EmptyState, ListaEsqueleto } from '@/components/states'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import * as accessApi from '@/features/access/api'
 import { GroupAccessDialog } from '@/features/access/GroupAccessDialog'
 import { GroupNameDialog } from '@/features/access/GroupNameDialog'
@@ -51,8 +50,6 @@ export function GroupsTab() {
   const porGrupo = (grupo: AccessGroup) =>
     (concesiones.data ?? []).filter((concesion) => concesion.group === grupo.id)
 
-  if (grupos.isPending) return <Skeleton className="h-40 rounded-lg" />
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -67,8 +64,11 @@ export function GroupsTab() {
         )}
       </div>
 
-      {lista.length === 0 ? (
+      {grupos.isPending ? (
+        <ListaEsqueleto filas={2} />
+      ) : lista.length === 0 ? (
         <EmptyState
+          enmarcado
           icon={UsersIcon}
           title="Todavía no hay grupos"
           description="Sirven para dar el mismo acceso a varias personas de una vez."

@@ -3,9 +3,8 @@ import { PlusIcon, TagIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useOutletContext } from 'react-router'
 
-import { EmptyState } from '@/components/states'
+import { EmptyState, ListaEsqueleto } from '@/components/states'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { LabelNameDialog } from '@/features/servers/LabelNameDialog'
 import { LabelRow } from '@/features/servers/LabelRow'
 import * as serversApi from '@/features/servers/api'
@@ -27,8 +26,6 @@ export function LabelsTab() {
 
   const etiquetas = catalogo.data ?? []
 
-  if (catalogo.isPending) return <Skeleton className="h-40 rounded-lg" />
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -43,8 +40,11 @@ export function LabelsTab() {
         )}
       </div>
 
-      {etiquetas.length === 0 ? (
+      {catalogo.isPending ? (
+        <ListaEsqueleto filas={2} />
+      ) : etiquetas.length === 0 ? (
         <EmptyState
+          enmarcado
           icon={TagIcon}
           title="Todavía no hay etiquetas"
           description="Con «Entorno» se concede acceso a toda la producción de una vez."

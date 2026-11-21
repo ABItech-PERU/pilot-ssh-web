@@ -19,6 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { LineaEsqueleto } from '@/components/states'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AccessSheet } from '@/features/access/AccessSheet'
 import { accionDeAcceso, puedeGestionar } from '@/features/access/levels'
@@ -31,6 +32,7 @@ import {
   AbrirTerminal,
   CopiarDireccion,
   Metricas,
+  MetricasEsqueleto,
   VerificadoBadge,
 } from '@/features/servers/server-parts'
 import { ServerFormDialog } from '@/features/servers/ServerFormDialog'
@@ -104,7 +106,7 @@ export function ServerPage() {
   })
 
   if (!isUuid(serverId) || detalle.isError) return <NoEncontrado />
-  if (detalle.isPending) return <Esqueleto />
+  if (detalle.isPending) return <Esqueleto serverId={serverId} />
 
   const server = detalle.data
   // Editar y eliminar solo quien gestiona la maquina; si no, daria 403
@@ -115,13 +117,7 @@ export function ServerPage() {
 
   return (
     <div className="space-y-6">
-      <Link
-        to="/app/servers"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
-      >
-        <ArrowLeftIcon className="size-4" />
-        Servidores
-      </Link>
+      <VolverAServidores />
 
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 space-y-1">
@@ -179,6 +175,7 @@ export function ServerPage() {
           to: buildServerPath(server.id, pestana),
           etiqueta,
           cuenta: cuenta(server, accesos),
+          cuentaPendiente: pestana === 'access' && acceso.isPending,
           end: true,
         }))}
       />
@@ -231,23 +228,52 @@ function NoEncontrado() {
   )
 }
 
-/** Misma forma que la pagina cargada: sin saltos al llegar los datos. */
-function Esqueleto() {
+function VolverAServidores() {
+  return (
+    <Link
+      to="/app/servers"
+      className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
+    >
+      <ArrowLeftIcon className="size-4" />
+      Servidores
+    </Link>
+  )
+}
+
+/** Lo fijo, real; lo de la API, barras de su alto. */
+function Esqueleto({ serverId }: { serverId: string }) {
   return (
     <div className="space-y-6" aria-busy>
-      <Skeleton className="h-5 w-24" />
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-56" />
-          <Skeleton className="h-4 w-36" />
+      <VolverAServidores />
+
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 space-y-1">
+          <LineaEsqueleto texto="2xl" className="w-56" />
+          <LineaEsqueleto className="w-36" />
+          <div className="pt-1">
+            <Skeleton className="h-5 w-28 rounded-full" />
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <Skeleton className="h-10 w-28" />
           <Skeleton className="h-10 w-24" />
           <Skeleton className="h-10 w-36" />
+          <Skeleton className="size-9" />
         </div>
-      </div>
-      <Skeleton className="h-[74px] w-full rounded-lg" />
-      <Skeleton className="h-10 w-full" />
+      </header>
+
+      <MetricasEsqueleto />
+
+      <TabNav
+        etiqueta="Secciones del servidor"
+        pestanas={PESTANAS.map(({ etiqueta, pestana }) => ({
+          to: buildServerPath(serverId, pestana),
+          etiqueta,
+          cuentaPendiente: pestana !== undefined && pestana !== 'stats',
+          end: true,
+        }))}
+      />
+
       <Skeleton className="h-48 w-full rounded-lg" />
     </div>
   )

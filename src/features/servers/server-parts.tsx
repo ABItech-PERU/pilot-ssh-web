@@ -25,7 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState, LineaEsqueleto } from '@/components/states'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { accionDeAcceso, puedeConectar, puedeGestionar } from '@/features/access/levels'
 import { buildCredentialPath } from '@/features/credentials/paths'
@@ -97,20 +97,36 @@ export function Metricas({ server }: { server: Server }) {
   )
 }
 
+/** Rótulos fijos: solo falta el número. */
+export function MetricasEsqueleto() {
+  return (
+    <div className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border bg-border">
+      <Metrica etiqueta="Sesiones" />
+      <Metrica etiqueta="Último uso" />
+      <Metrica etiqueta="Media" />
+    </div>
+  )
+}
+
 export function Metrica({
   etiqueta,
   valor,
   exacto,
 }: {
   etiqueta: string
-  valor: string
+  /** Sin valor: cargando. */
+  valor?: string
   exacto?: string
 }) {
   return (
     <div className="bg-card p-3 text-center">
-      <p className="truncate text-base font-semibold tabular-nums" title={exacto}>
-        {valor}
-      </p>
+      {valor === undefined ? (
+        <LineaEsqueleto texto="base" className="mx-auto w-12" />
+      ) : (
+        <p className="truncate text-base font-semibold tabular-nums" title={exacto}>
+          {valor}
+        </p>
+      )}
       <p className="text-muted-foreground mt-0.5 text-[11px] tracking-wide uppercase">
         {etiqueta}
       </p>
@@ -158,11 +174,11 @@ export function SesionesLista({
       <ul className="divide-y" aria-busy>
         {Array.from({ length: 3 }, (_, indice) => (
           <li key={indice} className="flex items-center justify-between gap-3 px-4 py-3">
-            <div className="space-y-1.5">
-              <Skeleton className="h-4 w-28" />
-              <Skeleton className="h-3 w-20" />
+            <div>
+              <LineaEsqueleto className="w-28" />
+              <LineaEsqueleto texto="xs" className="w-20" />
             </div>
-            <Skeleton className="h-4 w-14" />
+            <LineaEsqueleto texto="xs" className="w-20" />
           </li>
         ))}
       </ul>
@@ -179,9 +195,12 @@ export function SesionesLista({
 
   if (sesiones.length === 0) {
     return (
-      <p className="text-muted-foreground p-4 text-sm">
-        Nadie ha abierto la terminal todavía.
-      </p>
+      <EmptyState
+        compacto
+        icon={TerminalIcon}
+        title="Sin sesiones todavía"
+        description="Cada terminal que se abra quedará aquí, con quién y cuándo."
+      />
     )
   }
 

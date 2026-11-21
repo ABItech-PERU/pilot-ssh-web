@@ -77,17 +77,20 @@ export function TeamPage() {
             to: '/app/team',
             etiqueta: 'Personas',
             cuenta: equipo.data?.length ?? null,
+            cuentaPendiente: equipo.isPending,
             end: true,
           },
           {
             to: '/app/team/groups',
             etiqueta: 'Grupos de acceso',
             cuenta: grupos.data?.length ?? null,
+            cuentaPendiente: grupos.isPending,
           },
           {
             to: '/app/team/labels',
             etiqueta: 'Etiquetas',
             cuenta: etiquetas.data?.length ?? null,
+            cuentaPendiente: etiquetas.isPending,
           },
         ]}
       />

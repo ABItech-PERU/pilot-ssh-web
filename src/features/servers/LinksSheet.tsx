@@ -40,7 +40,7 @@ export function CredentialLinksSheet({ credential, open, onOpenChange }: Props) 
             vacio={
               puedeGestionar(credential)
                 ? 'Su web, su base de datos, su repositorio.'
-                : 'Todavía no hay enlaces.'
+                : 'Quien administra los añade.'
             }
             onGuardar={async (links) => {
               const actualizada = await serversApi.updateCredential(credential.id, {
@@ -90,7 +90,7 @@ export function ServerLinksSheet({ server, open, onOpenChange }: ServerProps) {
             vacio={
               puedeGestionar(server)
                 ? 'El panel, el monitoreo y todo lo del servidor entero.'
-                : 'Todavía no hay enlaces.'
+                : 'Quien administra los añade.'
             }
             onGuardar={async (links) => {
               const actualizado = await serversApi.updateServer(server.id, { links })

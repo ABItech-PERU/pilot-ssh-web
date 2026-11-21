@@ -5,8 +5,6 @@ import { toast } from 'sonner'
 import * as authApi from '@/features/auth/api'
 import { CLAVE_USUARIO } from '@/features/auth/session'
 import * as creditsApi from '@/features/credits/api'
-import { describirGratuito } from '@/features/credits/tarifas'
-import { useTarifas } from '@/features/credits/use-creditos'
 import { toApiError } from '@/lib/api-error'
 
 /** Pedir y confirmar el código; lo comparten el alta guiada y el aviso. */
@@ -40,16 +38,6 @@ export function useConfirmarCorreo(onConfirmado: () => void) {
   })
 
   return { pedir, confirmar, aviso, limpiarAviso: () => setAviso(null) }
-}
-
-/** Lo que se gana al confirmar, con cifras: «lo gratuito de cada día» no
- *  dice nada a quien acaba de llegar. */
-export function useRegaloAlConfirmar(): string {
-  const tarifas = useTarifas()
-  const gratis = tarifas.data && describirGratuito(tarifas.data)
-  return gratis
-    ? `500 créditos de regalo, más ${gratis} gratis cada día`
-    : '500 créditos de regalo'
 }
 
 /** Código del alta aún vigente: no hace falta pedir otro. */

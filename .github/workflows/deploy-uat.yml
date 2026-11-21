@@ -1,0 +1,37 @@
+name: Desplegar a UAT
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', '**.md']
+  workflow_dispatch:
+
+# Uno a la vez, sin cortar el que corre.
+concurrency:
+  group: deploy-uat
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  image:
+    needs: ci
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-image.yml
+
+  deploy:
+    needs: image
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      ambiente: uat
+      arbol: ${{ needs.image.outputs.arbol }}
+    secrets: inherit

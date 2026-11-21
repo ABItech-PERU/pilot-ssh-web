@@ -17,10 +17,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { EmailCodeField } from '@/features/account/EmailCodeField'
-import {
-  useConfirmarCorreo,
-  useRegaloAlConfirmar,
-} from '@/features/account/use-confirmar-correo'
+import { RegaloAlConfirmar } from '@/features/account/RegaloAlConfirmar'
+import { useConfirmarCorreo } from '@/features/account/use-confirmar-correo'
 import * as authApi from '@/features/auth/api'
 import { CLAVE_USUARIO, useSession } from '@/features/auth/session'
 import * as organizationsApi from '@/features/organizations/api'
@@ -72,7 +70,6 @@ export function OnboardingPage() {
   const { user, signOut } = useSession()
   const cliente = useQueryClient()
   const navegar = useNavigate()
-  const regalo = useRegaloAlConfirmar()
   const correoConfirmado = Boolean(user?.has_verified_email)
   // El código se envía con el alta: se confirma con el correo reciente
   const inicial: Paso = correoConfirmado ? 'datos' : 'correo'
@@ -172,7 +169,7 @@ export function OnboardingPage() {
   const progreso = buildPasos(paso, alcanzado, correoConfirmado)
 
   return (
-    <div className="bg-background flex min-h-dvh flex-col">
+    <div className="bg-background flex min-h-pantalla flex-col">
       {/* Única salida de quien entra por error: no hay otra navegación */}
       <header className="py-4">
         <Container className="flex items-center justify-between gap-4">
@@ -214,7 +211,7 @@ export function OnboardingPage() {
                     <>
                       Le enviamos un código a{' '}
                       <span className="text-foreground font-medium">{user?.email}</span>.
-                      Al confirmarlo recibe {regalo}.
+                      Al confirmarlo recibe <RegaloAlConfirmar />.
                     </>
                   )
                 ) : paso === 'datos' ? (

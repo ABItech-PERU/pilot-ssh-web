@@ -20,7 +20,11 @@ export function ServerLinksTab() {
         key={server.id}
         links={server.links}
         primerTipo="panel"
-        vacio="Todavía no hay enlaces."
+        vacio={
+          puedeGestionar(server)
+            ? 'Añada el primero con el botón de abajo.'
+            : 'Quien administra los añade.'
+        }
         soloLectura={!puedeGestionar(server)}
         onGuardar={async (links) => {
           const actualizado = await serversApi.updateServer(server.id, { links })

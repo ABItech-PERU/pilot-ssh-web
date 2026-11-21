@@ -35,7 +35,7 @@ export type PuntoDeRecarga =
  *  `peligro`: dinero perdido. Gris solo para lo cancelado. */
 export type TonoDeRecarga = 'aviso' | 'proceso' | 'ok' | 'neutro' | 'info' | 'peligro'
 
-export type AccionDeRecarga = 'pagar' | 'codigo' | 'contacto' | null
+type AccionDeRecarga = 'pagar' | 'codigo' | 'contacto' | null
 
 export interface EstadoDeRecarga {
   punto: PuntoDeRecarga

@@ -1,0 +1,22 @@
+# Ajuste de solo desarrollo sobre docker-compose.yml, con Vite y el codigo
+# montado para recargar al guardar. desplegar.sh lo agrega con APP_ENV=local
+
+services:
+  app:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install --no-audit --no-fund && npm run dev"
+    environment:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    volumes:
+      - .:/app
+      # Los paquetes de Linux, aparte de los de la maquina
+      - node_modules:/app/node_modules
+    # La primera vez, npm install tarda unos minutos
+    healthcheck:
+      start_period: 600s
+    deploy:
+      replicas: 1
+
+volumes:
+  node_modules:

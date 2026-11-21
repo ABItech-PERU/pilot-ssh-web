@@ -1,0 +1,60 @@
+name: Desplegar
+
+on:
+  workflow_call:
+    inputs:
+      ambiente:
+        description: uat o prod; su Environment de GitHub con variables y secretos
+        type: string
+        required: true
+      arbol:
+        description: Huella de la imagen ya probada
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGEN: ghcr.io/abitech-peru/pilotssh-web
+
+jobs:
+  deploy:
+    name: Desplegar a ${{ inputs.ambiente }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: ${{ inputs.ambiente }}
+    env:
+      AMBIENTE: ${{ inputs.ambiente }}
+      ARBOL: ${{ inputs.arbol }}
+      WEB_URL: ${{ vars.WEB_URL }}
+      DOKPLOY_WEBHOOK_URL: ${{ secrets.DOKPLOY_WEBHOOK_URL }}
+    steps:
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Dokploy despliega la etiqueta del ambiente.
+      - name: Promover la imagen
+        run: docker buildx imagetools create --tag "$IMAGEN:$AMBIENTE" "$IMAGEN:arbol-$ARBOL"
+
+      # El compose de Dokploy solo acepta el push de la rama configurada.
+      - name: Avisar a Dokploy
+        run: |
+          : "${DOKPLOY_WEBHOOK_URL:?Falta el secreto DOKPLOY_WEBHOOK_URL en el ambiente $AMBIENTE}"
+          curl -fsS --fail-with-body -X POST "$DOKPLOY_WEBHOOK_URL" \
+            -H "Content-Type: application/json" -H "X-GitHub-Event: push" \
+            -d '{"ref": "refs/heads/main"}'
+
+      # Con start-first, la versión vieja responde hasta el cambio.
+      - name: Esperar la versión nueva
+        run: |
+          : "${WEB_URL:?Falta la variable WEB_URL en el ambiente $AMBIENTE}"
+          until test "$(curl -fsS "$WEB_URL/version.txt")" = "$ARBOL"; do
+            sleep 5
+          done
+          curl -fsSI "$WEB_URL/" | grep -qi "^content-security-policy:"
+          curl -fsSI "$WEB_URL/" | grep -qi "^strict-transport-security:"

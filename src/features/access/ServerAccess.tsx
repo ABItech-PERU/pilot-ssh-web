@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FieldError } from '@/components/field-error'
 import { InfoHint } from '@/components/info-hint'
+import { EmptyState } from '@/components/states'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -122,12 +123,18 @@ export function ServerAccess({
 
         <Bloque titulo="Con acceso concedido">
           {concesiones.length === 0 ? (
-            <p className="text-muted-foreground p-3 text-sm">
-              {credencial
-                ? 'Todavía no entra nadie más con esta credencial.'
-                : 'Todavía no entra nadie más a este servidor.'}
-              {puedeRepartir && !conFormulario && ' Use «Compartir» para dar acceso.'}
-            </p>
+            <EmptyState
+              compacto
+              icon={UsersIcon}
+              title="Nadie más entra todavía"
+              description={
+                puedeRepartir && !conFormulario
+                  ? 'Use «Compartir» para dar acceso a alguien del equipo.'
+                  : credencial
+                    ? 'Solo quien administra usa esta credencial.'
+                    : 'Solo quien administra entra a este servidor.'
+              }
+            />
           ) : (
             concesiones.map((concesion) => (
               <GrantRow

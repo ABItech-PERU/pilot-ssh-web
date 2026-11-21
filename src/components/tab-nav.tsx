@@ -2,11 +2,15 @@ import { NavLink } from 'react-router'
 
 import { cn } from 'cn'
 
+import { Skeleton } from '@/components/ui/skeleton'
+
 export interface Pestana {
   to: string
   etiqueta: string
   /** Lo que hay dentro, cuando ahorra entrar a mirarlo. */
   cuenta?: number | null
+  /** Cuenta en camino: hueco reservado, sin salto. */
+  cuentaPendiente?: boolean
   /** La pestaña índice necesita `end`, o queda activa en todas las hijas. */
   end?: boolean
 }
@@ -38,10 +42,14 @@ export function TabNav({
               }
             >
               {pestana.etiqueta}
-              {pestana.cuenta != null && (
-                <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-xs tabular-nums">
-                  {pestana.cuenta}
-                </span>
+              {pestana.cuentaPendiente ? (
+                <Skeleton className="h-5 w-5 rounded-full" />
+              ) : (
+                pestana.cuenta != null && (
+                  <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-xs tabular-nums">
+                    {pestana.cuenta}
+                  </span>
+                )
               )}
             </NavLink>
           </li>

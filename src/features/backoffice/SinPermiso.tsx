@@ -19,6 +19,7 @@ export function SinPermiso({ titulo, descripcion, permiso }: Props) {
     <div className="space-y-6">
       <PageHeader title={titulo} description={descripcion} />
       <EmptyState
+        enmarcado
         icon={LockIcon}
         title={`Requiere el permiso de ${nombre}`}
         description="Pídalo a quien gestiona el personal."

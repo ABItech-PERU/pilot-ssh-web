@@ -9,16 +9,16 @@ import {
   subscribe,
 } from '@/features/auth/token-store'
 import { SESION_CADUCADA } from '@/lib/http'
-import type { CurrentUser, SessionTokens } from '@/types/api'
+import type { CurrentUser, SessionTokens, TwoFactorMethod } from '@/types/api'
 import { fijarZona } from '@/lib/zona-horaria'
 
 export const CLAVE_USUARIO = ['current-user'] as const
 
-/** Contraseña correcta: abre la sesión o deja pendiente el código del
- *  correo, nunca ambas. */
+/** Contraseña correcta: abre la sesión o deja pendiente el segundo código,
+ *  nunca ambas. */
 export type LoginResult =
   | { estado: 'listo'; user: CurrentUser }
-  | { estado: 'dos_pasos'; challenge: string; email: string }
+  | { estado: 'dos_pasos'; challenge: string; email: string; metodo: TwoFactorMethod }
 
 interface SessionContextValue {
   user: CurrentUser | null
@@ -75,6 +75,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           estado: 'dos_pasos',
           challenge: respuesta.challenge,
           email: respuesta.email,
+          metodo: respuesta.method,
         }
       }
       return { estado: 'listo', user: abrir(respuesta) }

@@ -25,6 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { LineaEsqueleto } from '@/components/states'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CredentialAccessSheet } from '@/features/access/CredentialAccessSheet'
 import { accionDeAcceso, puedeConectar, puedeGestionar } from '@/features/access/levels'
@@ -88,7 +89,7 @@ export function CredentialPage() {
   })
 
   if (!isUuid(credentialId) || detalle.isError) return <NoEncontrada />
-  if (detalle.isPending) return <Esqueleto />
+  if (detalle.isPending) return <Esqueleto credentialId={credentialId} />
 
   const credencial = detalle.data
   const forma = FORMAS_DE_ENTRAR[credencial.auth_type]
@@ -99,13 +100,7 @@ export function CredentialPage() {
 
   return (
     <div className="space-y-6">
-      <Link
-        to="/app/credentials"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
-      >
-        <ArrowLeftIcon className="size-4" />
-        Credenciales
-      </Link>
+      <VolverACredenciales />
 
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
@@ -390,22 +385,85 @@ function NoEncontrada() {
   )
 }
 
-/** Misma forma que la página cargada: sin saltos al llegar los datos. */
-function Esqueleto() {
+function VolverACredenciales() {
+  return (
+    <Link
+      to="/app/credentials"
+      className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
+    >
+      <ArrowLeftIcon className="size-4" />
+      Credenciales
+    </Link>
+  )
+}
+
+/** Lo fijo, real; lo de la API, barras de su alto. */
+function Esqueleto({ credentialId }: { credentialId: string }) {
   return (
     <div className="space-y-6" aria-busy>
-      <Skeleton className="h-5 w-28" />
-      <div className="flex items-start gap-3">
-        <Skeleton className="size-10 rounded-lg" />
-        <div className="space-y-2">
-          <Skeleton className="h-7 w-56" />
-          <Skeleton className="h-4 w-40" />
+      <VolverACredenciales />
+
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <Skeleton className="size-10 shrink-0 rounded-lg" />
+          <div className="min-w-0 space-y-1">
+            <LineaEsqueleto texto="xl" className="w-48" />
+            <LineaEsqueleto className="w-40" />
+          </div>
         </div>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <Skeleton className="h-10 w-28" />
+          <Skeleton className="h-10 w-24" />
+          <Skeleton className="h-10 w-36" />
+          <Skeleton className="size-9" />
+        </div>
+      </header>
+
+      <div className="bg-border grid grid-cols-2 gap-px overflow-hidden rounded-lg border sm:grid-cols-4">
+        {['Sesiones', 'Personas', 'Último uso', 'Media'].map((etiqueta) => (
+          <Metrica key={etiqueta} etiqueta={etiqueta} />
+        ))}
       </div>
-      <Skeleton className="h-[74px] w-full rounded-lg" />
-      <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
-        <Skeleton className="h-72 rounded-lg" />
-        <Skeleton className="h-72 rounded-lg" />
+
+      <div className="grid gap-6 lg:grid-cols-[20rem_1fr] lg:items-start">
+        <dl className="divide-y rounded-lg border">
+          <Dato etiqueta="Etiquetas">
+            <LineaEsqueleto className="w-20" />
+          </Dato>
+          <Dato etiqueta="Carpeta de trabajo">
+            <LineaEsqueleto className="w-48" />
+          </Dato>
+          <Dato etiqueta="Enlaces">
+            <LineaEsqueleto className="w-24" />
+          </Dato>
+          <Dato etiqueta="Alta">
+            <LineaEsqueleto className="w-32" />
+            <LineaEsqueleto texto="xs" className="w-40" />
+          </Dato>
+          <Dato etiqueta="Último cambio">
+            <LineaEsqueleto className="w-24" />
+          </Dato>
+        </dl>
+
+        <section className="min-w-0 space-y-4">
+          <TabNav
+            etiqueta="Secciones de la credencial"
+            pestanas={[
+              {
+                to: buildCredentialPath(credentialId),
+                etiqueta: 'Sesiones',
+                cuentaPendiente: true,
+                end: true,
+              },
+              {
+                to: buildCredentialPath(credentialId, 'stats'),
+                etiqueta: 'Estadísticas',
+                end: true,
+              },
+            ]}
+          />
+          <Skeleton className="h-72 w-full rounded-lg" />
+        </section>
       </div>
     </div>
   )

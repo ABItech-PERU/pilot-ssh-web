@@ -1,13 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
-import { CircleAlertIcon, HourglassIcon, TimerIcon, UsersIcon } from 'lucide-react'
+import {
+  CircleAlertIcon,
+  GlobeIcon,
+  HourglassIcon,
+  TimerIcon,
+  UsersIcon,
+} from 'lucide-react'
 import { useOutletContext } from 'react-router'
 
 import { Bloque } from '@/components/bloque'
-import { ErrorState } from '@/components/states'
-import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState, ErrorState } from '@/components/states'
 import * as credentialsApi from '@/features/credentials/api'
 import {
   ActividadDiaria,
+  ActividadDiariaEsqueleto,
   BarraDePeriodo,
   Cifra,
   Ranking,
@@ -71,11 +77,7 @@ export function CredentialStatsTab() {
 
       <Bloque titulo="Actividad del periodo">
         <div className="p-4">
-          {datos ? (
-            <ActividadDiaria datos={datos} />
-          ) : (
-            <Skeleton className="h-24 w-full" />
-          )}
+          {datos ? <ActividadDiaria datos={datos} /> : <ActividadDiariaEsqueleto />}
         </div>
       </Bloque>
 
@@ -86,7 +88,14 @@ export function CredentialStatsTab() {
               nombre: fila.name,
               total: fila.sessions,
             }))}
-            vacio="Nadie la ha usado en ese periodo."
+            vacio={
+              <EmptyState
+                compacto
+                icon={UsersIcon}
+                title="Sin uso en el periodo"
+                description="Nadie la ha usado en ese tiempo."
+              />
+            }
           />
         </Bloque>
 
@@ -97,7 +106,14 @@ export function CredentialStatsTab() {
               total: fila.sessions,
               maquina: true,
             }))}
-            vacio="Sin conexiones en ese periodo."
+            vacio={
+              <EmptyState
+                compacto
+                icon={GlobeIcon}
+                title="Sin conexiones"
+                description="Ninguna conexión en ese tiempo."
+              />
+            }
           />
         </Bloque>
       </div>

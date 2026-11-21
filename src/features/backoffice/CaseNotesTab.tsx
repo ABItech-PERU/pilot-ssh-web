@@ -95,6 +95,7 @@ export function CaseNotesTab() {
         <ErrorState error={notas.error} onRetry={() => notas.refetch()} />
       ) : notas.data.count === 0 ? (
         <EmptyState
+          enmarcado
           icon={NotebookPenIcon}
           title="Sin notas"
           description="Anote lo que pasó con este cliente para quien lo atienda después."

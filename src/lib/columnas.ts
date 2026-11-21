@@ -59,7 +59,7 @@ export function alternarColumna(
 }
 
 /** En el orden del catálogo: elegir una columna no la manda al final. */
-export function ordenar(visibles: string[], columnas: MetaDeColumna[]): string[] {
+function ordenar(visibles: string[], columnas: MetaDeColumna[]): string[] {
   return columnas.filter((cada) => visibles.includes(cada.key)).map((cada) => cada.key)
 }
 

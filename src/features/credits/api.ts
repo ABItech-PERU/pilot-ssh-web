@@ -63,7 +63,7 @@ export const clavesCreditos = {
 
 /** Solo los días con uso tienen fila: un mes cabe en una página. */
 const DIAS_CON_USO_POR_PAGINA = 31
-export const MOVIMIENTOS_POR_PAGINA = 20
+const MOVIMIENTOS_POR_PAGINA = 20
 
 export async function fetchWallet(slug: string) {
   const { data } = await http.get<Wallet>('/credits', { params: { organization: slug } })

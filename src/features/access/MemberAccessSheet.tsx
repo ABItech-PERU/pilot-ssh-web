@@ -75,6 +75,7 @@ export function MemberAccessSheet({ slug, miembro, open, onOpenChange }: Props) 
             </p>
           ) : consulta.data.servers.length === 0 ? (
             <EmptyState
+              enmarcado
               icon={ServerIcon}
               title="No entra a ningún servidor"
               description="Dele toda la organización arriba, o compártale un servidor desde su ficha."

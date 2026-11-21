@@ -1,0 +1,409 @@
+import { FitAddon } from '@xterm/addon-fit'
+import { SearchAddon } from '@xterm/addon-search'
+import { WebLinksAddon } from '@xterm/addon-web-links'
+import { Terminal } from '@xterm/xterm'
+import { cn } from 'cn'
+import { CoinsIcon, RotateCwIcon, XIcon } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router'
+
+import { Button } from '@/components/ui/button'
+import {
+  BuscadorEnTerminal,
+  type Coincidencias,
+} from '@/features/terminal/BuscadorEnTerminal'
+import { leerDelPrompt, leerOsc7 } from '@/features/terminal/carpeta-actual'
+import { SelectorDeCarpeta } from '@/features/terminal/SelectorDeCarpeta'
+import { CIERRE, type EstadoTerminal } from '@/features/terminal/socket'
+import { fetchPorcentaje } from '@/features/terminal/subida'
+import {
+  type Latencias,
+  useTerminalSocket,
+} from '@/features/terminal/use-terminal-socket'
+import type { Server, ServerUser } from '@/types/api'
+
+/** Hex: xterm no entiende oklch(). Copia de los tokens `--term-*` de
+ *  index.css; cambian juntos. */
+const TEMA = {
+  background: '#141922',
+  foreground: '#ecedf1',
+  cursor: '#5fd4c8',
+  cursorAccent: '#141922',
+  selectionBackground: 'rgba(95, 212, 200, 0.28)',
+  black: '#1c222c',
+  red: '#ef7272',
+  green: '#63d68f',
+  yellow: '#e8c86a',
+  blue: '#74acf2',
+  magenta: '#c896ea',
+  cyan: '#5fd4c8',
+  white: '#d7dae0',
+  brightBlack: '#5b6270',
+  brightRed: '#f78c8c',
+  brightGreen: '#7fe3a6',
+  brightYellow: '#f0d68a',
+  brightBlue: '#94c0f7',
+  brightMagenta: '#d7aef2',
+  brightCyan: '#84e2d8',
+  brightWhite: '#f5f6f8',
+}
+
+/** Alt+número es de las pestañas; abajo llegaría como un escape suelto. */
+const CAMBIA_DE_PESTANA = /^[1-9]$/
+
+/** Ctrl+C corta el proceso y Ctrl+F mueve el cursor: con Shift son de la
+ *  ventana, como en cualquier terminal. */
+const ATAJOS_DE_LA_VENTANA = 'fcv'
+
+const fetchAtajo = (evento: KeyboardEvent) =>
+  evento.ctrlKey && evento.shiftKey ? evento.key.toLowerCase() : ''
+
+const RESALTADO = {
+  matchBackground: '#3f4a5c',
+  matchOverviewRuler: '#5fd4c8',
+  activeMatchBackground: '#5fd4c8',
+  activeMatchColorOverviewRuler: '#5fd4c8',
+}
+
+const SIN_COINCIDENCIAS: Coincidencias = { actual: 0, total: 0 }
+
+interface PanelProps {
+  id: string
+  server: Server
+  credencial: ServerUser
+  /** Las de atrás siguen conectadas y recibiendo: solo dejan de verse. */
+  visible: boolean
+  onEstado: (id: string, estado: EstadoTerminal) => void
+  onLatencia: (id: string, medidas: Latencias) => void
+  /** Cerrar la que acabó: si es la única, se sale de la terminal. */
+  onCerrar: () => void
+  esLaUnica: boolean
+  /** Sus subidas, a mano de la barra: manda a la terminal que se ve. */
+  onSubidor: (id: string, mando: MandoDeSubida) => void
+}
+
+export interface MandoDeSubida {
+  subir: (archivos: File[]) => void
+  elegirCarpeta: () => void
+}
+
+/** Monta xterm una vez y le ata la shell; al reconectar, lo escrito sigue
+ *  en pantalla. */
+export function PanelDeTerminal({
+  id,
+  server,
+  credencial,
+  visible,
+  onEstado,
+  onLatencia,
+  onCerrar,
+  esLaUnica,
+  onSubidor,
+}: PanelProps) {
+  const contenedor = useRef<HTMLDivElement | null>(null)
+  const terminal = useRef<Terminal | null>(null)
+  const buscador = useRef<SearchAddon | null>(null)
+  const [estado, setEstado] = useState<EstadoTerminal>({ fase: 'conectando' })
+  const [buscando, setBuscando] = useState(false)
+  const [arrastrando, setArrastrando] = useState(false)
+  const [eligiendo, setEligiendo] = useState(false)
+  const entrada = useRef<HTMLInputElement | null>(null)
+  // La que anuncia el shell (OSC 7); el prompt es el plan B
+  const anunciada = useRef('')
+  const elegida = useRef('')
+  const [coincidencias, setCoincidencias] = useState<Coincidencias>(SIN_COINCIDENCIAS)
+
+  const avisarLatencia = useCallback(
+    (medidas: Latencias) => onLatencia(id, medidas),
+    [id, onLatencia],
+  )
+
+  const {
+    cancelarSubida,
+    enviarTamano,
+    pedirCarpetas,
+    reconectar,
+    subida,
+    subirVarios,
+    teclear,
+  } = useTerminalSocket({
+    server,
+    credencial,
+    terminal,
+    onEstado: setEstado,
+    onLatencia: avisarLatencia,
+  })
+
+  useEffect(() => {
+    onEstado(id, estado)
+  }, [id, estado, onEstado])
+
+  /** Donde está parada la shell: lo que anuncia, o lo que muestra el prompt. */
+  const fetchDestino = useCallback(() => {
+    const vista = terminal.current
+    const activa = vista?.buffer.active
+    const prompt = activa?.getLine(activa.baseY + activa.cursorY)?.translateToString(true)
+    return (
+      anunciada.current ||
+      (prompt ? leerDelPrompt(prompt) : null) ||
+      credencial.working_directory ||
+      '~'
+    )
+  }, [credencial.working_directory, terminal])
+
+  const subirAlDestino = useCallback(
+    (archivos: File[]) => void subirVarios(archivos, fetchDestino()),
+    [fetchDestino, subirVarios],
+  )
+
+  useEffect(() => {
+    onSubidor(id, { subir: subirAlDestino, elegirCarpeta: () => setEligiendo(true) })
+  }, [id, onSubidor, subirAlDestino])
+
+  useEffect(() => {
+    const nodo = contenedor.current
+    if (!nodo) return
+
+    const vista = new Terminal({
+      theme: TEMA,
+      fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+      fontSize: 13,
+      lineHeight: 1.25,
+      cursorBlink: true,
+      scrollback: 5000,
+      allowProposedApi: true,
+    })
+    const ajuste = new FitAddon()
+    const busqueda = new SearchAddon()
+    vista.loadAddon(ajuste)
+    vista.loadAddon(busqueda)
+    vista.loadAddon(new WebLinksAddon())
+    vista.open(nodo)
+    vista.attachCustomKeyEventHandler((evento) => {
+      if (evento.altKey && CAMBIA_DE_PESTANA.test(evento.key)) return false
+
+      const atajo = fetchAtajo(evento)
+      if (!atajo || !ATAJOS_DE_LA_VENTANA.includes(atajo)) return true
+      if (evento.type === 'keydown') {
+        if (atajo === 'f') setBuscando(true)
+        if (atajo === 'c') void copiarLoSeleccionado(vista)
+        if (atajo === 'v') void pegarDelPortapapeles(teclear)
+      }
+      return false
+    })
+    vista.parser.registerOscHandler(7, (carga) => {
+      anunciada.current = leerOsc7(carga) ?? anunciada.current
+      return false
+    })
+    terminal.current = vista
+    buscador.current = busqueda
+
+    const cuenta = busqueda.onDidChangeResults(({ resultIndex, resultCount }) =>
+      setCoincidencias({ actual: resultIndex + 1, total: resultCount }),
+    )
+
+    // Oculta mide cero y xterm quedaria en una fila; el ajuste espera a que
+    // se vea. Y tras open el contenedor aun no tiene tamaño: va en el frame
+    // siguiente
+    let marco = requestAnimationFrame(() => ajuste.fit())
+
+    const teclado = vista.onData(teclear)
+
+    const observador = new ResizeObserver(() => {
+      if (!nodo.clientWidth) return
+      cancelAnimationFrame(marco)
+      marco = requestAnimationFrame(() => {
+        ajuste.fit()
+        enviarTamano()
+      })
+    })
+    observador.observe(nodo)
+
+    return () => {
+      cancelAnimationFrame(marco)
+      observador.disconnect()
+      cuenta.dispose()
+      teclado.dispose()
+      vista.dispose()
+      terminal.current = null
+      buscador.current = null
+    }
+  }, [enviarTamano, teclear])
+
+  useEffect(() => {
+    if (visible && !buscando) terminal.current?.focus()
+  }, [visible, buscando])
+
+  const buscar = (texto: string, haciaAtras: boolean) => {
+    const opciones = { decorations: RESALTADO }
+    if (haciaAtras) buscador.current?.findPrevious(texto, opciones)
+    else buscador.current?.findNext(texto, opciones)
+  }
+
+  const cerrarBusqueda = () => {
+    buscador.current?.clearDecorations()
+    setCoincidencias(SIN_COINCIDENCIAS)
+    setBuscando(false)
+    terminal.current?.focus()
+  }
+
+  return (
+    <div
+      className={cn(
+        'relative flex min-h-0 flex-1 flex-col overflow-hidden p-2',
+        !visible && 'hidden',
+      )}
+      role="tabpanel"
+      aria-label={`Terminal de ${credencial.username}`}
+      onDragOver={(evento) => {
+        evento.preventDefault()
+        setArrastrando(true)
+      }}
+      onDragLeave={(evento) => {
+        // Pasar sobre xterm tambien dispara leave: solo cuenta salir del panel
+        if (!evento.currentTarget.contains(evento.relatedTarget as Node)) {
+          setArrastrando(false)
+        }
+      }}
+      onDrop={(evento) => {
+        evento.preventDefault()
+        setArrastrando(false)
+        const soltados = [...evento.dataTransfer.files]
+        if (soltados.length) subirAlDestino(soltados)
+      }}
+    >
+      <div ref={contenedor} className="min-h-0 flex-1 overflow-hidden" />
+
+      {estado.fase === 'cerrada' && (
+        <div className="border-term-border bg-term-bg relative z-10 mt-2 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
+          <span className="bg-term-root size-2 shrink-0 rounded-full" aria-hidden />
+          <span className="min-w-0 flex-1 text-sm">{estado.motivo}</span>
+          <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
+            {estado.reintentable && (
+              <BotonDeCierre className="flex-1 sm:flex-none" onClick={reconectar}>
+                <RotateCwIcon />
+                <span className="sm:hidden">Reconectar</span>
+                <span className="hidden sm:inline">Volver a conectar</span>
+              </BotonDeCierre>
+            )}
+            {estado.codigo === CIERRE.SIN_SALDO && (
+              <BotonDeCierre className="flex-1 sm:flex-none" asChild>
+                <Link to="/app/credits">
+                  <CoinsIcon />
+                  Ver créditos
+                </Link>
+              </BotonDeCierre>
+            )}
+            <BotonDeCierre className="flex-1 sm:flex-none" onClick={onCerrar}>
+              <XIcon />
+              <span className="sm:hidden">{esLaUnica ? 'Salir' : 'Cerrar'}</span>
+              <span className="hidden sm:inline">
+                {esLaUnica ? 'Salir de la terminal' : 'Cerrar pestaña'}
+              </span>
+            </BotonDeCierre>
+          </div>
+        </div>
+      )}
+
+      {buscando && (
+        <BuscadorEnTerminal
+          coincidencias={coincidencias}
+          onBuscar={buscar}
+          onCerrar={cerrarBusqueda}
+        />
+      )}
+
+      {arrastrando && (
+        <div className="bg-term-bg/85 absolute inset-2 grid place-items-center rounded-md border border-dashed border-white/25">
+          <p className="text-sm">Suelte el archivo para subirlo a esta carpeta</p>
+        </div>
+      )}
+
+      {subida && (
+        <div className="border-term-border bg-term-bg absolute inset-x-4 bottom-3 rounded-md border px-3 py-2">
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <span className="font-machine truncate">
+              {subida.nombre} <span className="text-term-dim">→ {subida.carpeta}</span>
+            </span>
+            <span className="text-term-dim ml-auto tabular-nums">
+              {fetchPorcentaje(subida)} %
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Cancelar la subida"
+              onClick={cancelarSubida}
+              className="text-term-dim hover:text-term-text size-5 hover:bg-white/5"
+            >
+              <XIcon className="size-3.5" />
+            </Button>
+          </div>
+          <div className="mt-1.5 h-1 rounded-full bg-white/10">
+            <div
+              className="bg-term-ok h-1 rounded-full transition-[width]"
+              style={{ width: `${fetchPorcentaje(subida)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      <SelectorDeCarpeta
+        abierto={eligiendo}
+        carpeta={fetchDestino()}
+        pedirCarpetas={pedirCarpetas}
+        onCerrar={() => setEligiendo(false)}
+        onElegir={(destino) => {
+          setEligiendo(false)
+          elegida.current = destino
+          entrada.current?.click()
+        }}
+      />
+
+      <input
+        ref={entrada}
+        type="file"
+        className="hidden"
+        multiple
+        onChange={(evento) => {
+          const elegidos = [...(evento.target.files ?? [])]
+          if (elegidos.length) void subirVarios(elegidos, elegida.current)
+          // Repetir el mismo archivo tambien cuenta como cambio
+          evento.target.value = ''
+        }}
+      />
+    </div>
+  )
+}
+
+async function copiarLoSeleccionado(vista: Terminal) {
+  const elegido = vista.getSelection()
+  if (!elegido) return
+  try {
+    await navigator.clipboard.writeText(elegido)
+  } catch {
+    // Sin permiso queda la selección: se copia con el menú del navegador
+  }
+}
+
+async function pegarDelPortapapeles(teclear: (datos: string) => void) {
+  try {
+    const texto = await navigator.clipboard.readText()
+    if (texto) teclear(texto)
+  } catch {
+    // Sin permiso no se pega; Ctrl+V del navegador sigue funcionando
+  }
+}
+
+function BotonDeCierre({ className, ...props }: React.ComponentProps<typeof Button>) {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className={cn(
+        'border-term-border text-term-text bg-transparent hover:bg-white/5',
+        className,
+      )}
+      {...props}
+    />
+  )
+}

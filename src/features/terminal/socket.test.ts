@@ -6,8 +6,12 @@ import {
   buildTerminalUrl,
   CIERRE,
   describeClose,
+  fetchEsperaDeReconexion,
   parseIncoming,
+  quotePath,
   quoteForShell,
+  RECONEXION,
+  reconnectsAutomatically,
 } from '@/features/terminal/socket'
 
 const SERVIDOR = '0f8fad5b-d9cb-469f-a165-70867728950e'
@@ -89,6 +93,17 @@ describe('quoteForShell', () => {
   })
 })
 
+describe('quotePath', () => {
+  it('deja la tilde fuera: entre comillas no se expande', () => {
+    expect(quotePath('~')).toBe('~')
+    expect(quotePath('~/mi sitio')).toBe("~/'mi sitio'")
+  })
+
+  it('lo demás va entrecomillado', () => {
+    expect(quotePath('/var/www')).toBe("'/var/www'")
+  })
+})
+
 describe('buildInitialCommand', () => {
   it('sin ruta no teclea nada', () => {
     expect(buildInitialCommand('   ')).toBeNull()
@@ -96,6 +111,10 @@ describe('buildInitialCommand', () => {
 
   it('con ruta hace cd y pulsa Enter', () => {
     expect(buildInitialCommand('/home/deploy/htdocs')).toBe("cd '/home/deploy/htdocs'\r")
+  })
+
+  it('con tilde, el cd la expande', () => {
+    expect(buildInitialCommand('~/app')).toBe("cd ~/'app'\r")
   })
 })
 
@@ -117,5 +136,68 @@ describe('parseIncoming', () => {
 
   it('sin message no hay nada que pintar', () => {
     expect(parseIncoming('{"type":"output"}')).toBeNull()
+  })
+})
+
+describe('buildTerminalUrl con sesión', () => {
+  it('lleva la sesión que se retoma', () => {
+    expect(
+      buildTerminalUrl('ws://x', SERVIDOR, CREDENCIAL, 'abc', 'se-sion-1'),
+    ).toContain('&sesion=se-sion-1')
+  })
+
+  it('sin sesión, no la nombra', () => {
+    expect(buildTerminalUrl('ws://x', SERVIDOR, CREDENCIAL, 'abc')).not.toContain(
+      'sesion=',
+    )
+  })
+})
+
+describe('parseIncoming del id de sesión', () => {
+  it('reconoce el id con el que se vuelve a la shell', () => {
+    expect(parseIncoming('{"type":"sesion","id":"abc"}')).toEqual({
+      type: 'sesion',
+      id: 'abc',
+    })
+  })
+
+  it('sin id no es un mensaje de sesión', () => {
+    expect(parseIncoming('{"type":"sesion"}')).toBeNull()
+  })
+})
+
+describe('fetchEsperaDeReconexion', () => {
+  it('dobla la espera y se detiene en el tope', () => {
+    expect(fetchEsperaDeReconexion(0)).toBe(RECONEXION.esperaBaseMs)
+    expect(fetchEsperaDeReconexion(1)).toBe(RECONEXION.esperaBaseMs * 2)
+    expect(fetchEsperaDeReconexion(20)).toBe(RECONEXION.esperaMaximaMs)
+  })
+})
+
+describe('describeClose con el tope de aperturas', () => {
+  it('no reintenta: insistir es lo que lo disparó', () => {
+    expect(describeClose(CIERRE.DEMASIADOS_INTENTOS).reintentable).toBe(false)
+  })
+})
+
+describe('reconnectsAutomatically', () => {
+  it('un relevo de versión reconecta solo y lo dice', () => {
+    expect(reconnectsAutomatically(CIERRE.REINICIO, 0)).toBe(true)
+    expect(describeClose(CIERRE.REINICIO).motivo).toContain('Reconectando')
+  })
+
+  it('deja de intentarlo tras unos pocos intentos', () => {
+    expect(reconnectsAutomatically(CIERRE.REINICIO, RECONEXION.intentos)).toBe(false)
+  })
+
+  it('un corte de red vuelve solo: la shell sigue viva', () => {
+    expect(reconnectsAutomatically(CIERRE.ANORMAL, 0)).toBe(true)
+    expect(reconnectsAutomatically(CIERRE.SERVIDOR, 0)).toBe(true)
+  })
+
+  it('lo que decide la persona o el permiso no vuelve solo', () => {
+    for (const codigo of [CIERRE.NORMAL, CIERRE.SIN_PERMISO, CIERRE.SIN_SALDO]) {
+      expect(reconnectsAutomatically(codigo, 0)).toBe(false)
+    }
   })
 })

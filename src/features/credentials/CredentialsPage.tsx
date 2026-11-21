@@ -23,7 +23,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { DataTable, type Columna } from '@/components/data-table'
 import { FilterBar, FiltroSelect, SearchInput, ViewToggle } from '@/components/filter-bar'
 import { Pagination } from '@/components/pagination'
-import { PageHeader } from '@/components/states'
+import { EmptyState, PageHeader } from '@/components/states'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -113,7 +113,7 @@ export function CredentialsPage() {
   })
 
   const { servidores, resuelta } = useServerOptions()
-  const opcionesDeEtiqueta = useLabelOptions(
+  const { opciones: opcionesDeEtiqueta } = useLabelOptions(
     credentialsApi.clavesCredencial.etiquetas,
     credentialsApi.fetchLabels,
   )
@@ -510,39 +510,42 @@ function Vacio({
   puedeRegistrar: boolean
   onAnadir: () => void
 }) {
-  const Icono = conFiltros ? SearchXIcon : KeyRoundIcon
+  if (conFiltros) {
+    return (
+      <EmptyState
+        icon={SearchXIcon}
+        title="Ninguna credencial coincide"
+        description="Pruebe con otro texto o limpie los filtros."
+      />
+    )
+  }
 
   return (
-    <div className="flex flex-col items-center">
-      <span className="bg-muted text-muted-foreground grid size-11 place-items-center rounded-full">
-        <Icono className="size-5" />
-      </span>
-      <h2 className="mt-4 text-base font-semibold">
-        {conFiltros ? 'Ninguna credencial coincide' : 'Todavía no hay credenciales'}
-      </h2>
-      <p className="text-muted-foreground mt-1 max-w-sm text-sm">
-        {conFiltros
-          ? 'Pruebe con otro texto o limpie los filtros.'
-          : hayDondeCrear
-            ? 'Es el usuario con el que se accede a cada servidor.'
-            : puedeRegistrar
-              ? 'Antes hay que registrar el servidor al que se accede.'
-              : 'Las que le compartan aparecerán aquí.'}
-      </p>
-      {!conFiltros &&
-        (hayDondeCrear ? (
-          <Button className="mt-5" onClick={onAnadir}>
+    <EmptyState
+      icon={KeyRoundIcon}
+      title="Todavía no hay credenciales"
+      description={
+        hayDondeCrear
+          ? 'Es el usuario con el que se accede a cada servidor.'
+          : puedeRegistrar
+            ? 'Antes hay que registrar el servidor al que se accede.'
+            : 'Las que le compartan aparecerán aquí.'
+      }
+      action={
+        hayDondeCrear ? (
+          <Button onClick={onAnadir}>
             <PlusIcon />
             Añadir credencial
           </Button>
         ) : puedeRegistrar ? (
-          <Button asChild className="mt-5">
+          <Button asChild>
             <Link to="/app/servers">
               <ServerIcon />
               Registrar servidor
             </Link>
           </Button>
-        ) : null)}
-    </div>
+        ) : undefined
+      }
+    />
   )
 }

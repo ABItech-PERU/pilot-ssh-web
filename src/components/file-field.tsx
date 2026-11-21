@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { formatFileSize } from '@/lib/format'
 
 /** Archivo ya guardado. No se borra: el servidor solo admite reemplazarlo. */
-export interface ArchivoGuardado {
+interface ArchivoGuardado {
   nombre: string
   /** Qué es, en una palabra: «PDF», «JPEG»… */
   detalle?: string

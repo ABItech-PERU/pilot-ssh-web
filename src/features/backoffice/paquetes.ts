@@ -17,7 +17,7 @@ export function porcentajeDeRegalo(paquete: {
 }
 
 /** Por encima, las fichas ocuparían media pantalla: se usa una lista. */
-export const MUCHOS_PAQUETES = 6
+const MUCHOS_PAQUETES = 6
 
 export function conListaDesplegable(cuantos: number): boolean {
   return cuantos > MUCHOS_PAQUETES

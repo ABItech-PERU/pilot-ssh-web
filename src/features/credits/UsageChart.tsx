@@ -1,7 +1,8 @@
 import { cn } from 'cn'
+import { ActivityIcon } from 'lucide-react'
 
 import { Bloque, VerTodo } from '@/components/bloque'
-import { ErrorState } from '@/components/states'
+import { EmptyState, ErrorState, LineaEsqueleto } from '@/components/states'
 import { Skeleton } from '@/components/ui/skeleton'
 import { buildCreditsPath } from '@/features/credits/rutas'
 import {
@@ -30,7 +31,7 @@ export function UsageChart({
         {error ? (
           <ErrorState error={error} onRetry={onReintentar} />
         ) : uso === undefined || zona === undefined ? (
-          <Skeleton className="h-36 w-full" />
+          <BarrasEsqueleto />
         ) : (
           <Barras serie={serieDelUltimoMes(uso, new Date(), zona)} />
         )}
@@ -40,12 +41,32 @@ export function UsageChart({
   )
 }
 
+/** Mismo alto que `Barras`: barras, fechas y leyenda. */
+export function BarrasEsqueleto() {
+  return (
+    <div className="space-y-3">
+      <Skeleton className="h-28 w-full" />
+      <div className="flex justify-between">
+        <LineaEsqueleto texto="xs" className="w-12" />
+        <LineaEsqueleto texto="xs" className="w-12" />
+      </div>
+      <div className="flex gap-x-4">
+        <LineaEsqueleto texto="xs" className="w-20" />
+        <LineaEsqueleto texto="xs" className="w-28" />
+      </div>
+    </div>
+  )
+}
+
 export function Barras({ serie }: { serie: SerieDeUso }) {
   if (!serie.barras.some((barra) => barra.usado)) {
     return (
-      <p className="text-muted-foreground py-10 text-center text-sm">
-        Nadie ha abierto una terminal en este tiempo.
-      </p>
+      <EmptyState
+        compacto
+        icon={ActivityIcon}
+        title="Sin uso en el periodo"
+        description="Nadie ha abierto una terminal en este tiempo."
+      />
     )
   }
 

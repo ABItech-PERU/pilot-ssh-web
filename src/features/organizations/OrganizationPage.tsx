@@ -16,7 +16,7 @@ import { toast } from 'sonner'
 import { AvatarViewerDialog } from '@/components/avatar-viewer-dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { SettingsRow, SettingsSection } from '@/components/settings-section'
-import { PageHeader } from '@/components/states'
+import { LineaEsqueleto, PageHeader } from '@/components/states'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -301,17 +301,75 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactN
   )
 }
 
+/** Marco de la página: sin salto al cargar. */
 function Esqueleto() {
   return (
     <div className="space-y-6">
-      <Skeleton className="h-8 w-56" />
-      <Skeleton className="h-5 w-40" />
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Skeleton className="h-20 rounded-lg" />
-        <Skeleton className="h-20 rounded-lg" />
-        <Skeleton className="h-20 rounded-lg" />
+      <div className="space-y-1">
+        <Skeleton className="h-7 w-56 sm:h-8" />
+        <Skeleton className="h-5 w-72 max-w-full" />
       </div>
-      <Skeleton className="h-40 rounded-lg" />
+
+      <Skeleton className="h-5.5 w-20 rounded-full" />
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        {['miembros', 'servidores', 'saldo'].map((cifra) => (
+          <div key={cifra} className="rounded-lg border p-4">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="mt-1 h-7 w-12" />
+          </div>
+        ))}
+      </div>
+
+      <section className="space-y-2">
+        <Skeleton className="h-4 w-16" />
+        <div className="divide-y rounded-lg border">
+          <FilaEsqueleto valor={<Skeleton className="size-8 rounded-md" />} />
+          {/* Largo de «Espacio de …»: en móvil baja de línea */}
+          <FilaEsqueleto valor={<Skeleton className="h-5 w-48" />} />
+          <FilaEsqueleto valor={<Skeleton className="h-5 w-24" />} conPista />
+        </div>
+      </section>
+
+      <section className="space-y-2">
+        <Skeleton className="h-4 w-16" />
+        <div className="grid divide-y rounded-lg border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+          {['rol', 'alta'].map((dato) => (
+            <div
+              key={dato}
+              className="flex items-center justify-between gap-3 p-4 sm:block"
+            >
+              <LineaEsqueleto className="w-12" />
+              <Skeleton className="h-5 w-24 sm:mt-1" />
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function FilaEsqueleto({
+  valor,
+  conPista,
+}: {
+  valor: React.ReactNode
+  conPista?: boolean
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+      <span className="flex items-center gap-3">
+        <Skeleton className="size-4" />
+        <div>
+          <LineaEsqueleto className="w-20" />
+          {conPista && <LineaEsqueleto texto="xs" className="w-48" />}
+        </div>
+      </span>
+      <span className="flex items-center gap-3">
+        {valor}
+        {/* Móvil: lápiz cuadrado */}
+        <Skeleton className="h-9 w-9 sm:w-20" />
+      </span>
     </div>
   )
 }

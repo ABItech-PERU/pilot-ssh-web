@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { Loader2Icon } from 'lucide-react'
+import { HistoryIcon, Loader2Icon } from 'lucide-react'
 import { Link } from 'react-router'
 
 import { SettingsSection } from '@/components/settings-section'
+import { EmptyState } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -44,9 +45,12 @@ export function AccountActivity() {
           No se pudo cargar la actividad.
         </p>
       ) : entradas.length === 0 ? (
-        <p className="text-muted-foreground p-4 text-sm">
-          Todavía no hay actividad en su cuenta.
-        </p>
+        <EmptyState
+          compacto
+          icon={HistoryIcon}
+          title="Sin actividad todavía"
+          description="Aquí queda cada inicio de sesión y cada cambio de seguridad."
+        />
       ) : (
         entradas.map((entrada) => {
           const Icono = iconoDeActividad(entrada.action)

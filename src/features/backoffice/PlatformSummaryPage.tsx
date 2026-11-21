@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
+import { cn } from 'cn'
 import {
   BanknoteIcon,
   Building2Icon,
   CheckIcon,
   ClockIcon,
   HandCoinsIcon,
+  ReceiptIcon,
   ShieldAlertIcon,
   TrendingDownIcon,
   UndoIcon,
@@ -14,9 +16,8 @@ import { useState } from 'react'
 import { Navigate } from 'react-router'
 
 import { Bloque, VerTodo } from '@/components/bloque'
-import { ErrorState, PageHeader } from '@/components/states'
+import { EmptyState, ErrorState, LineaEsqueleto, PageHeader } from '@/components/states'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { useSession } from '@/features/auth/session'
 import * as platformApi from '@/features/backoffice/api'
 import { llevaFinanzas, primeraSeccion } from '@/features/backoffice/permisos'
@@ -190,9 +191,12 @@ function Resumen() {
           ) : !datos ? (
             <Esqueleto />
           ) : datos.methods.length === 0 ? (
-            <p className="text-muted-foreground p-4 text-sm">
-              Sin recargas acreditadas en el periodo.
-            </p>
+            <EmptyState
+              compacto
+              icon={BanknoteIcon}
+              title="Sin cobros en el periodo"
+              description="Aquí se reparte lo cobrado entre los medios de pago."
+            />
           ) : (
             <ul className="divide-y">
               {repartir(datos.methods).map((medio) => (
@@ -235,9 +239,12 @@ function Resumen() {
           ) : porAcreditar.isPending ? (
             <Esqueleto />
           ) : porAcreditar.data.results.length === 0 ? (
-            <p className="text-muted-foreground p-4 text-sm">
-              Nada por cobrar. Lo pedido en línea y sin pagar está en Recargas.
-            </p>
+            <EmptyState
+              compacto
+              icon={CheckIcon}
+              title="Nada por acreditar"
+              description="Lo pedido en línea y sin pagar está en Recargas."
+            />
           ) : (
             <ul className="divide-y">
               {porAcreditar.data.results.map((solicitud) => (
@@ -280,11 +287,14 @@ function Resumen() {
                 <ErrorState error={ultimos.error} onRetry={() => ultimos.refetch()} />
               </div>
             ) : ultimos.isPending ? (
-              <Esqueleto />
+              <Esqueleto relleno="py-2.5" />
             ) : ultimos.data.results.length === 0 ? (
-              <p className="text-muted-foreground p-4 text-sm">
-                Aquí aparecerán las recargas y el uso de todas las organizaciones.
-              </p>
+              <EmptyState
+                compacto
+                icon={ReceiptIcon}
+                title="Sin movimientos"
+                description="Aquí aparecerán las recargas y el uso de todas las organizaciones."
+              />
             ) : (
               <ul className="divide-y">
                 {ultimos.data.results.map((movimiento) => (
@@ -320,13 +330,20 @@ function Resumen() {
   )
 }
 
-function Esqueleto() {
+/** Relleno de las filas reales de cada bloque. */
+function Esqueleto({ relleno = 'py-3' }: { relleno?: 'py-3' | 'py-2.5' }) {
   return (
     <ul className="divide-y">
       {Array.from({ length: EN_RESUMEN }, (_, indice) => (
-        <li key={indice} className="flex items-center justify-between px-4 py-3">
-          <Skeleton className="h-4 w-40" />
-          <Skeleton className="h-4 w-14" />
+        <li
+          key={indice}
+          className={cn('flex items-center justify-between gap-3 px-4', relleno)}
+        >
+          <div>
+            <LineaEsqueleto className="w-40" />
+            <LineaEsqueleto texto="xs" className="w-24" />
+          </div>
+          <LineaEsqueleto className="w-14" />
         </li>
       ))}
     </ul>

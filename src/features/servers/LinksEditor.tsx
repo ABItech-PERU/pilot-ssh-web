@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query'
 import {
   CopyIcon,
   ExternalLinkIcon,
+  LinkIcon,
   Loader2Icon,
   MoreVerticalIcon,
   PencilIcon,
@@ -15,6 +16,7 @@ import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { SidePanelFooter } from '@/components/side-panel'
+import { EmptyState } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -43,6 +45,7 @@ type Edicion = { indice: number | null }
 interface Props {
   links: ResourceLink[]
   primerTipo: LinkKind
+  /** Descripción del vacío. */
   vacio: string
   /** Alta al pie del panel lateral, a todo el ancho; en pagina, bajo la
    *  lista. */
@@ -117,7 +120,12 @@ export function LinksEditor({
       <div className={alPie ? 'min-h-0 flex-1 overflow-y-auto p-5' : undefined}>
         <div className="overflow-hidden rounded-lg border">
           {lista.length === 0 && !edicion ? (
-            <p className="text-muted-foreground p-4 text-sm">{vacio}</p>
+            <EmptyState
+              compacto
+              icon={LinkIcon}
+              title="Sin enlaces"
+              description={vacio}
+            />
           ) : (
             <ul className="divide-y">
               {lista.map((enlace, indice) =>

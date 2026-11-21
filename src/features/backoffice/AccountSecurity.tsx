@@ -13,7 +13,10 @@ import type { PlatformPerson } from '@/types/api'
 export function AccountSecurity({
   persona,
 }: {
-  persona: Pick<PlatformPerson, 'is_active' | 'has_verified_email' | 'two_factor_enabled'>
+  persona: Pick<
+    PlatformPerson,
+    'is_active' | 'has_verified_email' | 'two_factor_enabled' | 'two_factor_method'
+  >
 }) {
   if (!persona.is_active) {
     return (
@@ -40,7 +43,10 @@ export function AccountSecurity({
       {persona.two_factor_enabled ? (
         <span className="text-success inline-flex items-center gap-1.5">
           <ShieldCheckIcon className="size-3.5" />
-          Dos pasos
+          {/* Soporte: ¿perdió el teléfono o el correo? */}
+          {persona.two_factor_method === 'app'
+            ? 'Dos pasos con app'
+            : 'Dos pasos por correo'}
         </span>
       ) : (
         <span className="text-muted-foreground inline-flex items-center gap-1.5">

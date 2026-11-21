@@ -221,6 +221,7 @@ function Personas({
 
       {grupo.members.length === 0 ? (
         <EmptyState
+          compacto
           icon={UsersIcon}
           title="Todavía no hay nadie aquí"
           description={descripcionDelVacio(administra, fuera.length)}
