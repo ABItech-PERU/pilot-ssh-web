@@ -1,7 +1,7 @@
 # Desarrollo local
 
 Cómo levantar la web en su PC para programar. Corre igual que en `uat` y
-`prd` (Docker Swarm), pero con Vite y el código montado: al guardar un
+`prod` (Docker Swarm), pero con Vite y el código montado: al guardar un
 archivo, la página se actualiza sola.
 
 ## Antes de empezar
@@ -46,12 +46,12 @@ Compruébelo abriendo http://localhost:5190 en el navegador.
 
 ## Paso 3 · Trabajar
 
-| Quiero…                                     | Comando                                              |
-| ------------------------------------------- | ---------------------------------------------------- |
-| Ver lo que pasa en Vite                     | `docker service logs -f pilotssh_web_dev_app`        |
-| Comprobar tipos y correr las pruebas        | `sh deploy/docker/pruebas.sh`                        |
-| Aplicar un cambio del `.env`                | `sh deploy/docker/desplegar.sh`                      |
-| Instalar un paquete nuevo de `package.json` | `docker service update --force pilotssh_web_dev_app` |
+| Quiero…                                     | Comando                                             |
+| ------------------------------------------- | --------------------------------------------------- |
+| Ver lo que pasa en Vite                     | `docker service logs -f pilotssh_web_local_app`        |
+| Comprobar tipos y correr las pruebas        | `sh deploy/docker/pruebas.sh`                       |
+| Aplicar un cambio del `.env`                | `sh deploy/docker/desplegar.sh`                     |
+| Instalar un paquete nuevo de `package.json` | `docker service update --force pilotssh_web_local_app` |
 
 > **Nota:** Al guardar un archivo, la página se actualiza sola. Las llamadas a `/api`,
 > `/media` y `/ws` van a la API de desarrollo, sin configurar nada.
@@ -61,7 +61,7 @@ Compruébelo abriendo http://localhost:5190 en el navegador.
 ## Paso 4 · Apagar · _al terminar_
 
 ```bash
-docker stack rm pilotssh_web_dev
+docker stack rm pilotssh_web_local
 ```
 
 ---
@@ -83,7 +83,7 @@ docker stack rm pilotssh_web_dev
 Quedan en la carpeta `dist/`:
 
 ```bash
-web=$(docker ps -q -f name=pilotssh_web_dev_app)
+web=$(docker ps -q -f name=pilotssh_web_local_app)
 docker exec "$web" npm run build
 docker exec -e APP_SITE_URL=http://localhost:5190 -e PRERENDER_API_URL=http://localhost "$web" npm run prerender
 ```

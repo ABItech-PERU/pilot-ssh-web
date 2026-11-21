@@ -1,7 +1,7 @@
 // Configuracion del ambiente: la leen Vite en desarrollo y el arranque del
 // contenedor en Docker, con las mismas reglas
 
-const AMBIENTES = ['dev', 'uat', 'prd']
+const AMBIENTES = ['local', 'uat', 'prod']
 const LOCALES = new Set(['localhost', '127.0.0.1', '[::1]', '0.0.0.0'])
 
 /** Origen publico con https: la web publicada llama ahi desde el navegador. */
@@ -20,7 +20,7 @@ function assertPublicOrigin(nombre, valor) {
   )
 }
 
-/** Fuera de dev, la API y la web tienen que ser publicas y con https. */
+/** Fuera de local, la API y la web tienen que ser publicas y con https. */
 export function readConfiguracion(variables) {
   const ambiente = variables.APP_ENV ?? ''
   if (!AMBIENTES.includes(ambiente)) {
@@ -31,7 +31,7 @@ export function readConfiguracion(variables) {
 
   const apiUrl = (variables.APP_API_URL ?? '').replace(/\/$/, '')
   const sitioUrl = (variables.APP_SITE_URL ?? '').replace(/\/$/, '')
-  if (ambiente !== 'dev') {
+  if (ambiente !== 'local') {
     assertPublicOrigin('APP_API_URL', apiUrl)
     assertPublicOrigin('APP_SITE_URL', sitioUrl)
   }

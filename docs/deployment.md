@@ -1,6 +1,6 @@
 # Despliegue en el servidor
 
-Cómo instalar la web en un servidor para `uat` (pruebas) y `prd`
+Cómo instalar la web en un servidor para `uat` (pruebas) y `prod`
 (producción). Hay dos copias que se relevan sin corte, y la misma imagen
 sirve a los dos ambientes: al arrancar lee su `.env`. Una vez instalada,
 GitHub despliega solo: vea [GitHub Actions](github-actions.md).
@@ -22,22 +22,22 @@ GitHub despliega solo: vea [GitHub Actions](github-actions.md).
 
 Los datos de cada ambiente:
 
-|                     | `uat`                   | `prd`                   |
-| ------------------- | ----------------------- | ----------------------- |
-| Rama                | `staging`               | `main`                  |
-| Carpeta             | `/srv/pilotssh/web-uat` | `/srv/pilotssh/web-prd` |
-| Puerto (`WEB_PORT`) | `8192`                  | `8092`                  |
+|                     | `uat`                   | `prod`                   |
+| ------------------- | ----------------------- | ------------------------ |
+| Se despliega con    | Cada merge a `main`     | Una etiqueta `vX.Y.Z`    |
+| Carpeta             | `/srv/pilotssh/web-uat` | `/srv/pilotssh/web-prod` |
+| Puerto (`WEB_PORT`) | `8192`                  | `8092`                   |
 
 Los ejemplos de esta guía son de `uat`.
 
 ---
 
-## Paso 1 · Instalar el ambiente · _una vez para `uat` y otra para `prd`_
+## Paso 1 · Instalar el ambiente · _una vez para `uat` y otra para `prod`_
 
 **1.1 Descargar el código**
 
 ```bash
-git clone -b staging <url-del-repositorio> /srv/pilotssh/web-uat
+git clone <url-del-repositorio> /srv/pilotssh/web-uat
 cd /srv/pilotssh/web-uat
 ```
 
@@ -46,19 +46,12 @@ cd /srv/pilotssh/web-uat
 **1.2 Crear la configuración**
 
 ```bash
-cp .env.example .env
+cp .env.uat.example .env
 ```
 
-Y déjelo así ([qué es cada variable](entorno.md)):
-
-```env
-APP_ENV=uat
-APP_API_URL=https://uat-api-pilotssh.abitech.com.pe
-APP_SITE_URL=https://uat-pilotssh.abitech.com.pe
-PRERENDER_API_URL=
-IMAGE_TAG=
-WEB_PORT=8192
-```
+En `prod`, `cp .env.prod.example .env`. El ejemplo ya trae el ambiente, los
+dominios, la etiqueta de imagen y el puerto: revise los dominios
+([qué es cada variable](entorno.md)).
 
 **1.3 Levantar**
 
@@ -93,14 +86,19 @@ Las versiones nuevas las despliega GitHub solo.
 
 **Desplegar a mano** · en el servidor, dentro de la carpeta del ambiente:
 
-| Quiero…                       | Comando                                               |
-| ----------------------------- | ----------------------------------------------------- |
-| Desplegar la última versión   | `git pull && sh deploy/docker/desplegar.sh`           |
-| Aplicar un cambio del `.env`  | `sh deploy/docker/desplegar.sh`                       |
-| Volver a una versión anterior | `IMAGE_TAG=sha-1a2b3c4 sh deploy/docker/desplegar.sh` |
+| Quiero…                       | Comando                                                                                                                              |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Desplegar la última versión   | `git pull && sh deploy/docker/desplegar.sh`                                                                                          |
+| Aplicar un cambio del `.env`  | `sh deploy/docker/desplegar.sh`                                                                                                      |
+| Volver a una versión anterior | `IMAGE_TAG=arbol-<huella> sh deploy/docker/desplegar.sh`, o desde GitHub ([github-actions.md](github-actions.md#flujo-de-un-cambio)) |
 
 Con un panel de despliegue, use su botón de desplegar; para volver a una
 versión, cambie `IMAGE_TAG` en su configuración.
+
+**Cambiar el nombre de un ambiente** · por ejemplo de `prd` a `prod`. La web no
+guarda datos: `docker stack rm pilotssh_web_prd`, ponga `APP_ENV=prod` e
+`IMAGE_TAG=prod` en el `.env` y corra `sh deploy/docker/desplegar.sh`. Hágalo
+después de la API, porque al arrancar la web la consulta.
 
 **Revisar** · en el servidor, por SSH. El nombre del servicio sale con
 `docker service ls`:

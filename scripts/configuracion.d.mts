@@ -1,5 +1,5 @@
 export interface Configuracion {
-  ambiente: 'dev' | 'uat' | 'prd'
+  ambiente: 'local' | 'uat' | 'prod'
   apiUrl: string
   sitioUrl: string
 }

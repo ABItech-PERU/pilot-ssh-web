@@ -39,7 +39,7 @@ la API, en cada petición.
 
 1. Lee su `.env` y valida `APP_ENV`, `APP_API_URL` y `APP_SITE_URL`.
 2. Pide a la API el contacto, la empresa y los precios (`/api/site`, `/api/pricing`).
-3. Escribe `config.js`, las páginas públicas, `robots.txt` y, en `prd`, `sitemap.xml`.
+3. Escribe `config.js`, las páginas públicas, `robots.txt` y, en `prod`, `sitemap.xml`.
 4. Pone la dirección de la API en la CSP de nginx.
 
 Si la API no responde, el contenedor no arranca y Swarm mantiene la versión
@@ -51,7 +51,7 @@ vuelve a pedir al cargar; Google los ve en el siguiente arranque.
 ## SEO
 
 - En `uat` las páginas llevan `noindex` y `robots.txt` bloquea todo.
-- En `prd`, añada el dominio en [Search Console](https://search.google.com/search-console)
+- En `prod`, añada el dominio en [Search Console](https://search.google.com/search-console)
   y envíe `https://<dominio>/sitemap.xml`.
 - El `canonical` de cada página usa `APP_SITE_URL`: ahí va el dominio que se
   quiere posicionar. El dominio raíz posiciona mejor que un subdominio.

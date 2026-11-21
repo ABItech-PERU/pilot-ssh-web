@@ -48,10 +48,10 @@ export default defineConfig(({ isSsrBuild }) => {
         },
       },
     },
-    // Solo en el contenedor de desarrollo (docker-compose.dev.yml)
+    // Solo en el contenedor de desarrollo (docker-compose.local.yml)
     server: {
       host: '0.0.0.0',
-      // El 80, como nginx en uat y prd: Swarm lo publica en WEB_PORT
+      // El 80, como nginx en uat y prod; Swarm lo publica en WEB_PORT
       port: 80,
       strictPort: true,
       hmr: { clientPort: Number(process.env.WEB_PORT) || undefined },

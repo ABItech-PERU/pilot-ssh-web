@@ -54,11 +54,11 @@ La guía completa, paso a paso: **[docs/desarrollo.md](docs/desarrollo.md)**.
 
 ## Ambientes
 
-| Ambiente | Rama      | Dónde corre         |
-| -------- | --------- | ------------------- |
-| `dev`    | `develop` | Su PC               |
-| `uat`    | `staging` | Servidor de pruebas |
-| `prd`    | `main`    | Producción          |
+| Ambiente | Cómo llega                         | Dónde corre         |
+| -------- | ---------------------------------- | ------------------- |
+| `local`  | `sh deploy/docker/desplegar.sh`    | Su PC               |
+| `uat`    | Cada merge a `main`                | Servidor de pruebas |
+| `prod`   | Una etiqueta `vX.Y.Z` sobre `main` | Producción          |
 
 Los tres usan el mismo `docker-compose.yml` y la misma imagen: al arrancar,
 cada ambiente la configura con su `.env`.
@@ -80,8 +80,8 @@ pilot-ssh-web/
 ├── scripts/                # prerenderizado y utilidades
 ├── deploy/docker/          # nginx, arranque y scripts: desplegar, pruebas
 ├── docs/                   # documentación
-├── docker-compose.yml      # el stack de Swarm: dev, uat y prd
-├── docker-compose.dev.yml  # solo dev: Vite con el código montado
+├── docker-compose.yml      # el stack de Swarm: local, uat y prod
+├── docker-compose.local.yml # solo local: Vite con el código montado
 ├── Dockerfile
 └── vite.config.ts
 ```

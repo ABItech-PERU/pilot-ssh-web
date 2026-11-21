@@ -17,7 +17,7 @@ const ssr = path.join(raiz, 'dist-ssr')
 const configuracion = readConfiguracion(process.env)
 const { sitioUrl } = configuracion
 // Pruebas no debe salir en Google: ni sitemap ni permiso a los buscadores
-const indexable = configuracion.ambiente === 'prd'
+const indexable = configuracion.ambiente === 'prod'
 // Si la API publicada no se alcanza desde el servidor, otra dirección
 const apiUrl = (process.env.PRERENDER_API_URL || configuracion.apiUrl).replace(/\/$/, '')
 if (!sitioUrl) throw new Error('Falta APP_SITE_URL: las páginas la usan en sus enlaces.')

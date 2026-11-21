@@ -4,7 +4,7 @@
 set -eu
 . "$(dirname "$0")/entorno.sh"
 
-contenedor="$(docker ps -q -f name=pilotssh_web_dev_app | head -1)"
+contenedor="$(docker ps -q -f name=pilotssh_web_local_app | head -1)"
 if [ -z "$contenedor" ]; then
   echo "La web de desarrollo no está levantada: sh deploy/docker/desplegar.sh" >&2
   exit 1

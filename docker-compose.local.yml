@@ -1,5 +1,5 @@
-# Solo desarrollo, sobre docker-compose.yml: Vite con el codigo montado,
-# recarga al guardar. desplegar.sh lo agrega cuando APP_ENV=dev
+# Ajuste de solo desarrollo sobre docker-compose.yml, con Vite y el codigo
+# montado para recargar al guardar. desplegar.sh lo agrega con APP_ENV=local
 
 services:
   app:
@@ -7,7 +7,7 @@ services:
     working_dir: /app
     command: sh -c "npm install --no-audit --no-fund && npm run dev"
     environment:
-      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     volumes:
       - .:/app
       # Los paquetes de Linux, aparte de los de la maquina

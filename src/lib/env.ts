@@ -1,7 +1,7 @@
-/** De /config.js: lo sirve Vite en dev y lo escribe el arranque en Docker. */
+/** Viene de /config.js, que sirve Vite en local o escribe el arranque. */
 export interface Configuracion {
-  ambiente: 'dev' | 'uat' | 'prd'
-  /** Vacio en dev: el proxy de Vite sirve /api. */
+  ambiente: 'local' | 'uat' | 'prod'
+  /** Vacio en local, porque el proxy de Vite sirve /api. */
   apiUrl: string
 }
 
@@ -14,9 +14,9 @@ const apiUrl = (configuracion.apiUrl ?? '').replace(/\/$/, '')
 
 export const env = {
   apiUrl,
-  ambiente: configuracion.ambiente ?? 'dev',
+  ambiente: configuracion.ambiente ?? 'local',
 
-  /** wss fuera de dev: el token viaja en la query. */
+  /** Con wss fuera de local, porque el token viaja en la query. */
   get socketUrl() {
     if (!apiUrl) {
       const protocolo = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
