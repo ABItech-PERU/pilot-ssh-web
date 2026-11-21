@@ -55,9 +55,16 @@ a la última de cada ambiente. La huella va en `/version.txt`.
    `v*`), con las mismas variables y secretos que la API, salvo que la
    dirección de la espera es `WEB_URL`, la de la web, sin `/` al final.
 
-Dokploy se configura igual que en la API:
-[Con Dokploy](../../pilot-ssh-api/docs/github-actions.md#con-dokploy), con
-el secreto `DOKPLOY_WEBHOOK_URL` del servicio de la web.
+Dokploy se instala con la guía de la API,
+[Con Dokploy](../../pilot-ssh-api/docs/github-actions.md#con-dokploy), después
+de la API y con estas diferencias:
+
+- Servicio `pilot-ssh-web-uat` (o `-prod`), repositorio
+  `ABItech-PERU/pilot-ssh-web`.
+- En _Environment_, el `.env.uat.example` de la web; no lleva claves.
+- El secreto va en el ambiente de este repositorio:
+  `gh secret set DOKPLOY_WEBHOOK_URL --env uat -R ABItech-PERU/pilot-ssh-web`.
+- No se crea ninguna cuenta.
 
 ## Problemas frecuentes
 
