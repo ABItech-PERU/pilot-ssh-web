@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 960 156" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="cifras-dark-title cifras-dark-desc" id="cifras-dark-root">
+        <title id="cifras-dark-title">La web de Pilot SSH en cifras</title>
+        <desc id="cifras-dark-desc">13 dominios, 377 pruebas, 2 temas y 3 ambientes.</desc>
+        <defs>
+      <style>#cifras-dark-root { font-family: 'Inter', system-ui, sans-serif; color: #ebeff2; }
+      #cifras-dark-root .diagram-container { width: 100%; overflow-x: auto; }
+      @media print {
+#cifras-dark-root .diagram-container { overflow-x: visible; }
+}</style>
+          <marker id="cifras-dark-cifras-dark-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#a4acb4"/></marker>
+          <marker id="cifras-dark-cifras-dark-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#40c1bd"/></marker>
+        </defs>
+        <rect width="100%" height="100%" fill="#0b1016"/>
+        <text x="150" y="76" fill="#ebeff2" font-size="40" font-family="'Inter', system-ui, sans-serif" text-anchor="middle" font-weight="700">13</text>
+        <text x="150" y="104" fill="#ebeff2" font-size="16" font-family="'Inter', system-ui, sans-serif" text-anchor="middle" font-weight="600">Dominios</text>
+        <text x="150" y="124" fill="#a4acb4" font-size="12" font-family="'JetBrains Mono', ui-monospace, monospace" text-anchor="middle">en src/features/</text>
+        <line x1="260" y1="32" x2="260" y2="128" stroke="#ebeff2" stroke-width="0.8" stroke-opacity="0.12"/>
+        <text x="370" y="76" fill="#40c1bd" font-size="40" font-family="'Inter', system-ui, sans-serif" text-anchor="middle" font-weight="700">377</text>
+        <text x="370" y="104" fill="#ebeff2" font-size="16" font-family="'Inter', system-ui, sans-serif" text-anchor="middle" font-weight="600">Pruebas</text>
+        <text x="370" y="124" fill="#a4acb4" font-size="12" font-family="'JetBrains Mono', ui-monospace, monospace" text-anchor="middle">con Vitest</text>
+        <line x1="480" y1="32" x2="480" y2="128" stroke="#ebeff2" stroke-width="0.8" stroke-opacity="0.12"/>
+        <text x="590" y="76" fill="#ebeff2" font-size="40" font-family="'Inter', system-ui, sans-serif" text-anchor="middle" font-weight="700">2</text>
+        <text x="590" y="104" fill="#ebeff2" font-size="16" font-family="'Inter', system-ui, sans-serif" text-anchor="middle" font-weight="600">Temas</text>
+        <text x="590" y="124" fill="#a4acb4" font-size="12" font-family="'JetBrains Mono', ui-monospace, monospace" text-anchor="middle">claro y oscuro</text>
+        <line x1="700" y1="32" x2="700" y2="128" stroke="#ebeff2" stroke-width="0.8" stroke-opacity="0.12"/>
+        <text x="810" y="76" fill="#ebeff2" font-size="40" font-family="'Inter', system-ui, sans-serif" text-anchor="middle" font-weight="700">3</text>
+        <text x="810" y="104" fill="#ebeff2" font-size="16" font-family="'Inter', system-ui, sans-serif" text-anchor="middle" font-weight="600">Ambientes</text>
+        <text x="810" y="124" fill="#a4acb4" font-size="12" font-family="'JetBrains Mono', ui-monospace, monospace" text-anchor="middle">local, uat y prod</text>
+      </svg>
