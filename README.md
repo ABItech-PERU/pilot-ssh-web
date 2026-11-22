@@ -11,21 +11,49 @@
 
 <p align="center">
   <a href="https://github.com/ABItech-PERU/pilot-ssh-web/actions/workflows/deploy-uat.yml"><img alt="Despliegue a uat" src="https://img.shields.io/github/actions/workflow/status/ABItech-PERU/pilot-ssh-web/deploy-uat.yml?branch=main&style=flat&label=uat"></a>
+  <img alt="React 19" src="https://img.shields.io/badge/react-19-149ECA?style=flat&logo=react&logoColor=white">
+  <img alt="TypeScript 6" src="https://img.shields.io/badge/typescript-6-3178C6?style=flat&logo=typescript&logoColor=white">
   <a href="LICENSE"><img alt="Licencia propietaria" src="https://img.shields.io/badge/licencia-propietaria-555?style=flat"></a>
 </p>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagramas/cifras-dark.svg">
+  <img alt="13 dominios, 377 pruebas, 2 temas y 3 ambientes" src="docs/diagramas/cifras.svg">
+</picture>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/imagenes/inicio-oscuro.png">
   <img alt="Página de inicio de Pilot SSH con el acceso de una persona a un servidor, su sesión en la terminal y el registro" src="docs/imagenes/inicio-claro.png">
 </picture>
 
-## Características
+## Qué resuelve
 
-- Sitio público con inicio, precios, seguridad y páginas legales, prerenderizado para buscadores y vistas previas.
-- Panel de cada organización con sus servidores, credenciales, equipo, accesos, auditoría y créditos.
-- Terminal SSH en el navegador con xterm.js, que se reconecta cuando la API se actualiza.
-- Recargas con Mercado Pago (tarjeta, Yape y PagoEfectivo) sin salir del panel.
-- Panel de plataforma para el soporte, las finanzas y las operaciones del personal.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/iconos/buscar-dark.svg"><img alt="Buscadores" src="docs/iconos/buscar.svg" width="28"></picture><br><strong>Sitio público prerenderizado</strong><br>Inicio, precios, seguridad y páginas legales listos para buscadores y vistas previas.
+    </td>
+    <td width="50%" valign="top">
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/iconos/usuarios-dark.svg"><img alt="Organización" src="docs/iconos/usuarios.svg" width="28"></picture><br><strong>Panel de cada organización</strong><br>Servidores, credenciales, equipo, accesos, auditoría y créditos en un solo lugar.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/iconos/terminal-dark.svg"><img alt="Terminal" src="docs/iconos/terminal.svg" width="28"></picture><br><strong>Terminal en el navegador</strong><br>xterm.js por WebSocket, que se reconecta cuando la API se actualiza.
+    </td>
+    <td width="50%" valign="top">
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/iconos/moneda-dark.svg"><img alt="Recargas" src="docs/iconos/moneda.svg" width="28"></picture><br><strong>Recargas sin salir del panel</strong><br>Mercado Pago con tarjeta, Yape y PagoEfectivo.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/iconos/personal-dark.svg"><img alt="Personal" src="docs/iconos/personal.svg" width="28"></picture><br><strong>Panel de plataforma</strong><br>Soporte, finanzas y operaciones del personal de Pilot SSH.
+    </td>
+    <td width="50%" valign="top">
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/iconos/contenedor-dark.svg"><img alt="Contenedor" src="docs/iconos/contenedor.svg" width="28"></picture><br><strong>Una imagen para todo</strong><br>La misma imagen corre en local, uat y prod; cada ambiente la configura al arrancar.
+    </td>
+  </tr>
+</table>
 
 ## Requisitos
 
@@ -57,14 +85,14 @@ encuentra en [docs/desarrollo.md](docs/desarrollo.md).
 
 ## Ambientes
 
-| Ambiente | Cómo llega                         | Dónde corre               |
-| -------- | ---------------------------------- | ------------------------- |
-| `local`  | `sh deploy/docker/desplegar.sh`    | el equipo de cada persona |
-| `uat`    | cada merge a `main`                | servidor de pruebas       |
-| `prod`   | una etiqueta `vX.Y.Z` sobre `main` | producción                |
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagramas/ambientes-dark.svg">
+  <img alt="Una rama corta entra por pull request con la CI en verde; main despliega a uat y una etiqueta vX.Y.Z lleva la misma imagen a prod" src="docs/diagramas/ambientes.svg">
+</picture>
 
-Los tres ambientes usan el mismo `docker-compose.yml` y la misma imagen;
-cada uno la configura al arrancar con su propio `.env`.
+Los tres ambientes, `local`, `uat` y `prod`, usan el mismo
+`docker-compose.yml` y la misma imagen; cada uno la configura al arrancar con
+su propio `.env`.
 
 ## Documentación
 
@@ -88,7 +116,7 @@ src/lib/          http, errores y formato; env.ts lee config.js
 public/           marca, favicon y tema.js
 scripts/          prerenderizado y utilidades
 deploy/docker/    nginx, arranque y scripts de despliegue y pruebas
-docs/             documentación
+docs/             documentación y diagramas con su fuente
 ```
 
 ## Contribuir

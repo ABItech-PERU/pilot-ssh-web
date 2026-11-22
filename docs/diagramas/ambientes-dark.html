@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>De una rama a producción</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #0b1016; color: #ebeff2; padding: 3rem 1rem; }
+    .frame { max-width: 1200px; width: 100%; min-width: 0; margin: 0 auto; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="diagram-container">
+      <svg viewBox="0 0 960 152" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ambientes-dark-title ambientes-dark-desc">
+        <title id="ambientes-dark-title">De una rama a producción</title>
+        <desc id="ambientes-dark-desc">Una rama corta entra por pull request con la CI en verde; main despliega a uat y una etiqueta vX.Y.Z lleva la misma imagen a prod.</desc>
+        <defs>
+          <marker id="ambientes-dark-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#a4acb4"/></marker>
+          <marker id="ambientes-dark-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#40c1bd"/></marker>
+        </defs>
+        <rect width="100%" height="100%" fill="#0b1016"/>
+        <path d="M 224,76 H 272" fill="none" stroke="#a4acb4" stroke-width="1.2" marker-end="url(#ambientes-dark-arrow)"/>
+        <path d="M 456,76 H 504" fill="none" stroke="#a4acb4" stroke-width="1.2" marker-end="url(#ambientes-dark-arrow)"/>
+        <path d="M 688,76 H 736" fill="none" stroke="#40c1bd" stroke-width="1.4" marker-end="url(#ambientes-dark-arrow-accent)"/>
+        <rect x="40" y="40" width="184" height="72" rx="6" fill="#0b1016"/>
+        <rect x="40" y="40" width="184" height="72" rx="6" fill="#131920" stroke="#ebeff2" stroke-width="1"/>
+        <rect x="48" y="48" width="32" height="12" rx="2" fill="transparent" stroke="rgba(235,239,242,0.40)" stroke-width="0.8"/>
+        <text x="64" y="57" fill="#ebeff2" font-size="8" font-family="'JetBrains Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">RAMA</text>
+        <text x="132" y="84" fill="#ebeff2" font-size="16" font-family="'Inter', system-ui, sans-serif" text-anchor="middle" font-weight="600">Rama corta</text>
+        <text x="132" y="102" fill="#a4acb4" font-size="12" font-family="'JetBrains Mono', ui-monospace, monospace" text-anchor="middle">feature/* o fix/*</text>
+        <rect x="272" y="40" width="184" height="72" rx="6" fill="#0b1016"/>
+        <rect x="272" y="40" width="184" height="72" rx="6" fill="#131920" stroke="#ebeff2" stroke-width="1"/>
+        <rect x="280" y="48" width="56" height="12" rx="2" fill="transparent" stroke="rgba(235,239,242,0.40)" stroke-width="0.8"/>
+        <text x="308" y="57" fill="#ebeff2" font-size="8" font-family="'JetBrains Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">REVISIÓN</text>
+        <text x="364" y="84" fill="#ebeff2" font-size="16" font-family="'Inter', system-ui, sans-serif" text-anchor="middle" font-weight="600">Pull request</text>
+        <text x="364" y="102" fill="#a4acb4" font-size="12" font-family="'JetBrains Mono', ui-monospace, monospace" text-anchor="middle">CI en verde</text>
+        <rect x="504" y="40" width="184" height="72" rx="6" fill="#0b1016"/>
+        <rect x="504" y="40" width="184" height="72" rx="6" fill="#131920" stroke="#ebeff2" stroke-width="1"/>
+        <rect x="512" y="48" width="28" height="12" rx="2" fill="transparent" stroke="rgba(235,239,242,0.40)" stroke-width="0.8"/>
+        <text x="526" y="57" fill="#ebeff2" font-size="8" font-family="'JetBrains Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">UAT</text>
+        <text x="596" y="84" fill="#ebeff2" font-size="16" font-family="'Inter', system-ui, sans-serif" text-anchor="middle" font-weight="600">main</text>
+        <text x="596" y="102" fill="#a4acb4" font-size="12" font-family="'JetBrains Mono', ui-monospace, monospace" text-anchor="middle">despliega a uat</text>
+        <rect x="736" y="40" width="184" height="72" rx="6" fill="#0b1016"/>
+        <rect x="736" y="40" width="184" height="72" rx="6" fill="rgba(64,193,189,0.12)" stroke="#40c1bd" stroke-width="1"/>
+        <rect x="744" y="48" width="32" height="12" rx="2" fill="transparent" stroke="rgba(64,193,189,0.50)" stroke-width="0.8"/>
+        <text x="760" y="57" fill="#40c1bd" font-size="8" font-family="'JetBrains Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">PROD</text>
+        <text x="828" y="84" fill="#ebeff2" font-size="16" font-family="'Inter', system-ui, sans-serif" text-anchor="middle" font-weight="600">vX.Y.Z</text>
+        <text x="828" y="102" fill="#a4acb4" font-size="12" font-family="'JetBrains Mono', ui-monospace, monospace" text-anchor="middle">misma imagen, a prod</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>
