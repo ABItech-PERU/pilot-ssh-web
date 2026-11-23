@@ -7,6 +7,12 @@ import { crearEcoPredictivo } from '@/features/terminal/eco-predictivo'
 import * as serversApi from '@/features/servers/api'
 import { avisarSubida } from '@/features/terminal/AvisoDeSubida'
 import {
+  type AvanceDeDescarga,
+  crearDescarga,
+  type DescargaEnCurso,
+  VENTANA_DE_DESCARGA,
+} from '@/features/terminal/descarga'
+import {
   buildInitialCommand,
   buildTerminalSocketPath,
   buildTerminalUrl,
@@ -14,6 +20,8 @@ import {
   describeClose,
   type EstadoTerminal,
   fetchEsperaDeReconexion,
+  type MensajeDeArchivo,
+  type MensajeDeArchivos,
   type MensajeDeCarpetas,
   type MensajeDeSubida,
   parseIncoming,
@@ -26,8 +34,14 @@ import {
   enviarPorTramos,
   fetchCarpetaDeLaRuta,
 } from '@/features/terminal/subida'
+import { descargarArchivo } from '@/lib/download'
 import { env } from '@/lib/env'
 import type { Server, ServerUser } from '@/types/api'
+
+export type OrdenDeArchivo =
+  | { renombrar: { ruta: string; nombre: string } }
+  | { borrar: { ruta: string } }
+  | { crear_carpeta: { ruta: string; nombre: string } }
 
 /** Por encima, la letra tarda en aparecer y conviene adelantarla. */
 const LATENCIA_PARA_ADELANTAR_MS = 90
@@ -88,6 +102,11 @@ export function useTerminalSocket({
   const [subida, setSubida] = useState<AvanceDeSubida | null>(null)
   const respuesta = useRef<((suya: MensajeDeSubida) => void) | null>(null)
   const listado = useRef<((suyo: MensajeDeCarpetas) => void) | null>(null)
+  const listadoDeArchivos = useRef<((suyo: MensajeDeArchivos) => void) | null>(null)
+  const cambio = useRef<((suyo: MensajeDeArchivo) => void) | null>(null)
+  const [descarga, setDescarga] = useState<AvanceDeDescarga | null>(null)
+  const bajando = useRef<DescargaEnCurso | null>(null)
+  const pidiendoDescarga = useRef(false)
   const cancelada = useRef(false)
   const enCurso = useRef(false)
   const enVuelo = useRef(0)
@@ -169,6 +188,51 @@ export function useTerminalSocket({
       }),
     [enviar],
   )
+
+  /** Lo que hay en una carpeta del servidor, con tamaño, fecha y permisos. */
+  const pedirArchivos = useCallback(
+    (ruta: string) =>
+      new Promise<MensajeDeArchivos>((contestar) => {
+        listadoDeArchivos.current = contestar
+        enviar({ archivos: { ruta } })
+      }),
+    [enviar],
+  )
+
+  /** Renombrar, borrar o crear, de uno en uno porque el servidor contesta en orden. */
+  const cambiarArchivo = useCallback(
+    (orden: OrdenDeArchivo) =>
+      new Promise<MensajeDeArchivo>((contestar) => {
+        cambio.current = contestar
+        enviar(orden)
+      }),
+    [enviar],
+  )
+
+  /** Pide el archivo; los tramos llegan al socket y se guarda al terminar. */
+  const descargar = useCallback(
+    (ruta: string) => {
+      if (bajando.current || pidiendoDescarga.current) {
+        toast('Los archivos bajan de uno en uno.')
+        return
+      }
+      pidiendoDescarga.current = true
+      enviar({ descarga: { ruta } })
+    },
+    [enviar],
+  )
+
+  const soltarDescarga = () => {
+    bajando.current = null
+    pidiendoDescarga.current = false
+    setDescarga(null)
+  }
+
+  const cancelarDescarga = useCallback(() => {
+    soltarDescarga()
+    enviar({ descarga: { cancelar: true } })
+    toast('Descarga cancelada.')
+  }, [enviar])
 
   /** Tramos sin confirmar. Dos mantienen el canal lleno sin encolar tanto
    *  que la tecla siguiente espere. */
@@ -335,6 +399,8 @@ export function useTerminalSocket({
       const abierto = new WebSocket(
         buildTerminalUrl(env.socketUrl, server.id, credencial.id, vale, sesion.current),
       )
+      // Los tramos de una descarga llegan crudos, no como texto
+      abierto.binaryType = 'arraybuffer'
       socket.current = abierto
 
       let numeroDePing = 0
@@ -363,8 +429,54 @@ export function useTerminalSocket({
       }
 
       abierto.onmessage = (evento) => {
+        if (evento.data instanceof ArrayBuffer) {
+          const actual = bajando.current
+          if (!actual) return
+          actual.sumar(evento.data)
+          setDescarga(actual.avance())
+          enviar({ descarga: { sigue: true } })
+          return
+        }
+
         const mensaje = parseIncoming(String(evento.data))
         if (!mensaje) return
+        if (mensaje.type === 'archivos') {
+          const contestar = listadoDeArchivos.current
+          listadoDeArchivos.current = null
+          contestar?.(mensaje)
+          return
+        }
+        if (mensaje.type === 'archivo') {
+          const contestar = cambio.current
+          cambio.current = null
+          contestar?.(mensaje)
+          return
+        }
+        if (mensaje.type === 'descarga') {
+          if (mensaje.estado === 'preparada') {
+            if (!pidiendoDescarga.current) return
+            pidiendoDescarga.current = false
+            const nueva = crearDescarga({
+              nombre: mensaje.nombre ?? 'archivo',
+              tamano: mensaje.tamano ?? 0,
+              ruta: mensaje.ruta ?? '',
+            })
+            bajando.current = nueva
+            setDescarga(nueva.avance())
+            for (let pedido = 0; pedido < VENTANA_DE_DESCARGA; pedido += 1) {
+              enviar({ descarga: { sigue: true } })
+            }
+            return
+          }
+          const terminada = bajando.current
+          soltarDescarga()
+          if (mensaje.estado === 'lista' && terminada) {
+            descargarArchivo(terminada.armar(), terminada.nombre)
+            toast.success(`${terminada.nombre} descargado.`)
+          }
+          if (mensaje.estado === 'error') toast.error(mensaje.message ?? 'No se pudo descargar.')
+          return
+        }
         if (mensaje.type === 'sesion') {
           sesion.current = mensaje.id
           salto.current = mensaje.saltoMs
@@ -407,6 +519,28 @@ export function useTerminalSocket({
       abierto.onclose = (evento) => {
         escribir(eco.current.limpiar())
         soltarTurnos()
+        if (bajando.current || pidiendoDescarga.current) {
+          toast.error('Se perdió la conexión durante la descarga.')
+          soltarDescarga()
+        }
+        // Lo que esperaba respuesta no queda colgado
+        listadoDeArchivos.current?.({
+          type: 'archivos',
+          ruta: '',
+          inicio: '',
+          padre: '',
+          entradas: [],
+          recortada: false,
+          error: 'Se perdió la conexión con la terminal.',
+        })
+        listadoDeArchivos.current = null
+        cambio.current?.({
+          type: 'archivo',
+          accion: 'borrar',
+          estado: 'error',
+          message: 'Se perdió la conexión con la terminal.',
+        })
+        cambio.current = null
         const contestar = respuesta.current
         respuesta.current = null
         contestar?.({
@@ -466,8 +600,13 @@ export function useTerminalSocket({
   ])
 
   return {
+    cambiarArchivo,
+    cancelarDescarga,
     cancelarSubida,
+    descarga,
+    descargar,
     enviarTamano,
+    pedirArchivos,
     pedirCarpetas,
     reconectar,
     subida,

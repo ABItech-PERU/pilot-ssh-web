@@ -38,6 +38,47 @@ export type MensajeDeCarpetas = {
   error?: string
 }
 
+export type TipoDeEntrada = 'carpeta' | 'archivo' | 'enlace'
+
+export interface EntradaDeArchivo {
+  nombre: string
+  tipo: TipoDeEntrada
+  tamano: number
+  /** ISO en UTC; null si el servidor no la da. */
+  modificado: string | null
+  permisos: string
+}
+
+/** Lo que hay en una carpeta, carpetas primero, como lo ordena el servidor. */
+export type MensajeDeArchivos = {
+  type: 'archivos'
+  ruta: string
+  inicio: string
+  padre: string
+  entradas: EntradaDeArchivo[]
+  recortada: boolean
+  error?: string
+}
+
+/** Cómo va el archivo que se baja; los datos llegan en marcos binarios. */
+export type MensajeDeDescarga = {
+  type: 'descarga'
+  estado: 'preparada' | 'lista' | 'error'
+  nombre?: string
+  tamano?: number
+  ruta?: string
+  message?: string
+}
+
+/** Resultado de renombrar, borrar o crear una carpeta. */
+export type MensajeDeArchivo = {
+  type: 'archivo'
+  accion: 'renombrar' | 'borrar' | 'crear_carpeta'
+  estado: 'hecho' | 'error'
+  ruta?: string
+  message?: string
+}
+
 /** Respuesta al ping: con su número se mide la ida y vuelta de verdad. */
 type MensajeDePong = { type: 'pong'; ping: number }
 
@@ -47,6 +88,9 @@ export type MensajeEntrante =
   | { type: 'sesion'; id: string; saltoMs?: number }
   | MensajeDeSubida
   | MensajeDeCarpetas
+  | MensajeDeArchivos
+  | MensajeDeDescarga
+  | MensajeDeArchivo
   | MensajeDePong
 
 /** La ruta del WebSocket. El vale se pide para esta misma ruta. */
@@ -164,6 +208,21 @@ export function buildInitialCommand(path: string): string | null {
 }
 
 const ESTADOS_DE_SUBIDA = ['preparada', 'sigue', 'guardada', 'error']
+const ESTADOS_DE_DESCARGA = ['preparada', 'lista', 'error']
+const ACCIONES_DE_ARCHIVO: MensajeDeArchivo['accion'][] = ['renombrar', 'borrar', 'crear_carpeta']
+const TIPOS_DE_ENTRADA: TipoDeEntrada[] = ['carpeta', 'archivo', 'enlace']
+
+function parseEntrada(cruda: unknown): EntradaDeArchivo {
+  const dato = (cruda ?? {}) as Partial<Record<keyof EntradaDeArchivo, unknown>>
+  const tipo = TIPOS_DE_ENTRADA.find((uno) => uno === dato.tipo) ?? 'archivo'
+  return {
+    nombre: String(dato.nombre ?? ''),
+    tipo,
+    tamano: Number(dato.tamano ?? 0),
+    modificado: typeof dato.modificado === 'string' ? dato.modificado : null,
+    permisos: String(dato.permisos ?? ''),
+  }
+}
 
 export function parseIncoming(raw: string): MensajeEntrante | null {
   try {
@@ -179,7 +238,11 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
       inicio?: string
       padre?: string
       carpetas?: unknown
+      entradas?: unknown
       recortada?: boolean
+      nombre?: string
+      tamano?: number
+      accion?: string
     }
     if (dato.type === 'sesion') {
       if (typeof dato.id !== 'string') return null
@@ -197,6 +260,39 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
         carpetas: Array.isArray(dato.carpetas) ? dato.carpetas.map(String) : [],
         recortada: Boolean(dato.recortada),
         error: dato.error,
+      }
+    }
+    if (dato.type === 'archivos') {
+      return {
+        type: 'archivos',
+        ruta: String(dato.ruta ?? ''),
+        inicio: String(dato.inicio ?? ''),
+        padre: String(dato.padre ?? ''),
+        entradas: Array.isArray(dato.entradas) ? dato.entradas.map(parseEntrada) : [],
+        recortada: Boolean(dato.recortada),
+        error: dato.error,
+      }
+    }
+    if (dato.type === 'descarga') {
+      if (!ESTADOS_DE_DESCARGA.includes(dato.estado ?? '')) return null
+      return {
+        type: 'descarga',
+        estado: dato.estado as MensajeDeDescarga['estado'],
+        nombre: dato.nombre,
+        tamano: dato.tamano,
+        ruta: dato.ruta,
+        message: dato.message,
+      }
+    }
+    if (dato.type === 'archivo') {
+      const accion = ACCIONES_DE_ARCHIVO.find((una) => una === dato.accion)
+      if (!accion) return null
+      return {
+        type: 'archivo',
+        accion,
+        estado: dato.estado === 'hecho' ? 'hecho' : 'error',
+        ruta: dato.ruta,
+        message: dato.message,
       }
     }
     if (dato.type === 'subida') {

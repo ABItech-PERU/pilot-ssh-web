@@ -3,6 +3,7 @@ import {
   ChevronDownIcon,
   CircleQuestionMarkIcon,
   FolderIcon,
+  FolderOpenIcon,
   PlusIcon,
   UploadIcon,
   XIcon,
@@ -36,6 +37,8 @@ interface BarraProps {
   onAbrir: (credentialId: string) => void
   onSubir: (archivos: File[]) => void
   onElegirCarpeta: () => void
+  onVerArchivos: () => void
+  archivosAbiertos: boolean
 }
 
 export function BarraDePestanas({
@@ -48,6 +51,8 @@ export function BarraDePestanas({
   onAbrir,
   onSubir,
   onElegirCarpeta,
+  onVerArchivos,
+  archivosAbiertos,
 }: BarraProps) {
   const archivo = useRef<HTMLInputElement | null>(null)
   const [viendoAtajos, setViendoAtajos] = useState(false)
@@ -156,6 +161,21 @@ export function BarraDePestanas({
           abierto={viendoAtajos}
           onCerrar={() => setViendoAtajos(false)}
         />
+
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Archivos"
+          aria-pressed={archivosAbiertos}
+          title="Archivos del servidor: descargar, subir, renombrar y borrar"
+          onClick={onVerArchivos}
+          className={cn(
+            'hover:text-term-text mr-1 size-6 hover:bg-white/5',
+            archivosAbiertos ? 'text-term-text bg-white/10' : 'text-term-dim',
+          )}
+        >
+          <FolderOpenIcon className="size-4" />
+        </Button>
 
         <Button
           variant="ghost"

@@ -208,3 +208,91 @@ describe('reconnectsAutomatically', () => {
     }
   })
 })
+
+describe('parseIncoming de archivos', () => {
+  it('lee el listado con su detalle', () => {
+    const listado = parseIncoming(
+      JSON.stringify({
+        type: 'archivos',
+        ruta: '/home/root',
+        inicio: '/home/root',
+        padre: '/home',
+        entradas: [
+          {
+            nombre: 'notas.txt',
+            tipo: 'archivo',
+            tamano: 8,
+            modificado: '2026-11-20T10:00:00Z',
+            permisos: 'rw-r--r--',
+          },
+        ],
+        recortada: false,
+      }),
+    )
+
+    expect(listado).toEqual({
+      type: 'archivos',
+      ruta: '/home/root',
+      inicio: '/home/root',
+      padre: '/home',
+      entradas: [
+        {
+          nombre: 'notas.txt',
+          tipo: 'archivo',
+          tamano: 8,
+          modificado: '2026-11-20T10:00:00Z',
+          permisos: 'rw-r--r--',
+        },
+      ],
+      recortada: false,
+      error: undefined,
+    })
+  })
+
+  it('un tipo desconocido cuenta como archivo, no rompe el listado', () => {
+    const listado = parseIncoming(
+      JSON.stringify({ type: 'archivos', entradas: [{ nombre: 'x', tipo: 'socket' }] }),
+    )
+
+    expect(listado?.type === 'archivos' && listado.entradas[0]?.tipo).toBe('archivo')
+  })
+
+  it('lee cómo va la descarga', () => {
+    expect(
+      parseIncoming(
+        '{"type":"descarga","estado":"preparada","nombre":"a.txt","tamano":3,"ruta":"/a.txt"}',
+      ),
+    ).toEqual({
+      type: 'descarga',
+      estado: 'preparada',
+      nombre: 'a.txt',
+      tamano: 3,
+      ruta: '/a.txt',
+      message: undefined,
+    })
+  })
+
+  it('un estado de descarga desconocido se ignora', () => {
+    expect(parseIncoming('{"type":"descarga","estado":"rara"}')).toBeNull()
+  })
+
+  it('lee la respuesta de renombrar y borrar', () => {
+    expect(
+      parseIncoming('{"type":"archivo","accion":"borrar","estado":"hecho","ruta":"/a.txt"}'),
+    ).toEqual({
+      type: 'archivo',
+      accion: 'borrar',
+      estado: 'hecho',
+      ruta: '/a.txt',
+      message: undefined,
+    })
+  })
+})
+
+describe('parseIncoming de carpetas nuevas', () => {
+  it('lee la respuesta de crear una carpeta', () => {
+    expect(
+      parseIncoming('{"type":"archivo","accion":"crear_carpeta","estado":"hecho","ruta":"/r"}'),
+    ).toMatchObject({ type: 'archivo', accion: 'crear_carpeta', estado: 'hecho' })
+  })
+})

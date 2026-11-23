@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { LineaEsqueleto } from '@/components/states'
+import { fetchMigas, joinRuta } from '@/features/terminal/archivos'
 import type { MensajeDeCarpetas } from '@/features/terminal/socket'
 
 interface SelectorProps {
@@ -100,7 +101,7 @@ export function SelectorDeCarpeta({
             <>
               {listado?.padre && (
                 <FilaDeCarpeta
-                  nombre="Subir un nivel"
+                  nombre="Carpeta superior"
                   icono={CornerLeftUpIcon}
                   onClick={() => void navegar(listado.padre)}
                 />
@@ -110,7 +111,7 @@ export function SelectorDeCarpeta({
                   key={nombre}
                   nombre={nombre}
                   icono={FolderIcon}
-                  onClick={() => void navegar(`${aqui === '/' ? '' : aqui}/${nombre}`)}
+                  onClick={() => void navegar(joinRuta(aqui, nombre))}
                 />
               ))}
               {listado && listado.carpetas.length === 0 && (
@@ -161,11 +162,3 @@ function FilaDeCarpeta({
   )
 }
 
-/** Cada tramo de la ruta, con lo que hay que pedir para volver a él. */
-function fetchMigas(ruta: string): { nombre: string; ruta: string }[] {
-  const tramos = ruta.split('/').filter(Boolean)
-  return tramos.map((nombre, posicion) => ({
-    nombre,
-    ruta: `/${tramos.slice(0, posicion + 1).join('/')}`,
-  }))
-}
