@@ -1,19 +1,24 @@
 import { cn } from 'cn'
 import {
+  CheckSquareIcon,
   ChevronRightIcon,
   CopyIcon,
   CornerLeftUpIcon,
   DownloadIcon,
   EllipsisVerticalIcon,
+  FileArchiveIcon,
   FileIcon,
+  FilePenLineIcon,
   FolderIcon,
   FolderPlusIcon,
   HouseIcon,
+  KeyRoundIcon,
   Link2Icon,
   Loader2Icon,
   PencilIcon,
   RefreshCwIcon,
   SearchIcon,
+  SlidersHorizontalIcon,
   SquareTerminalIcon,
   Trash2Icon,
   UploadIcon,
@@ -25,25 +30,42 @@ import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { LineaEsqueleto } from '@/components/states'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
+  type CriterioDeOrden,
   describeBorrado,
   fetchMigas,
   filtrarEntradas,
   joinRuta,
+  ordenarEntradas,
+  quitarOcultos,
+  type Sentido,
 } from '@/features/terminal/archivos'
+import { DialogoDePermisos } from '@/features/terminal/DialogoDePermisos'
+import { EditorDeArchivo } from '@/features/terminal/EditorDeArchivo'
 import type {
   EntradaDeArchivo,
   MensajeDeArchivo,
   MensajeDeArchivos,
+  MensajeDeContenido,
 } from '@/features/terminal/socket'
 import type { OrdenDeArchivo } from '@/features/terminal/use-terminal-socket'
+import {
+  guardarVista,
+  leerVista,
+  type VistaDeArchivos,
+} from '@/features/terminal/vista-de-archivos'
 import { formatDateTime, formatFileSize } from '@/lib/format'
 
 interface Props {
@@ -51,7 +73,13 @@ interface Props {
   carpetaInicial: string
   pedirArchivos: (ruta: string) => Promise<MensajeDeArchivos>
   cambiarArchivo: (orden: OrdenDeArchivo) => Promise<MensajeDeArchivo>
-  descargar: (ruta: string) => void
+  pedirContenido: (ruta: string) => Promise<MensajeDeContenido>
+  guardarContenido: (orden: {
+    ruta: string
+    texto: string
+    version: string
+  }) => Promise<MensajeDeContenido>
+  descargar: (ruta: string, comprimir?: boolean) => void
   subir: (archivos: File[], carpeta: string) => Promise<void>
   /** Lleva la shell a esa carpeta con un `cd`. */
   abrirEnTerminal: (ruta: string) => void
@@ -60,11 +88,19 @@ interface Props {
 
 const ICONO_DEL_TIPO = { carpeta: FolderIcon, archivo: FileIcon, enlace: Link2Icon }
 
+const ORDENES: { valor: CriterioDeOrden; etiqueta: string }[] = [
+  { valor: 'nombre', etiqueta: 'Nombre' },
+  { valor: 'tamano', etiqueta: 'Tamaño' },
+  { valor: 'fecha', etiqueta: 'Fecha de cambio' },
+]
+
 /** Los archivos del servidor junto a la terminal, por su misma conexión. */
 export function PanelDeArchivos({
   carpetaInicial,
   pedirArchivos,
   cambiarArchivo,
+  pedirContenido,
+  guardarContenido,
   descargar,
   subir,
   abrirEnTerminal,
@@ -74,9 +110,15 @@ export function PanelDeArchivos({
   const [aviso, setAviso] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
   const [busqueda, setBusqueda] = useState('')
+  const [vista, setVista] = useState<VistaDeArchivos>(leerVista)
+  const [escribiendoRuta, setEscribiendoRuta] = useState(false)
   const [renombrando, setRenombrando] = useState<string | null>(null)
   const [creando, setCreando] = useState(false)
-  const [porBorrar, setPorBorrar] = useState<EntradaDeArchivo | null>(null)
+  const [eligiendo, setEligiendo] = useState(false)
+  const [elegidos, setElegidos] = useState<Set<string>>(new Set())
+  const [porBorrar, setPorBorrar] = useState<EntradaDeArchivo[]>([])
+  const [editando, setEditando] = useState<string | null>(null)
+  const [conPermisos, setConPermisos] = useState<EntradaDeArchivo | null>(null)
   const [cambiando, setCambiando] = useState(false)
   const [arrastrando, setArrastrando] = useState(false)
   const selector = useRef<HTMLInputElement | null>(null)
@@ -85,13 +127,17 @@ export function PanelDeArchivos({
     nodo?.focus({ preventScroll: true })
   }, [])
 
+  useEffect(() => guardarVista(vista), [vista])
+
   const navegar = useCallback(
     async (ruta: string) => {
       setCargando(true)
       setAviso(null)
       setRenombrando(null)
       setCreando(false)
+      setEscribiendoRuta(false)
       setBusqueda('')
+      setElegidos(new Set())
       const suyo = await pedirArchivos(ruta)
       if (suyo.error) setAviso(suyo.error)
       else setListado(suyo)
@@ -153,12 +199,33 @@ export function PanelDeArchivos({
     }
   }
 
+  /** De uno en uno y con un solo aviso al final, diga lo que diga cada uno. */
   const borrar = async () => {
-    if (!porBorrar) return
-    const ruta = joinRuta(aqui, porBorrar.nombre)
-    // Se cierra también si falla, porque repetirlo daría el mismo motivo
-    await cambiar({ borrar: { ruta } }, `${porBorrar.nombre} borrado.`)
-    setPorBorrar(null)
+    const lista = porBorrar
+    setCambiando(true)
+    let borrados = 0
+    let motivo = ''
+    for (const entrada of lista) {
+      const respuesta = await cambiarArchivo({ borrar: { ruta: joinRuta(aqui, entrada.nombre) } })
+      if (respuesta.estado === 'hecho') borrados += 1
+      else motivo ||= respuesta.message ?? ''
+    }
+    setCambiando(false)
+    setPorBorrar([])
+    setElegidos(new Set())
+    setEligiendo(false)
+    if (borrados === lista.length) {
+      toast.success(lista.length === 1 ? `${lista[0]?.nombre} borrado.` : `${borrados} borrados.`)
+    } else {
+      toast.error(
+        lista.length === 1 ? motivo : `Se borraron ${borrados} de ${lista.length}. ${motivo}`,
+      )
+    }
+    await recargar()
+  }
+
+  const cambiarPermisos = async (ruta: string, modo: string) => {
+    if (await cambiar({ permisos: { ruta, modo } }, 'Permisos cambiados.')) setConPermisos(null)
   }
 
   const copiarRuta = async (ruta: string) => {
@@ -171,19 +238,53 @@ export function PanelDeArchivos({
   }
 
   const entradas = listado?.entradas ?? []
-  const visibles = filtrarEntradas(entradas, busqueda)
-  const borrado = porBorrar ? describeBorrado(porBorrar.tipo) : null
+  const sinOcultos = quitarOcultos(entradas)
+  const visibles = ordenarEntradas(
+    filtrarEntradas(vista.ocultos ? entradas : sinOcultos, busqueda),
+    vista.orden,
+    vista.sentido,
+  )
+  const ocultas = vista.ocultos ? 0 : entradas.length - sinOcultos.length
+  const deLaSeleccion = visibles.filter((entrada) => elegidos.has(entrada.nombre))
+  const todosElegidos = visibles.length > 0 && deLaSeleccion.length === visibles.length
+
+  const alternar = (nombre: string) =>
+    setElegidos((antes) => {
+      const despues = new Set(antes)
+      if (despues.has(nombre)) despues.delete(nombre)
+      else despues.add(nombre)
+      return despues
+    })
+
+  const salirDeLaSeleccion = () => {
+    setEligiendo(false)
+    setElegidos(new Set())
+  }
+
+  const descargarElegidos = () => {
+    for (const entrada of deLaSeleccion) {
+      descargar(joinRuta(aqui, entrada.nombre), entrada.tipo === 'carpeta')
+    }
+    salirDeLaSeleccion()
+  }
+
+  const borrado = describirLoQueSeBorra(porBorrar)
 
   return (
     <aside
       // El foco entra al abrir, así Escape cierra sin hacer clic antes
       ref={enfocarAlAbrir}
       tabIndex={-1}
-      id="panel-de-archivos"
       aria-label="Archivos del servidor"
-      className="border-term-border bg-term-bg text-term-text absolute inset-2 z-20 flex flex-col rounded-md border shadow-lg outline-none sm:left-auto sm:w-96"
+      className="border-term-border bg-term-bg text-term-text absolute inset-2 z-20 flex flex-col rounded-md border shadow-lg outline-none sm:left-auto sm:w-[26rem]"
       onKeyDown={(evento) => {
-        if (evento.key === 'Escape' && !renombrando && !creando && !porBorrar) onCerrar()
+        if (evento.key !== 'Escape' || renombrando || creando || escribiendoRuta) return
+        // Los diálogos viven en un portal, pero React les sube el teclado hasta
+        // aquí. Su Escape es suyo, o el panel cerraría el editor sin preguntar
+        const deUnDialogo = !evento.currentTarget.contains(evento.target as Node)
+        if (deUnDialogo || editando || conPermisos || porBorrar.length) return
+        if (eligiendo) salirDeLaSeleccion()
+        else onCerrar()
       }}
       onDragOver={(evento) => {
         evento.preventDefault()
@@ -225,49 +326,79 @@ export function PanelDeArchivos({
         </BotonDelPanel>
       </header>
 
-      <nav
-        aria-label="Ruta"
-        className="border-term-border flex flex-wrap items-center gap-0.5 border-b px-2 py-1 text-xs"
-      >
-        <Button
-          size="sm"
-          variant="ghost"
-          className="text-term-dim hover:text-term-text h-7 px-2 hover:bg-white/5"
-          onClick={() => void navegar('~')}
+      {escribiendoRuta ? (
+        <CampoDeRuta
+          actual={aqui}
+          onIr={(ruta) => void navegar(ruta)}
+          onCancelar={() => setEscribiendoRuta(false)}
+        />
+      ) : (
+        <nav
+          aria-label="Ruta"
+          className="border-term-border flex items-center gap-0.5 border-b px-2 py-1 text-xs"
         >
-          <HouseIcon />
-          Inicio
-        </Button>
-        {fetchMigas(aqui).map((miga, posicion, migas) => (
-          <span key={miga.ruta} className="flex items-center gap-0.5">
-            <ChevronRightIcon className="text-term-dim size-3" aria-hidden />
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5">
             <Button
               size="sm"
               variant="ghost"
-              aria-current={posicion === migas.length - 1 ? 'location' : undefined}
-              className={cn(
-                'font-machine hover:text-term-text h-7 px-1.5 hover:bg-white/5',
-                posicion === migas.length - 1 ? 'text-term-text' : 'text-term-dim',
-              )}
-              onClick={() => void navegar(miga.ruta)}
+              className="text-term-dim hover:text-term-text h-7 px-2 hover:bg-white/5"
+              onClick={() => void navegar('~')}
             >
-              {miga.nombre}
+              <HouseIcon />
+              Inicio
             </Button>
-          </span>
-        ))}
-      </nav>
+            {fetchMigas(aqui).map((miga, posicion, migas) => (
+              <span key={miga.ruta} className="flex items-center gap-0.5">
+                <ChevronRightIcon className="text-term-dim size-3" aria-hidden />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-current={posicion === migas.length - 1 ? 'location' : undefined}
+                  className={cn(
+                    'font-machine hover:text-term-text h-7 px-1.5 hover:bg-white/5',
+                    posicion === migas.length - 1 ? 'text-term-text' : 'text-term-dim',
+                  )}
+                  onClick={() => void navegar(miga.ruta)}
+                >
+                  {miga.nombre}
+                </Button>
+              </span>
+            ))}
+          </div>
+          <BotonDelPanel etiqueta="Escribir una ruta" onClick={() => setEscribiendoRuta(true)}>
+            <PencilIcon className="size-3.5" />
+          </BotonDelPanel>
+        </nav>
+      )}
 
-      <label className="border-term-border flex items-center gap-2 border-b px-3 py-1.5">
-        <SearchIcon className="text-term-dim size-3.5 shrink-0" aria-hidden />
-        <span className="sr-only">Buscar en esta carpeta</span>
-        <input
-          type="search"
-          value={busqueda}
-          onChange={(evento) => setBusqueda(evento.target.value)}
-          placeholder="Buscar en esta carpeta"
-          className="placeholder:text-term-dim min-w-0 flex-1 bg-transparent py-1 text-sm outline-none"
-        />
-      </label>
+      <div className="border-term-border flex items-center gap-1 border-b py-1 pr-1.5 pl-3">
+        <label className="flex min-w-0 flex-1 items-center gap-2">
+          <SearchIcon className="text-term-dim size-3.5 shrink-0" aria-hidden />
+          <span className="sr-only">Buscar en esta carpeta</span>
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(evento) => setBusqueda(evento.target.value)}
+            placeholder="Buscar en esta carpeta"
+            className="placeholder:text-term-dim min-w-0 flex-1 bg-transparent py-1 text-sm outline-none"
+          />
+        </label>
+        <MenuDeVista vista={vista} onCambiar={setVista} />
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Elegir varios"
+          title="Elegir varios"
+          aria-pressed={eligiendo}
+          onClick={() => (eligiendo ? salirDeLaSeleccion() : setEligiendo(true))}
+          className={cn(
+            'hover:text-term-text size-8 shrink-0 hover:bg-white/5',
+            eligiendo ? 'text-term-text bg-white/10' : 'text-term-dim',
+          )}
+        >
+          <CheckSquareIcon className="size-4" />
+        </Button>
+      </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto" aria-busy={cargando}>
         {cargando && !listado && (
@@ -295,6 +426,25 @@ export function PanelDeArchivos({
 
         {listado && !aviso && (
           <ul className={cn('divide-term-border divide-y', cargando && 'opacity-60')}>
+            {eligiendo && visibles.length > 0 && (
+              <li className="flex items-center gap-2 px-3 py-1.5 text-xs">
+                <Checkbox
+                  aria-label="Elegir todos"
+                  checked={todosElegidos}
+                  onCheckedChange={(valor) =>
+                    setElegidos(
+                      valor === true ? new Set(visibles.map((e) => e.nombre)) : new Set(),
+                    )
+                  }
+                  className="border-term-dim"
+                />
+                <span className="text-term-dim">
+                  {deLaSeleccion.length
+                    ? `${deLaSeleccion.length} de ${visibles.length} elegidos`
+                    : 'Elegir todos'}
+                </span>
+              </li>
+            )}
             {creando && (
               <li>
                 <CampoDeNombre
@@ -307,7 +457,7 @@ export function PanelDeArchivos({
                 />
               </li>
             )}
-            {listado.padre && !busqueda && (
+            {listado.padre && !busqueda && !eligiendo && (
               <li>
                 <button
                   type="button"
@@ -335,12 +485,19 @@ export function PanelDeArchivos({
                   ) : (
                     <FilaDeEntrada
                       entrada={entrada}
-                      onAbrir={() => void navegar(ruta)}
+                      eligiendo={eligiendo}
+                      elegida={elegidos.has(entrada.nombre)}
+                      onElegir={() => alternar(entrada.nombre)}
+                      onAbrir={() =>
+                        entrada.tipo === 'archivo' ? setEditando(ruta) : void navegar(ruta)
+                      }
                       onDescargar={() => descargar(ruta)}
+                      onComprimir={() => descargar(ruta, true)}
                       onAbrirEnTerminal={() => abrirEnTerminal(ruta)}
                       onCopiarRuta={() => void copiarRuta(ruta)}
                       onRenombrar={() => setRenombrando(entrada.nombre)}
-                      onBorrar={() => setPorBorrar(entrada)}
+                      onPermisos={() => setConPermisos(entrada)}
+                      onBorrar={() => setPorBorrar([entrada])}
                     />
                   )}
                 </li>
@@ -365,19 +522,58 @@ export function PanelDeArchivos({
         )}
 
         {listado && entradas.length > 0 && visibles.length === 0 && (
-          <p className="text-term-dim p-4 text-sm">Nada se llama así en esta carpeta.</p>
+          <p className="text-term-dim p-4 text-sm">
+            {busqueda ? 'Nada se llama así en esta carpeta.' : 'Solo hay archivos ocultos.'}
+          </p>
         )}
 
-        {listado?.recortada && !cargando && (
-          <p className="text-term-dim p-3 text-xs">
-            Se muestran las primeras 300. Para el resto, use la terminal.
+        {listado && !cargando && (listado.recortada || ocultas > 0) && (
+          <p className="text-term-dim space-x-1 p-3 text-xs">
+            {listado.recortada && <span>Se muestran las primeras 300.</span>}
+            {ocultas > 0 && (
+              <button
+                type="button"
+                className="hover:text-term-text underline underline-offset-2"
+                onClick={() => setVista({ ...vista, ocultos: true })}
+              >
+                {ocultas === 1 ? 'Mostrar 1 archivo oculto' : `Mostrar ${ocultas} ocultos`}
+              </button>
+            )}
           </p>
         )}
       </div>
 
-      <p className="border-term-border text-term-dim hidden border-t px-3 py-2 text-xs sm:block">
-        Suelte archivos aquí para subirlos a esta carpeta.
-      </p>
+      {eligiendo ? (
+        <div className="border-term-border flex items-center gap-1.5 border-t px-3 py-2">
+          <span className="text-term-dim mr-auto text-xs">
+            {deLaSeleccion.length === 1 ? '1 elegido' : `${deLaSeleccion.length} elegidos`}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!deLaSeleccion.length}
+            onClick={descargarElegidos}
+            className="border-term-border text-term-text h-7 bg-transparent hover:bg-white/5"
+          >
+            <DownloadIcon />
+            Descargar
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!deLaSeleccion.length}
+            onClick={() => setPorBorrar(deLaSeleccion)}
+            className="border-term-border text-term-root hover:text-term-root h-7 bg-transparent hover:bg-white/5"
+          >
+            <Trash2Icon />
+            Borrar
+          </Button>
+        </div>
+      ) : (
+        <p className="border-term-border text-term-dim hidden border-t px-3 py-2 text-xs sm:block">
+          Suelte archivos aquí para subirlos a esta carpeta.
+        </p>
+      )}
 
       {arrastrando && (
         <div className="bg-term-bg/90 absolute inset-0 grid place-items-center rounded-md border border-dashed border-white/25">
@@ -400,35 +596,139 @@ export function PanelDeArchivos({
       />
 
       <ConfirmDialog
-        open={Boolean(porBorrar)}
-        onOpenChange={(abierto) => !abierto && setPorBorrar(null)}
-        titulo={`¿Borrar ${porBorrar?.nombre ?? ''}?`}
-        descripcion={porBorrar ? joinRuta(aqui, porBorrar.nombre) : ''}
-        detalles={borrado?.detalles}
-        accion={borrado?.accion ?? 'Borrar'}
+        open={porBorrar.length > 0}
+        onOpenChange={(abierto) => !abierto && setPorBorrar([])}
+        titulo={borrado.titulo}
+        descripcion={borrado.descripcion}
+        detalles={borrado.detalles}
+        accion={borrado.accion}
         destructiva
         pendiente={cambiando}
         onConfirmar={() => void borrar()}
+      />
+
+      <EditorDeArchivo
+        ruta={editando}
+        pedirContenido={pedirContenido}
+        guardarContenido={guardarContenido}
+        descargar={descargar}
+        onCerrar={() => {
+          setEditando(null)
+          void recargar()
+        }}
+      />
+
+      <DialogoDePermisos
+        entrada={
+          conPermisos ? { ...conPermisos, ruta: joinRuta(aqui, conPermisos.nombre) } : null
+        }
+        pendiente={cambiando}
+        onGuardar={(ruta, modo) => void cambiarPermisos(ruta, modo)}
+        onCerrar={() => setConPermisos(null)}
       />
     </aside>
   )
 }
 
+/** Uno se nombra; varios se cuentan, como pide la regla de bajas. */
+function describirLoQueSeBorra(lista: EntradaDeArchivo[]) {
+  const [unico] = lista
+  if (lista.length === 1 && unico) {
+    const { accion, detalles } = describeBorrado(unico.tipo)
+    return { titulo: `¿Borrar ${unico.nombre}?`, descripcion: unico.nombre, accion, detalles }
+  }
+  const carpetas = lista.filter((entrada) => entrada.tipo === 'carpeta').length
+  const detalles = ['Se borran del servidor. No hay papelera para recuperarlos.']
+  if (carpetas) detalles.push('Las carpetas solo se borran si están vacías.')
+  return {
+    titulo: `¿Borrar ${lista.length} elementos?`,
+    descripcion: 'Se borran uno por uno. Si alguno falla, el aviso dice por qué.',
+    accion: `Borrar ${lista.length}`,
+    detalles,
+  }
+}
+
+function MenuDeVista({
+  vista,
+  onCambiar,
+}: {
+  vista: VistaDeArchivos
+  onCambiar: (vista: VistaDeArchivos) => void
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Ordenar y filtrar"
+          title="Ordenar y filtrar"
+          className="text-term-dim hover:text-term-text size-8 shrink-0 hover:bg-white/5"
+        >
+          <SlidersHorizontalIcon className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
+        <DropdownMenuRadioGroup
+          value={vista.orden}
+          onValueChange={(orden) => onCambiar({ ...vista, orden: orden as CriterioDeOrden })}
+        >
+          {ORDENES.map((orden) => (
+            <DropdownMenuRadioItem key={orden.valor} value={orden.valor}>
+              {orden.etiqueta}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup
+          value={vista.sentido}
+          onValueChange={(sentido) => onCambiar({ ...vista, sentido: sentido as Sentido })}
+        >
+          <DropdownMenuRadioItem value="asc">
+            {vista.orden === 'nombre' ? 'De la A a la Z' : 'De menor a mayor'}
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="desc">
+            {vista.orden === 'nombre' ? 'De la Z a la A' : 'De mayor a menor'}
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuCheckboxItem
+          checked={vista.ocultos}
+          onCheckedChange={(ocultos) => onCambiar({ ...vista, ocultos: ocultos === true })}
+        >
+          Mostrar ocultos
+        </DropdownMenuCheckboxItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 function FilaDeEntrada({
   entrada,
+  eligiendo,
+  elegida,
+  onElegir,
   onAbrir,
   onDescargar,
+  onComprimir,
   onAbrirEnTerminal,
   onCopiarRuta,
   onRenombrar,
+  onPermisos,
   onBorrar,
 }: {
   entrada: EntradaDeArchivo
+  eligiendo: boolean
+  elegida: boolean
+  onElegir: () => void
   onAbrir: () => void
   onDescargar: () => void
+  onComprimir: () => void
   onAbrirEnTerminal: () => void
   onCopiarRuta: () => void
   onRenombrar: () => void
+  onPermisos: () => void
   onBorrar: () => void
 }) {
   const Icono = ICONO_DEL_TIPO[entrada.tipo]
@@ -439,89 +739,165 @@ function FilaDeEntrada({
   ]
     .filter(Boolean)
     .join(' · ')
-
-  const contenido = (
-    <>
-      <Icono
-        className={cn('size-4 shrink-0', esArchivo ? 'text-term-dim' : 'text-term-arg')}
-        aria-hidden
-      />
-      <span className="min-w-0 flex-1">
-        <span className="font-machine block truncate text-sm">{entrada.nombre}</span>
-        <span className="text-term-dim block truncate text-xs">
-          {detalle}
-          {entrada.permisos && (
-            <span className="font-machine hidden sm:inline">
-              {detalle ? ' · ' : ''}
-              {entrada.permisos}
-            </span>
-          )}
-        </span>
-      </span>
-    </>
-  )
+  const pista = esArchivo
+    ? 'Abrir para ver o editar'
+    : entrada.tipo === 'enlace'
+      ? 'Abrir a donde apunta'
+      : undefined
 
   return (
-    <div className="flex items-center gap-0.5 pr-1.5 hover:bg-white/5">
-      {esArchivo ? (
-        // Un archivo no se abre. Su botón a la vista es descargarlo
-        <div className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-3">{contenido}</div>
-      ) : (
-        <button
-          type="button"
-          onClick={onAbrir}
-          title={entrada.tipo === 'enlace' ? 'Abrir a donde apunta' : undefined}
-          className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-3 text-left"
-        >
-          {contenido}
-        </button>
+    <div
+      className={cn('flex items-center gap-0.5 pr-1.5 hover:bg-white/5', elegida && 'bg-white/5')}
+    >
+      {eligiendo && (
+        <Checkbox
+          aria-label={`Elegir ${entrada.nombre}`}
+          checked={elegida}
+          onCheckedChange={onElegir}
+          className="border-term-dim ml-3"
+        />
       )}
+      <button
+        type="button"
+        onClick={eligiendo ? onElegir : onAbrir}
+        title={eligiendo ? undefined : pista}
+        className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-3 text-left"
+      >
+        <Icono
+          className={cn('size-4 shrink-0', esArchivo ? 'text-term-dim' : 'text-term-arg')}
+          aria-hidden
+        />
+        <span className="min-w-0 flex-1">
+          <span className="font-machine block truncate text-sm">{entrada.nombre}</span>
+          <span className="text-term-dim block truncate text-xs">
+            {detalle}
+            {entrada.permisos && (
+              <span className="font-machine hidden sm:inline">
+                {detalle ? ' · ' : ''}
+                {entrada.permisos}
+              </span>
+            )}
+          </span>
+        </span>
+      </button>
 
-      {esArchivo && (
+      {esArchivo && !eligiendo && (
         <BotonDelPanel etiqueta={`Descargar ${entrada.nombre}`} onClick={onDescargar}>
           <DownloadIcon className="size-4" />
         </BotonDelPanel>
       )}
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`Más acciones de ${entrada.nombre}`}
-            className="text-term-dim hover:text-term-text size-8 shrink-0 hover:bg-white/10"
-          >
-            <EllipsisVerticalIcon className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {esArchivo ? (
-            <DropdownMenuItem onSelect={onDescargar}>
-              <DownloadIcon />
-              Descargar
+      {!eligiendo && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Más acciones de ${entrada.nombre}`}
+              className="text-term-dim hover:text-term-text size-8 shrink-0 hover:bg-white/10"
+            >
+              <EllipsisVerticalIcon className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {esArchivo ? (
+              <>
+                <DropdownMenuItem onSelect={onAbrir}>
+                  <FilePenLineIcon />
+                  Ver o editar
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={onDescargar}>
+                  <DownloadIcon />
+                  Descargar
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuItem onSelect={onAbrirEnTerminal}>
+                  <SquareTerminalIcon />
+                  Abrir en la terminal
+                </DropdownMenuItem>
+                {entrada.tipo === 'carpeta' && (
+                  <DropdownMenuItem onSelect={onComprimir}>
+                    <FileArchiveIcon />
+                    Descargar comprimida
+                  </DropdownMenuItem>
+                )}
+              </>
+            )}
+            <DropdownMenuItem onSelect={onCopiarRuta}>
+              <CopyIcon />
+              Copiar ruta
             </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem onSelect={onAbrirEnTerminal}>
-              <SquareTerminalIcon />
-              Abrir en la terminal
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onRenombrar}>
+              <PencilIcon />
+              Renombrar
             </DropdownMenuItem>
-          )}
-          <DropdownMenuItem onSelect={onCopiarRuta}>
-            <CopyIcon />
-            Copiar ruta
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={onRenombrar}>
-            <PencilIcon />
-            Renombrar
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onSelect={onBorrar}>
-            <Trash2Icon />
-            Borrar…
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+            {entrada.tipo !== 'enlace' && (
+              <DropdownMenuItem onSelect={onPermisos}>
+                <KeyRoundIcon />
+                Permisos…
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem variant="destructive" onSelect={onBorrar}>
+              <Trash2Icon />
+              Borrar…
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
+  )
+}
+
+/** Teclear la ruta de una vez, como en la barra de un explorador. */
+function CampoDeRuta({
+  actual,
+  onIr,
+  onCancelar,
+}: {
+  actual: string
+  onIr: (ruta: string) => void
+  onCancelar: () => void
+}) {
+  const [ruta, setRuta] = useState(actual)
+  return (
+    <form
+      className="border-term-border flex items-center gap-1.5 border-b px-2 py-1.5"
+      onSubmit={(evento) => {
+        evento.preventDefault()
+        if (ruta.trim()) onIr(ruta.trim())
+      }}
+    >
+      <input
+        aria-label="Ruta a la que ir"
+        className="font-machine border-term-border min-w-0 flex-1 rounded-sm border bg-transparent px-2 py-1 text-sm outline-none focus-visible:border-white/40"
+        value={ruta}
+        autoFocus
+        onFocus={(evento) => evento.currentTarget.select()}
+        onChange={(evento) => setRuta(evento.target.value)}
+        onKeyDown={(evento) => {
+          if (evento.key === 'Escape') {
+            evento.stopPropagation()
+            onCancelar()
+          }
+        }}
+        placeholder="/var/www o ~/sitio"
+      />
+      <Button type="submit" size="sm" className="bg-term-ok text-term-bg hover:bg-term-ok/90 h-7">
+        Ir
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={onCancelar}
+        className="border-term-border h-7 bg-transparent hover:bg-white/5"
+      >
+        Cancelar
+      </Button>
+    </form>
   )
 }
 

@@ -296,3 +296,40 @@ describe('parseIncoming de carpetas nuevas', () => {
     ).toMatchObject({ type: 'archivo', accion: 'crear_carpeta', estado: 'hecho' })
   })
 })
+
+describe('parseIncoming del editor', () => {
+  it('lee el contenido de un archivo', () => {
+    expect(
+      parseIncoming(
+        JSON.stringify({
+          type: 'contenido',
+          estado: 'listo',
+          ruta: '/a.txt',
+          nombre: 'a.txt',
+          texto: 'hola',
+          tamano: 4,
+          version: '1-4',
+          recortado: false,
+          editable: true,
+        }),
+      ),
+    ).toEqual({
+      type: 'contenido',
+      estado: 'listo',
+      ruta: '/a.txt',
+      nombre: 'a.txt',
+      texto: 'hola',
+      tamano: 4,
+      version: '1-4',
+      recortado: false,
+      editable: true,
+      message: undefined,
+    })
+  })
+
+  it('lee el resultado de cambiar permisos', () => {
+    expect(
+      parseIncoming('{"type":"archivo","accion":"permisos","estado":"hecho","ruta":"/a"}'),
+    ).toMatchObject({ accion: 'permisos', estado: 'hecho' })
+  })
+})

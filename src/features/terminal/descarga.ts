@@ -6,7 +6,8 @@ export const VENTANA_DE_DESCARGA = 4
 export interface AvanceDeDescarga {
   nombre: string
   recibido: number
-  total: number
+  /** Null en una carpeta comprimida, que no sabe su tamaño hasta el final. */
+  total: number | null
 }
 
 export interface DescargaEnCurso {
@@ -19,7 +20,7 @@ export interface DescargaEnCurso {
 /** El archivo entero queda en memoria hasta guardarlo; por eso hay tope. */
 export function crearDescarga(detalle: {
   nombre: string
-  tamano: number
+  tamano: number | null
   ruta: string
 }): DescargaEnCurso {
   const partes: ArrayBuffer[] = []
@@ -36,7 +37,11 @@ export function crearDescarga(detalle: {
   }
 }
 
-export function fetchPorcentajeDeDescarga({ recibido, total }: AvanceDeDescarga): number {
+export function fetchPorcentajeDeDescarga({
+  recibido,
+  total,
+}: AvanceDeDescarga): number | null {
+  if (total === null) return null
   if (!total) return 100
   return Math.min(100, Math.round((recibido / total) * 100))
 }

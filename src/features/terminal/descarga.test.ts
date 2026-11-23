@@ -34,3 +34,14 @@ describe('fetchPorcentajeDeDescarga', () => {
     expect(fetchPorcentajeDeDescarga({ nombre: 'a', recibido: 0, total: 0 })).toBe(100)
   })
 })
+
+describe('una carpeta comprimida', () => {
+  it('no sabe su tamaño: avanza sin porcentaje', () => {
+    const descarga = crearDescarga({ nombre: 'web.tar.gz', tamano: null, ruta: '/web' })
+    descarga.sumar(tramo('abc'))
+
+    const avance = descarga.avance()
+    expect(avance.total).toBeNull()
+    expect(fetchPorcentajeDeDescarga(avance)).toBeNull()
+  })
+})
