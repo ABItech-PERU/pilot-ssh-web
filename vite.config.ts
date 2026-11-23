@@ -62,7 +62,8 @@ export default defineConfig(({ isSsrBuild }) => {
       proxy: {
         '/api': { target: 'http://host.docker.internal:8000' },
         '/media': { target: 'http://host.docker.internal:8000' },
-        '/ws': { target: 'ws://host.docker.internal:8000', ws: true },
+        // http y no ws: bajo /ws/ van el WebSocket y también las descargas
+        '/ws': { target: 'http://host.docker.internal:8000', ws: true },
       },
     },
     test: {

@@ -1,47 +1,33 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { crearDescarga, fetchPorcentajeDeDescarga } from '@/features/terminal/descarga'
+import { abrirDescarga, fetchUrlDeDescarga } from '@/features/terminal/descarga'
 
-const tramo = (texto: string) => new TextEncoder().encode(texto).buffer
-
-describe('crearDescarga', () => {
-  it('junta los tramos en el orden en que llegan', async () => {
-    const descarga = crearDescarga({ nombre: 'notas.txt', tamano: 10, ruta: '/x/notas.txt' })
-
-    descarga.sumar(tramo('hola '))
-    descarga.sumar(tramo('mundo'))
-
-    const archivo = descarga.armar()
-    expect(await archivo.text()).toBe('hola mundo')
+describe('fetchUrlDeDescarga', () => {
+  it('apunta a la API, que es otro dominio', () => {
+    expect(fetchUrlDeDescarga('/ws/descargas/vale', 'https://api.pilotssh.pe')).toBe(
+      'https://api.pilotssh.pe/ws/descargas/vale',
+    )
   })
 
-  it('cuenta lo recibido para la barra de avance', () => {
-    const descarga = crearDescarga({ nombre: 'a.bin', tamano: 8, ruta: '/a.bin' })
-
-    descarga.sumar(tramo('abcd'))
-
-    expect(descarga.avance()).toEqual({ nombre: 'a.bin', recibido: 4, total: 8 })
+  it('sin API configurada usa el dominio de la página', () => {
+    expect(fetchUrlDeDescarga('/ws/descargas/vale', '')).toBe(
+      `${window.location.origin}/ws/descargas/vale`,
+    )
   })
 })
 
-describe('fetchPorcentajeDeDescarga', () => {
-  it('redondea y no pasa de 100', () => {
-    expect(fetchPorcentajeDeDescarga({ nombre: 'a', recibido: 1, total: 3 })).toBe(33)
-    expect(fetchPorcentajeDeDescarga({ nombre: 'a', recibido: 9, total: 8 })).toBe(100)
-  })
+describe('abrirDescarga', () => {
+  afterEach(() => vi.restoreAllMocks())
 
-  it('un archivo vacío no divide por cero', () => {
-    expect(fetchPorcentajeDeDescarga({ nombre: 'a', recibido: 0, total: 0 })).toBe(100)
-  })
-})
+  it('entrega el enlace al gestor de descargas del navegador sin dejar rastro', () => {
+    const pulsar = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {})
 
-describe('una carpeta comprimida', () => {
-  it('no sabe su tamaño: avanza sin porcentaje', () => {
-    const descarga = crearDescarga({ nombre: 'web.tar.gz', tamano: null, ruta: '/web' })
-    descarga.sumar(tramo('abc'))
+    abrirDescarga('/ws/descargas/vale', 'https://api.pilotssh.pe')
 
-    const avance = descarga.avance()
-    expect(avance.total).toBeNull()
-    expect(fetchPorcentajeDeDescarga(avance)).toBeNull()
+    const enlace = pulsar.mock.contexts[0] as HTMLAnchorElement
+    expect(enlace.href).toBe('https://api.pilotssh.pe/ws/descargas/vale')
+    expect(enlace.isConnected).toBe(false)
   })
 })

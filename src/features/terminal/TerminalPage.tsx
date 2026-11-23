@@ -9,6 +9,7 @@ import '@/features/terminal/terminal.css'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { useUbicacionDeAvisos } from '@/components/ui/sonner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import * as serversApi from '@/features/servers/api'
 import { FORMAS_DE_ENTRAR } from '@/features/servers/auth-type'
@@ -107,6 +108,14 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
 
   const anotarLatencia = useCallback((id: string, medidas: Latencias) => {
     setLatencias((actuales) => ({ ...actuales, [id]: medidas }))
+  }, [])
+
+  // Arriba a la izquierda, bajo las pestañas, los avisos no tapan el panel
+  // de archivos de la derecha ni el prompt de abajo
+  const [bordeDeAvisos, setBordeDeAvisos] = useState<number | null>(null)
+  useUbicacionDeAvisos('top-left', bordeDeAvisos)
+  const medirPestanas = useCallback((barra: HTMLDivElement | null) => {
+    if (barra) setBordeDeAvisos(Math.round(barra.getBoundingClientRect().bottom) + 8)
   }, [])
 
   // Lo que pide la barra va a la shell que se ve, no a las de atrás
@@ -247,19 +256,19 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
         </div>
       </header>
 
-      <BarraDePestanas
-        pestanas={pestanas}
-        activa={activa.id}
-        estados={estados}
-        credenciales={server.users}
-        onActivar={setActiva}
-        onCerrar={cerrar}
-        onAbrir={abrir}
-        onSubir={(archivos) => mandos.current[activa.id]?.subir(archivos)}
-        onElegirCarpeta={() => mandos.current[activa.id]?.elegirCarpeta()}
-        onVerArchivos={() => mandos.current[activa.id]?.verArchivos()}
-        archivosAbiertos={Boolean(archivosAbiertos[activa.id])}
-      />
+      <div ref={medirPestanas} className="shrink-0">
+        <BarraDePestanas
+          pestanas={pestanas}
+          activa={activa.id}
+          estados={estados}
+          credenciales={server.users}
+          onActivar={setActiva}
+          onCerrar={cerrar}
+          onAbrir={abrir}
+          onVerArchivos={() => mandos.current[activa.id]?.verArchivos()}
+          archivosAbiertos={Boolean(archivosAbiertos[activa.id])}
+        />
+      </div>
 
       {pestanas.map((pestana) => {
         const suya = server.users.find((una) => una.id === pestana.credentialId)

@@ -27,17 +27,6 @@ export type MensajeDeSubida = {
   message?: string
 }
 
-/** Carpetas de un nivel del servidor, para elegir destino sin teclear. */
-export type MensajeDeCarpetas = {
-  type: 'carpetas'
-  ruta: string
-  inicio: string
-  padre: string
-  carpetas: string[]
-  recortada: boolean
-  error?: string
-}
-
 export type TipoDeEntrada = 'carpeta' | 'archivo' | 'enlace'
 
 export interface EntradaDeArchivo {
@@ -75,14 +64,16 @@ export type MensajeDeContenido = {
   message?: string
 }
 
-/** Cómo va el archivo que se baja; los datos llegan en marcos binarios. */
+/** El enlace que baja el navegador, o por qué no se pudo. `cortada` llega
+ *  si la descarga falla a medias, sin que nadie la haya pedido en ese momento. */
 export type MensajeDeDescarga = {
   type: 'descarga'
-  estado: 'preparada' | 'lista' | 'error'
+  estado: 'preparada' | 'cortada' | 'error'
   nombre?: string
   /** Null en una carpeta comprimida. */
   tamano?: number | null
   ruta?: string
+  url?: string
   message?: string
 }
 
@@ -103,7 +94,6 @@ export type MensajeEntrante =
   | { type: 'output' | 'error'; message: string }
   | { type: 'sesion'; id: string; saltoMs?: number }
   | MensajeDeSubida
-  | MensajeDeCarpetas
   | MensajeDeArchivos
   | MensajeDeDescarga
   | MensajeDeArchivo
@@ -225,7 +215,7 @@ export function buildInitialCommand(path: string): string | null {
 }
 
 const ESTADOS_DE_SUBIDA = ['preparada', 'sigue', 'guardada', 'error']
-const ESTADOS_DE_DESCARGA = ['preparada', 'lista', 'error']
+const ESTADOS_DE_DESCARGA = ['preparada', 'cortada', 'error']
 const ACCIONES_DE_ARCHIVO: MensajeDeArchivo['accion'][] = [
   'renombrar',
   'borrar',
@@ -260,11 +250,11 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
       ruta?: string
       inicio?: string
       padre?: string
-      carpetas?: unknown
       entradas?: unknown
       recortada?: boolean
       nombre?: string
       tamano?: number | null
+      url?: string
       accion?: string
       texto?: string
       version?: string
@@ -277,17 +267,6 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
     }
     if (dato.type === 'pong') {
       return typeof dato.ping === 'number' ? { type: 'pong', ping: dato.ping } : null
-    }
-    if (dato.type === 'carpetas') {
-      return {
-        type: 'carpetas',
-        ruta: String(dato.ruta ?? ''),
-        inicio: String(dato.inicio ?? ''),
-        padre: String(dato.padre ?? ''),
-        carpetas: Array.isArray(dato.carpetas) ? dato.carpetas.map(String) : [],
-        recortada: Boolean(dato.recortada),
-        error: dato.error,
-      }
     }
     if (dato.type === 'archivos') {
       return {
@@ -323,6 +302,7 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
         nombre: dato.nombre,
         tamano: dato.tamano,
         ruta: dato.ruta,
+        url: dato.url,
         message: dato.message,
       }
     }

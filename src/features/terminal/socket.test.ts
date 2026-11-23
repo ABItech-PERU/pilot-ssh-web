@@ -257,23 +257,27 @@ describe('parseIncoming de archivos', () => {
     expect(listado?.type === 'archivos' && listado.entradas[0]?.tipo).toBe('archivo')
   })
 
-  it('lee cómo va la descarga', () => {
-    expect(
-      parseIncoming(
-        '{"type":"descarga","estado":"preparada","nombre":"a.txt","tamano":3,"ruta":"/a.txt"}',
-      ),
-    ).toEqual({
+  it('lee el enlace de una descarga preparada', () => {
+    const mensaje = {
       type: 'descarga',
       estado: 'preparada',
       nombre: 'a.txt',
       tamano: 3,
       ruta: '/a.txt',
-      message: undefined,
-    })
+      url: '/ws/descargas/vale',
+    }
+
+    expect(parseIncoming(JSON.stringify(mensaje))).toEqual({ ...mensaje, message: undefined })
+  })
+
+  it('lee el aviso de una descarga cortada a medias', () => {
+    expect(
+      parseIncoming('{"type":"descarga","estado":"cortada","message":"No se pudo."}'),
+    ).toMatchObject({ type: 'descarga', estado: 'cortada', message: 'No se pudo.' })
   })
 
   it('un estado de descarga desconocido se ignora', () => {
-    expect(parseIncoming('{"type":"descarga","estado":"rara"}')).toBeNull()
+    expect(parseIncoming('{"type":"descarga","estado":"lista"}')).toBeNull()
   })
 
   it('lee la respuesta de renombrar y borrar', () => {
