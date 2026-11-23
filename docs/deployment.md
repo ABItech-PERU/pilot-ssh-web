@@ -12,6 +12,7 @@ GitHub despliega solo: vea [GitHub Actions](github-actions.md).
 | **La API del mismo ambiente ya instalada** ([su guía](../../pilot-ssh-api/docs/deployment.md)) | La web lee de ella el contacto y los precios al arrancar               |
 | En el `.env` de esa API, `SECURITY_CORS_ORIGINS` y `APP_WEB_URL` con la dirección de la web    | Sin ellos, el navegador bloquea las llamadas y los correos enlazan mal |
 | El dominio de la web apuntando al servidor (registro `A`)                                      | Por ejemplo `uat-pilotssh.abitech.com.pe`                              |
+| La web y la API en el mismo dominio registrable                                                | Como `uat-pilotssh.abitech.com.pe` y `uat-api-pilotssh.abitech.com.pe`. Si no, el navegador no manda la cookie de la sesión |
 
 > **Dónde:** todos los comandos de esta guía se escriben **en el servidor**. Desde
 > su PC, conéctese así:

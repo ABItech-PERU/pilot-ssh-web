@@ -12,3 +12,8 @@ Cambios notables de Pilot SSH Web, según Keep a Changelog 1.1 y SemVer 2.0.
 - Recargas de créditos con Mercado Pago.
 - Panel de plataforma para soporte, finanzas y operaciones.
 - Despliegue continuo a `uat` y publicación en `prod` con etiqueta `vX.Y.Z`.
+
+### Seguridad
+
+- La sesión ya no se guarda en `localStorage`: el `access` vive en memoria y el `refresh` en una cookie `httpOnly`.
+- La terminal se abre con un vale de un solo uso en lugar del `access` en la URL.

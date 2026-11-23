@@ -64,7 +64,7 @@ export function OpenSessions() {
   })
 
   const cerrarOtras = useMutation({
-    mutationFn: () => authApi.closeOtherSessions(actual),
+    mutationFn: () => authApi.closeOtherSessions(),
     onSuccess: async (datos) => {
       setCerrandoOtras(false)
       await cliente.invalidateQueries({ queryKey: authApi.clavesSesion.todas })

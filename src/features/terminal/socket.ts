@@ -49,17 +49,22 @@ export type MensajeEntrante =
   | MensajeDeCarpetas
   | MensajeDePong
 
-/** Token en la query: el handshake del navegador no admite cabeceras.
- *  Dura 30 minutos y produccion exige wss. Con `sesion`, retoma la shell
- *  que quedó abierta en el servidor. */
+/** La ruta del WebSocket. El vale se pide para esta misma ruta. */
+export function buildTerminalSocketPath(serverId: string, credentialId: string): string {
+  return `/ws/terminal/${serverId}/${credentialId}`
+}
+
+/** Vale de un uso en la query, porque el handshake del navegador no admite
+ *  cabeceras. Con `sesion`, retoma la shell que quedó abierta. */
 export function buildTerminalUrl(
   base: string,
   serverId: string,
   credentialId: string,
-  token: string,
+  vale: string,
   sesion?: string | null,
 ): string {
-  const url = `${base}/ws/terminal/${serverId}/${credentialId}?token=${encodeURIComponent(token)}`
+  const ruta = buildTerminalSocketPath(serverId, credentialId)
+  const url = `${base}${ruta}?ticket=${encodeURIComponent(vale)}`
   return sesion ? `${url}&sesion=${encodeURIComponent(sesion)}` : url
 }
 

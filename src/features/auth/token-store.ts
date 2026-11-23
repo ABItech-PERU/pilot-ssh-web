@@ -1,14 +1,15 @@
 /** Sesión fuera de React: el cliente HTTP la necesita sin hooks.
  *
- *  En localStorage: el WebSocket exige el access en la query, legible por
- *  JavaScript. Pendiente: cookie httpOnly más ticket para el socket.
+ *  Solo en memoria. El refresh vive en una cookie httpOnly de la API, así
+ *  que un XSS no se lleva más que el access de esta pestaña.
  */
 
-const CLAVE = 'pilotssh.session'
+/** Solo dice si hay sesión, sin credencial. Evita un refresco en cada visita. */
+const MARCA = 'pilotssh.hay-sesion'
+const SESION_VIEJA = 'pilotssh.session'
 
 export interface StoredSession {
   access: string
-  refresh: string
   expiresAt: string
   /** Identifica este dispositivo en la lista de sesiones abiertas. */
   sessionId?: string
@@ -16,59 +17,45 @@ export interface StoredSession {
 
 type Listener = (session: StoredSession | null) => void
 
-let cached: StoredSession | null | undefined
+let actual: StoredSession | null = null
 const listeners = new Set<Listener>()
+const alEntrarFuera = new Set<() => void>()
 
-function parse(raw: string | null): StoredSession | null {
-  if (!raw) return null
+function escribirMarca(hay: boolean) {
   try {
-    const dato = JSON.parse(raw) as Partial<StoredSession>
-    if (!dato.access || !dato.refresh) return null
-    return {
-      access: dato.access,
-      refresh: dato.refresh,
-      expiresAt: dato.expiresAt ?? '',
-      sessionId: dato.sessionId,
-    }
+    if (hay) window.localStorage.setItem(MARCA, '1')
+    else window.localStorage.removeItem(MARCA)
   } catch {
-    // Entrada corrupta o de otra versión: se descarta y se pide login
-    return null
+    // Sin almacenamiento, recargar pide iniciar sesión de nuevo
   }
 }
 
 export function getSession(): StoredSession | null {
-  if (cached === undefined) {
-    try {
-      cached = parse(window.localStorage.getItem(CLAVE))
-    } catch {
-      // Ventana privada o almacenamiento bloqueado: la sesión dura la pestaña
-      cached = null
-    }
-  }
-  return cached
+  return actual
 }
 
 export function getAccessToken(): string | null {
-  return getSession()?.access ?? null
+  return actual?.access ?? null
+}
+
+/** Si al recargar vale la pena pedir un access con la cookie. */
+export function mayHaveSession(): boolean {
+  try {
+    return window.localStorage.getItem(MARCA) === '1'
+  } catch {
+    return false
+  }
 }
 
 export function saveSession(session: StoredSession) {
-  cached = session
-  try {
-    window.localStorage.setItem(CLAVE, JSON.stringify(session))
-  } catch {
-    // Sin almacenamiento, la sesión vive en memoria hasta recargar
-  }
+  actual = session
+  escribirMarca(true)
   notify()
 }
 
 export function clearSession() {
-  cached = null
-  try {
-    window.localStorage.removeItem(CLAVE)
-  } catch {
-    // Nada que limpiar si nunca se pudo escribir
-  }
+  actual = null
+  escribirMarca(false)
   notify()
 }
 
@@ -77,14 +64,31 @@ export function subscribe(listener: Listener) {
   return () => listeners.delete(listener)
 }
 
+/** Avisa cuando otra pestaña inicia sesión, para pedir aquí un access. */
+export function onSignedInElsewhere(callback: () => void) {
+  alEntrarFuera.add(callback)
+  return () => {
+    alEntrarFuera.delete(callback)
+  }
+}
+
 function notify() {
-  const actual = getSession()
   for (const listener of listeners) listener(actual)
 }
 
-/** Sincroniza la sesión con los cambios de otras pestañas. */
+try {
+  window.localStorage.removeItem(SESION_VIEJA)
+} catch {
+  // Nada que limpiar si el almacenamiento está bloqueado
+}
+
+/** Las pestañas comparten la marca. Su cambio dice si se entró o se salió. */
 window.addEventListener('storage', (evento) => {
-  if (evento.key !== CLAVE) return
-  cached = parse(evento.newValue)
+  if (evento.key !== MARCA) return
+  if (evento.newValue === '1') {
+    for (const callback of alEntrarFuera) callback()
+    return
+  }
+  actual = null
   notify()
 })
