@@ -24,7 +24,7 @@ import {
   UploadIcon,
   XIcon,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -744,6 +744,9 @@ function FilaDeEntrada({
     : entrada.tipo === 'enlace'
       ? 'Abrir a donde apunta'
       : undefined
+  // El nombre accesible es solo el del archivo; tamaño y fecha lo describen
+  const idDelDetalle = useId()
+  const descripcion = [detalle, entrada.permisos].filter(Boolean).join(' · ')
 
   return (
     <div
@@ -761,6 +764,8 @@ function FilaDeEntrada({
         type="button"
         onClick={eligiendo ? onElegir : onAbrir}
         title={eligiendo ? undefined : pista}
+        aria-label={entrada.nombre}
+        aria-describedby={idDelDetalle}
         className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-3 text-left"
       >
         <Icono
@@ -769,7 +774,10 @@ function FilaDeEntrada({
         />
         <span className="min-w-0 flex-1">
           <span className="font-machine block truncate text-sm">{entrada.nombre}</span>
-          <span className="text-term-dim block truncate text-xs">
+          <span id={idDelDetalle} className="sr-only">
+            {descripcion}
+          </span>
+          <span aria-hidden className="text-term-dim block truncate text-xs">
             {detalle}
             {entrada.permisos && (
               <span className="font-machine hidden sm:inline">
