@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  aplicarFinDeLinea,
   describeBorrado,
+  describePermisos,
+  esModoValido,
+  fetchCuadricula,
+  fetchFinDeLinea,
   fetchMigas,
+  fetchOctal,
+  fetchOctalDeCuadricula,
   filtrarEntradas,
   joinRuta,
+  ordenarEntradas,
+  quitarOcultos,
 } from '@/features/terminal/archivos'
 import type { EntradaDeArchivo } from '@/features/terminal/socket'
 
@@ -69,5 +78,96 @@ describe('describeBorrado', () => {
 
   it('un enlace deja su destino como estaba', () => {
     expect(describeBorrado('enlace').detalles.join(' ')).toContain('destino')
+  })
+})
+
+describe('ordenarEntradas', () => {
+  const lista = [
+    { ...entrada('b.txt'), tamano: 50, modificado: '2026-01-02T00:00:00Z' },
+    { ...entrada('zeta', 'carpeta'), tamano: 4096, modificado: '2026-01-01T00:00:00Z' },
+    { ...entrada('A.log'), tamano: 900, modificado: '2026-01-03T00:00:00Z' },
+    { ...entrada('alfa', 'carpeta'), tamano: 4096, modificado: '2026-01-04T00:00:00Z' },
+  ]
+
+  it('por nombre, carpetas primero y sin mirar mayúsculas', () => {
+    expect(ordenarEntradas(lista, 'nombre', 'asc').map((e) => e.nombre)).toEqual([
+      'alfa',
+      'zeta',
+      'A.log',
+      'b.txt',
+    ])
+  })
+
+  it('por tamaño, de mayor a menor, sin sacar las carpetas de arriba', () => {
+    expect(ordenarEntradas(lista, 'tamano', 'desc').map((e) => e.nombre)).toEqual([
+      'alfa',
+      'zeta',
+      'A.log',
+      'b.txt',
+    ])
+  })
+
+  it('por fecha, lo más reciente primero', () => {
+    expect(ordenarEntradas(lista, 'fecha', 'desc').map((e) => e.nombre)).toEqual([
+      'alfa',
+      'zeta',
+      'A.log',
+      'b.txt',
+    ])
+  })
+
+  it('no cambia la lista que recibe', () => {
+    const copia = [...lista]
+    ordenarEntradas(lista, 'tamano', 'asc')
+    expect(lista).toEqual(copia)
+  })
+})
+
+describe('quitarOcultos', () => {
+  it('quita lo que empieza con punto', () => {
+    const lista = [entrada('.env'), entrada('index.php'), entrada('.git', 'carpeta')]
+    expect(quitarOcultos(lista).map((e) => e.nombre)).toEqual(['index.php'])
+  })
+})
+
+describe('permisos', () => {
+  it('lee el número de una cadena de permisos', () => {
+    expect(fetchOctal('rw-r--r--')).toBe('644')
+    expect(fetchOctal('rwxr-x---')).toBe('750')
+  })
+
+  it('los bits especiales cuentan su ejecutar y nada más', () => {
+    expect(fetchOctal('rwxr-sr-x')).toBe('755')
+    expect(fetchOctal('rwxr-xr-T')).toBe('754')
+  })
+
+  it('pasa del número a la cuadrícula y vuelve', () => {
+    const cuadricula = fetchCuadricula('640')
+    expect(cuadricula.propietario).toEqual({ leer: true, escribir: true, ejecutar: false })
+    expect(cuadricula.grupo).toEqual({ leer: true, escribir: false, ejecutar: false })
+    expect(cuadricula.otros).toEqual({ leer: false, escribir: false, ejecutar: false })
+    expect(fetchOctalDeCuadricula(cuadricula)).toBe('640')
+  })
+
+  it('reconoce un número válido', () => {
+    expect(esModoValido('755')).toBe(true)
+    expect(esModoValido('7777')).toBe(false)
+    expect(esModoValido('89a')).toBe(false)
+  })
+
+  it('escribe el número como se lee en ls', () => {
+    expect(describePermisos('755')).toBe('rwxr-xr-x')
+  })
+})
+
+describe('fin de línea', () => {
+  it('reconoce un archivo de Windows', () => {
+    expect(fetchFinDeLinea('a\r\nb\r\n')).toBe('\r\n')
+    expect(fetchFinDeLinea('a\nb\n')).toBe('\n')
+  })
+
+  it('devuelve los finales de Windows que el editor del navegador quita', () => {
+    expect(aplicarFinDeLinea('a\nb\n', '\r\n')).toBe('a\r\nb\r\n')
+    expect(aplicarFinDeLinea('a\nb\n', '\n')).toBe('a\nb\n')
   })
 })

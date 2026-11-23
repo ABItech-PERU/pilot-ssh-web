@@ -60,12 +60,28 @@ export type MensajeDeArchivos = {
   error?: string
 }
 
+/** El texto de un archivo para el editor, o cómo quedó al guardarlo. */
+export type MensajeDeContenido = {
+  type: 'contenido'
+  estado: 'listo' | 'guardado' | 'error'
+  ruta?: string
+  nombre?: string
+  texto?: string
+  tamano?: number
+  version?: string
+  /** Pasaba del tope: se ve el final y no se edita. */
+  recortado?: boolean
+  editable?: boolean
+  message?: string
+}
+
 /** Cómo va el archivo que se baja; los datos llegan en marcos binarios. */
 export type MensajeDeDescarga = {
   type: 'descarga'
   estado: 'preparada' | 'lista' | 'error'
   nombre?: string
-  tamano?: number
+  /** Null en una carpeta comprimida. */
+  tamano?: number | null
   ruta?: string
   message?: string
 }
@@ -73,7 +89,7 @@ export type MensajeDeDescarga = {
 /** Resultado de renombrar, borrar o crear una carpeta. */
 export type MensajeDeArchivo = {
   type: 'archivo'
-  accion: 'renombrar' | 'borrar' | 'crear_carpeta'
+  accion: 'renombrar' | 'borrar' | 'crear_carpeta' | 'permisos'
   estado: 'hecho' | 'error'
   ruta?: string
   message?: string
@@ -91,6 +107,7 @@ export type MensajeEntrante =
   | MensajeDeArchivos
   | MensajeDeDescarga
   | MensajeDeArchivo
+  | MensajeDeContenido
   | MensajeDePong
 
 /** La ruta del WebSocket. El vale se pide para esta misma ruta. */
@@ -209,7 +226,13 @@ export function buildInitialCommand(path: string): string | null {
 
 const ESTADOS_DE_SUBIDA = ['preparada', 'sigue', 'guardada', 'error']
 const ESTADOS_DE_DESCARGA = ['preparada', 'lista', 'error']
-const ACCIONES_DE_ARCHIVO: MensajeDeArchivo['accion'][] = ['renombrar', 'borrar', 'crear_carpeta']
+const ACCIONES_DE_ARCHIVO: MensajeDeArchivo['accion'][] = [
+  'renombrar',
+  'borrar',
+  'crear_carpeta',
+  'permisos',
+]
+const ESTADOS_DE_CONTENIDO = ['listo', 'guardado', 'error']
 const TIPOS_DE_ENTRADA: TipoDeEntrada[] = ['carpeta', 'archivo', 'enlace']
 
 function parseEntrada(cruda: unknown): EntradaDeArchivo {
@@ -241,8 +264,12 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
       entradas?: unknown
       recortada?: boolean
       nombre?: string
-      tamano?: number
+      tamano?: number | null
       accion?: string
+      texto?: string
+      version?: string
+      editable?: boolean
+      recortado?: boolean
     }
     if (dato.type === 'sesion') {
       if (typeof dato.id !== 'string') return null
@@ -271,6 +298,21 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
         entradas: Array.isArray(dato.entradas) ? dato.entradas.map(parseEntrada) : [],
         recortada: Boolean(dato.recortada),
         error: dato.error,
+      }
+    }
+    if (dato.type === 'contenido') {
+      if (!ESTADOS_DE_CONTENIDO.includes(dato.estado ?? '')) return null
+      return {
+        type: 'contenido',
+        estado: dato.estado as MensajeDeContenido['estado'],
+        ruta: dato.ruta,
+        nombre: dato.nombre,
+        texto: dato.texto,
+        tamano: dato.tamano ?? undefined,
+        version: dato.version,
+        recortado: dato.recortado,
+        editable: dato.editable,
+        message: dato.message,
       }
     }
     if (dato.type === 'descarga') {

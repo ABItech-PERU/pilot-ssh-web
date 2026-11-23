@@ -22,6 +22,7 @@ import {
   type Latencias,
   useTerminalSocket,
 } from '@/features/terminal/use-terminal-socket'
+import { formatFileSize } from '@/lib/format'
 import type { Server, ServerUser } from '@/types/api'
 
 /** Hex: xterm no entiende oklch(). Copia de los tokens `--term-*` de
@@ -132,6 +133,9 @@ export function PanelDeTerminal({
     cancelarSubida,
     descarga,
     descargar,
+    enCola,
+    guardarContenido,
+    pedirContenido,
     enviarTamano,
     pedirArchivos,
     pedirCarpetas,
@@ -355,6 +359,8 @@ export function PanelDeTerminal({
           carpetaInicial={explorando}
           pedirArchivos={pedirArchivos}
           cambiarArchivo={cambiarArchivo}
+          pedirContenido={pedirContenido}
+          guardarContenido={guardarContenido}
           descargar={descargar}
           subir={subirVarios}
           abrirEnTerminal={abrirEnTerminal}
@@ -376,10 +382,15 @@ export function PanelDeTerminal({
           {descarga && (
             <BarraDeAvance
               porcentaje={fetchPorcentajeDeDescarga(descarga)}
+              recibido={descarga.recibido}
               cancelar="Cancelar la descarga"
               onCancelar={cancelarDescarga}
             >
-              <span className="text-term-dim">Descargando</span> {descarga.nombre}
+              <span className="text-term-dim">
+                {descarga.total === null ? 'Comprimiendo y descargando' : 'Descargando'}
+              </span>{' '}
+              {descarga.nombre}
+              {enCola > 0 && <span className="text-term-dim"> · {enCola} en cola</span>}
             </BarraDeAvance>
           )}
         </div>
@@ -432,14 +443,16 @@ async function pegarDelPortapapeles(teclear: (datos: string) => void) {
   }
 }
 
-/** Cómo va una copia, con su cancelar a mano. */
+/** Cómo va una copia, con su cancelar a mano. Sin porcentaje, cuenta lo recibido. */
 function BarraDeAvance({
   porcentaje,
+  recibido = 0,
   cancelar,
   onCancelar,
   children,
 }: {
-  porcentaje: number
+  porcentaje: number | null
+  recibido?: number
   cancelar: string
   onCancelar: () => void
   children: React.ReactNode
@@ -448,7 +461,9 @@ function BarraDeAvance({
     <div className="border-term-border bg-term-bg rounded-md border px-3 py-2">
       <div className="flex items-center justify-between gap-3 text-xs">
         <span className="font-machine truncate">{children}</span>
-        <span className="text-term-dim ml-auto tabular-nums">{porcentaje} %</span>
+        <span className="text-term-dim ml-auto shrink-0 tabular-nums">
+          {porcentaje === null ? formatFileSize(recibido) : `${porcentaje} %`}
+        </span>
         <Button
           variant="ghost"
           size="icon-sm"
@@ -459,10 +474,13 @@ function BarraDeAvance({
           <XIcon className="size-3.5" />
         </Button>
       </div>
-      <div className="mt-1.5 h-1 rounded-full bg-white/10">
+      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
         <div
-          className="bg-term-ok h-1 rounded-full transition-[width]"
-          style={{ width: `${porcentaje}%` }}
+          className={cn(
+            'bg-term-ok h-1 rounded-full transition-[width]',
+            porcentaje === null && 'w-1/3 animate-pulse',
+          )}
+          style={porcentaje === null ? undefined : { width: `${porcentaje}%` }}
         />
       </div>
     </div>
