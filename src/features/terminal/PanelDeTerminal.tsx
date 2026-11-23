@@ -13,8 +13,10 @@ import {
   type Coincidencias,
 } from '@/features/terminal/BuscadorEnTerminal'
 import { leerDelPrompt, leerOsc7 } from '@/features/terminal/carpeta-actual'
+import { fetchPorcentajeDeDescarga } from '@/features/terminal/descarga'
+import { PanelDeArchivos } from '@/features/terminal/PanelDeArchivos'
 import { SelectorDeCarpeta } from '@/features/terminal/SelectorDeCarpeta'
-import { CIERRE, type EstadoTerminal } from '@/features/terminal/socket'
+import { CIERRE, type EstadoTerminal, quotePath } from '@/features/terminal/socket'
 import { fetchPorcentaje } from '@/features/terminal/subida'
 import {
   type Latencias,
@@ -78,13 +80,16 @@ interface PanelProps {
   /** Cerrar la que acabó: si es la única, se sale de la terminal. */
   onCerrar: () => void
   esLaUnica: boolean
-  /** Sus subidas, a mano de la barra: manda a la terminal que se ve. */
-  onSubidor: (id: string, mando: MandoDeSubida) => void
+  /** Sus archivos, a mano de la barra: manda a la terminal que se ve. */
+  onMando: (id: string, mando: MandoDeArchivos) => void
+  /** Para que la barra diga si el panel de archivos está abierto. */
+  onArchivosAbiertos: (id: string, abiertos: boolean) => void
 }
 
-export interface MandoDeSubida {
+export interface MandoDeArchivos {
   subir: (archivos: File[]) => void
   elegirCarpeta: () => void
+  verArchivos: () => void
 }
 
 /** Monta xterm una vez y le ata la shell; al reconectar, lo escrito sigue
@@ -98,7 +103,8 @@ export function PanelDeTerminal({
   onLatencia,
   onCerrar,
   esLaUnica,
-  onSubidor,
+  onMando,
+  onArchivosAbiertos,
 }: PanelProps) {
   const contenedor = useRef<HTMLDivElement | null>(null)
   const terminal = useRef<Terminal | null>(null)
@@ -107,6 +113,8 @@ export function PanelDeTerminal({
   const [buscando, setBuscando] = useState(false)
   const [arrastrando, setArrastrando] = useState(false)
   const [eligiendo, setEligiendo] = useState(false)
+  // La carpeta en la que se abrió; null con el panel cerrado
+  const [explorando, setExplorando] = useState<string | null>(null)
   const entrada = useRef<HTMLInputElement | null>(null)
   // La que anuncia el shell (OSC 7); el prompt es el plan B
   const anunciada = useRef('')
@@ -119,8 +127,13 @@ export function PanelDeTerminal({
   )
 
   const {
+    cambiarArchivo,
+    cancelarDescarga,
     cancelarSubida,
+    descarga,
+    descargar,
     enviarTamano,
+    pedirArchivos,
     pedirCarpetas,
     reconectar,
     subida,
@@ -157,8 +170,26 @@ export function PanelDeTerminal({
   )
 
   useEffect(() => {
-    onSubidor(id, { subir: subirAlDestino, elegirCarpeta: () => setEligiendo(true) })
-  }, [id, onSubidor, subirAlDestino])
+    onMando(id, {
+      subir: subirAlDestino,
+      elegirCarpeta: () => setEligiendo(true),
+      verArchivos: () => setExplorando((abierto) => (abierto ? null : fetchDestino())),
+    })
+  }, [id, onMando, subirAlDestino, fetchDestino])
+
+  useEffect(() => {
+    onArchivosAbiertos(id, explorando !== null)
+  }, [id, explorando, onArchivosAbiertos])
+
+  const cerrarArchivos = () => {
+    setExplorando(null)
+    terminal.current?.focus()
+  }
+
+  const abrirEnTerminal = (ruta: string) => {
+    teclear(`cd ${quotePath(ruta)}`)
+    terminal.current?.focus()
+  }
 
   useEffect(() => {
     const nodo = contenedor.current
@@ -231,8 +262,8 @@ export function PanelDeTerminal({
   }, [enviarTamano, teclear])
 
   useEffect(() => {
-    if (visible && !buscando) terminal.current?.focus()
-  }, [visible, buscando])
+    if (visible && !buscando && !explorando) terminal.current?.focus()
+  }, [visible, buscando, explorando])
 
   const buscar = (texto: string, haciaAtras: boolean) => {
     const opciones = { decorations: RESALTADO }
@@ -319,31 +350,38 @@ export function PanelDeTerminal({
         </div>
       )}
 
-      {subida && (
-        <div className="border-term-border bg-term-bg absolute inset-x-4 bottom-3 rounded-md border px-3 py-2">
-          <div className="flex items-center justify-between gap-3 text-xs">
-            <span className="font-machine truncate">
-              {subida.nombre} <span className="text-term-dim">→ {subida.carpeta}</span>
-            </span>
-            <span className="text-term-dim ml-auto tabular-nums">
-              {fetchPorcentaje(subida)} %
-            </span>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Cancelar la subida"
-              onClick={cancelarSubida}
-              className="text-term-dim hover:text-term-text size-5 hover:bg-white/5"
+      {explorando !== null && (
+        <PanelDeArchivos
+          carpetaInicial={explorando}
+          pedirArchivos={pedirArchivos}
+          cambiarArchivo={cambiarArchivo}
+          descargar={descargar}
+          subir={subirVarios}
+          abrirEnTerminal={abrirEnTerminal}
+          onCerrar={cerrarArchivos}
+        />
+      )}
+
+      {(subida || descarga) && (
+        <div className="absolute inset-x-4 bottom-3 z-30 flex flex-col gap-2">
+          {subida && (
+            <BarraDeAvance
+              porcentaje={fetchPorcentaje(subida)}
+              cancelar="Cancelar la subida"
+              onCancelar={cancelarSubida}
             >
-              <XIcon className="size-3.5" />
-            </Button>
-          </div>
-          <div className="mt-1.5 h-1 rounded-full bg-white/10">
-            <div
-              className="bg-term-ok h-1 rounded-full transition-[width]"
-              style={{ width: `${fetchPorcentaje(subida)}%` }}
-            />
-          </div>
+              {subida.nombre} <span className="text-term-dim">→ {subida.carpeta}</span>
+            </BarraDeAvance>
+          )}
+          {descarga && (
+            <BarraDeAvance
+              porcentaje={fetchPorcentajeDeDescarga(descarga)}
+              cancelar="Cancelar la descarga"
+              onCancelar={cancelarDescarga}
+            >
+              <span className="text-term-dim">Descargando</span> {descarga.nombre}
+            </BarraDeAvance>
+          )}
         </div>
       )}
 
@@ -392,6 +430,43 @@ async function pegarDelPortapapeles(teclear: (datos: string) => void) {
   } catch {
     // Sin permiso no se pega; Ctrl+V del navegador sigue funcionando
   }
+}
+
+/** Cómo va una copia, con su cancelar a mano. */
+function BarraDeAvance({
+  porcentaje,
+  cancelar,
+  onCancelar,
+  children,
+}: {
+  porcentaje: number
+  cancelar: string
+  onCancelar: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="border-term-border bg-term-bg rounded-md border px-3 py-2">
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <span className="font-machine truncate">{children}</span>
+        <span className="text-term-dim ml-auto tabular-nums">{porcentaje} %</span>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={cancelar}
+          onClick={onCancelar}
+          className="text-term-dim hover:text-term-text size-5 hover:bg-white/5"
+        >
+          <XIcon className="size-3.5" />
+        </Button>
+      </div>
+      <div className="mt-1.5 h-1 rounded-full bg-white/10">
+        <div
+          className="bg-term-ok h-1 rounded-full transition-[width]"
+          style={{ width: `${porcentaje}%` }}
+        />
+      </div>
+    </div>
+  )
 }
 
 function BotonDeCierre({ className, ...props }: React.ComponentProps<typeof Button>) {

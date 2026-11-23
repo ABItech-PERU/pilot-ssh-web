@@ -14,7 +14,7 @@ import * as serversApi from '@/features/servers/api'
 import { FORMAS_DE_ENTRAR } from '@/features/servers/auth-type'
 import { buildServerPath } from '@/features/servers/paths'
 import { BarraDePestanas } from '@/features/terminal/BarraDePestanas'
-import { type MandoDeSubida, PanelDeTerminal } from '@/features/terminal/PanelDeTerminal'
+import { type MandoDeArchivos, PanelDeTerminal } from '@/features/terminal/PanelDeTerminal'
 import {
   buildPestana,
   fetchActivaTrasCerrar,
@@ -27,8 +27,7 @@ import { isUuid } from '@/lib/ids'
 import { useVolver } from '@/lib/use-volver'
 import type { Server, ServerUser } from '@/types/api'
 
-/** No monta la sesion sin servidor y credencial: el socket nace con el
- *  token ya refrescado. */
+/** No monta la sesión sin servidor y credencial que existan. */
 export function TerminalPage() {
   const { serverId: serverParam } = useParams()
   const [parametros] = useSearchParams()
@@ -37,8 +36,7 @@ export function TerminalPage() {
   const credentialId = parametros.get('credential') ?? ''
   const direccionValida = isUuid(serverId) && isUuid(credentialId)
 
-  // Pasa por el interceptor: refresca el access caducado antes de que el
-  // WebSocket lo lleve en la query (un 4401 no tiene remedio)
+  // Pasa por el interceptor, que refresca el access antes de pedir el vale
   const servidor = useQuery({
     queryKey: serversApi.clavesServidor.detalle(serverId),
     queryFn: () => serversApi.fetchServer(serverId),
@@ -112,9 +110,13 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
   }, [])
 
   // Lo que pide la barra va a la shell que se ve, no a las de atrás
-  const subidores = useRef<Record<string, MandoDeSubida>>({})
-  const anotarSubidor = useCallback((id: string, mando: MandoDeSubida) => {
-    subidores.current[id] = mando
+  const mandos = useRef<Record<string, MandoDeArchivos>>({})
+  const [archivosAbiertos, setArchivosAbiertos] = useState<Record<string, boolean>>({})
+  const anotarArchivos = useCallback((id: string, abiertos: boolean) => {
+    setArchivosAbiertos((antes) => (antes[id] === abiertos ? antes : { ...antes, [id]: abiertos }))
+  }, [])
+  const anotarMando = useCallback((id: string, mando: MandoDeArchivos) => {
+    mandos.current[id] = mando
   }, [])
 
   const abrir = (credentialId: string) => {
@@ -134,7 +136,8 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
     setPestanas(pestanas.filter((una) => una.id !== cerrada.id))
     setEstados((actuales) => fetchSinLa(actuales, cerrada.id))
     setLatencias((actuales) => fetchSinLa(actuales, cerrada.id))
-    subidores.current = fetchSinLa(subidores.current, cerrada.id)
+    mandos.current = fetchSinLa(mandos.current, cerrada.id)
+    setArchivosAbiertos((actuales) => fetchSinLa(actuales, cerrada.id))
   }
 
   // La direccion sigue a lo que se ve: recargar vuelve a esta credencial
@@ -252,8 +255,10 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
         onActivar={setActiva}
         onCerrar={cerrar}
         onAbrir={abrir}
-        onSubir={(archivos) => subidores.current[activa.id]?.subir(archivos)}
-        onElegirCarpeta={() => subidores.current[activa.id]?.elegirCarpeta()}
+        onSubir={(archivos) => mandos.current[activa.id]?.subir(archivos)}
+        onElegirCarpeta={() => mandos.current[activa.id]?.elegirCarpeta()}
+        onVerArchivos={() => mandos.current[activa.id]?.verArchivos()}
+        archivosAbiertos={Boolean(archivosAbiertos[activa.id])}
       />
 
       {pestanas.map((pestana) => {
@@ -270,7 +275,8 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
             onLatencia={anotarLatencia}
             onCerrar={() => cerrar(pestana)}
             esLaUnica={pestanas.length === 1}
-            onSubidor={anotarSubidor}
+            onMando={anotarMando}
+            onArchivosAbiertos={anotarArchivos}
           />
         )
       })}
