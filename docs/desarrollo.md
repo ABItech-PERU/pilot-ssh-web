@@ -73,7 +73,7 @@ docker stack rm pilotssh_web_local
 | `this node is not a swarm manager`              | Falta `docker swarm init`: vea el paso 1 de la guía de la API                                |
 | `port is already allocated`                     | Otro programa usa el puerto `5190`: ciérrelo                                                 |
 | «No pudimos conectar con el servidor» en la web | La API de desarrollo no está levantada                                                       |
-| «Tu sesión expiró» nada más entrar              | Vuelva a entrar; si sigue, borre `pilotssh.session` en el almacenamiento del navegador       |
+| «Tu sesión expiró» nada más entrar              | Vuelva a entrar; si sigue, borre la cookie `pilotssh_refresh` del navegador                    |
 | La página sale en blanco                        | Mire la consola del navegador (F12), no la terminal                                          |
 | `Refused to load …` en la consola               | La CSP no permite ese dominio: vea [arquitectura.md](arquitectura.md#cabeceras-de-seguridad) |
 

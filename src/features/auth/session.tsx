@@ -1,14 +1,23 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createContext, use, useCallback, useEffect, useSyncExternalStore } from 'react'
+import {
+  createContext,
+  use,
+  useCallback,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 
 import * as authApi from '@/features/auth/api'
 import {
   clearSession,
   getSession,
+  mayHaveSession,
+  onSignedInElsewhere,
   saveSession,
   subscribe,
 } from '@/features/auth/token-store'
-import { SESION_CADUCADA } from '@/lib/http'
+import { restoreSession, SESION_CADUCADA } from '@/lib/http'
 import type { CurrentUser, SessionTokens, TwoFactorMethod } from '@/types/api'
 import { fijarZona } from '@/lib/zona-horaria'
 
@@ -23,7 +32,7 @@ export type LoginResult =
 interface SessionContextValue {
   user: CurrentUser | null
   isAuthenticated: boolean
-  /** Hay token guardado, pero aún sin identidad. */
+  /** Recuperando la sesión con la cookie, o con token y aún sin identidad. */
   isResolving: boolean
   signIn: (credentials: authApi.Credentials) => Promise<LoginResult>
   completeTwoFactor: (input: { challenge: string; code: string }) => Promise<CurrentUser>
@@ -40,6 +49,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const sesion = useSyncExternalStore(subscribe, getSession, () => null)
   const hasToken = Boolean(sesion)
 
+  // Al recargar, el access no está en memoria y se pide con la cookie
+  const [isRestoring, setRestoring] = useState(() => !getSession() && mayHaveSession())
+  useEffect(() => {
+    void restoreSession().finally(() => setRestoring(false))
+    return onSignedInElsewhere(() => void restoreSession())
+  }, [])
+
   const { data: user, isLoading } = useQuery({
     queryKey: CLAVE_USUARIO,
     queryFn: authApi.fetchCurrentUser,
@@ -55,7 +71,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     (respuesta: SessionTokens) => {
       saveSession({
         access: respuesta.access,
-        refresh: respuesta.refresh,
         expiresAt: respuesta.expires_at,
         sessionId: respuesta.session_id,
       })
@@ -90,13 +105,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   )
 
   const signOut = useCallback(async () => {
-    const actual = getSession()
     clearSession()
     cliente.clear()
 
-    if (!actual) return
     try {
-      await authApi.logout(actual.refresh)
+      await authApi.logout()
     } catch {
       // Sesión local ya cerrada; el refresh caduca solo en 7 días
     }
@@ -112,7 +125,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const valor: SessionContextValue = {
     user: user ?? null,
     isAuthenticated: hasToken && Boolean(user),
-    isResolving: hasToken && isLoading,
+    isResolving: isRestoring || (hasToken && isLoading),
     signIn,
     completeTwoFactor,
     signOut,

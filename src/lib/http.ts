@@ -1,10 +1,16 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
-import { clearSession, getSession, saveSession } from '@/features/auth/token-store'
+import {
+  clearSession,
+  getSession,
+  mayHaveSession,
+  saveSession,
+} from '@/features/auth/token-store'
 import { env } from '@/lib/env'
 import type { RefreshResponse } from '@/types/api'
 
 const RUTA_REFRESCO = '/auth/refresh'
+const CANDADO_DE_REFRESCO = 'pilotssh-refresco'
 
 /** Se emite cuando el refresco falla: la sesion es irrecuperable. */
 export const SESION_CADUCADA = 'pilotssh:sesion-caducada'
@@ -20,11 +26,13 @@ export const http = axios.create({
   timeout: 20000,
 })
 
-/** Sin token en el cliente del refresco: solo lleva el refresh en el cuerpo. */
-const httpSinSesion = axios.create({
+/** Para las rutas que leen la cookie del refresh, sin Bearer. La API exige
+ *  la cabecera propia contra CSRF. */
+export const httpConCookie = axios.create({
   baseURL: `${env.apiUrl}/api`,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'X-Pilot-Ssh': '1' },
   timeout: 20000,
+  withCredentials: true,
 })
 
 http.interceptors.request.use((config) => {
@@ -33,27 +41,40 @@ http.interceptors.request.use((config) => {
   return config
 })
 
-// Un solo refresco para todas las peticiones en vuelo: con rotacion,
-// cada refresh invalida el anterior
+/** En fila con las demás pestañas. Con rotación, la segunda mandaría la
+ *  cookie que la primera acaba de revocar. */
+function enFila<T>(tarea: () => Promise<T>): Promise<T> {
+  if (!navigator.locks) return tarea()
+  return navigator.locks.request(CANDADO_DE_REFRESCO, tarea)
+}
+
+// Un solo refresco para todas las peticiones en vuelo de esta pestaña
 let refrescoEnCurso: Promise<string> | null = null
 
-async function refreshAccessToken(): Promise<string> {
-  const sesion = getSession()
-  if (!sesion) throw new Error('sin sesion')
-
-  const { data } = await httpSinSesion.post<RefreshResponse>(RUTA_REFRESCO, {
-    refresh: sesion.refresh,
+function refreshAccessToken(): Promise<string> {
+  refrescoEnCurso ??= enFila(async () => {
+    const { data } = await httpConCookie.post<RefreshResponse>(RUTA_REFRESCO)
+    saveSession({
+      access: data.access,
+      expiresAt: data.expires_at,
+      sessionId: data.session_id ?? undefined,
+    })
+    return data.access
+  }).finally(() => {
+    refrescoEnCurso = null
   })
+  return refrescoEnCurso
+}
 
-  saveSession({
-    access: data.access,
-    // ROTATE_REFRESH_TOKENS deja el anterior en la lista negra
-    refresh: data.refresh ?? sesion.refresh,
-    expiresAt: '',
-    // Identifica este equipo en la lista de sesiones aunque el token rote
-    sessionId: sesion.sessionId,
-  })
-  return data.access
+/** Al cargar no hay access en memoria, así que se pide con la cookie. */
+export async function restoreSession(): Promise<void> {
+  if (getSession() || !mayHaveSession()) return
+  try {
+    await refreshAccessToken()
+  } catch {
+    // La cookie caducó o se cerró en otro equipo. Toca iniciar sesión
+    clearSession()
+  }
 }
 
 /** El error de una descarga llega como Blob: se parsea para poder
@@ -88,10 +109,7 @@ http.interceptors.response.use(
     original.yaReintentada = true
 
     try {
-      refrescoEnCurso ??= refreshAccessToken().finally(() => {
-        refrescoEnCurso = null
-      })
-      const access = await refrescoEnCurso
+      const access = await refreshAccessToken()
 
       original.headers.Authorization = `Bearer ${access}`
       return http(original)

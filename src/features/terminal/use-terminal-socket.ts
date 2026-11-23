@@ -2,12 +2,13 @@ import type { Terminal } from '@xterm/xterm'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
-import { getAccessToken } from '@/features/auth/token-store'
+import { requestSocketTicket } from '@/features/auth/api'
 import { crearEcoPredictivo } from '@/features/terminal/eco-predictivo'
 import * as serversApi from '@/features/servers/api'
 import { avisarSubida } from '@/features/terminal/AvisoDeSubida'
 import {
   buildInitialCommand,
+  buildTerminalSocketPath,
   buildTerminalUrl,
   CIERRE,
   describeClose,
@@ -293,8 +294,8 @@ export function useTerminalSocket({
       reintento = window.setTimeout(intentarDeNuevo, espera)
     }
 
-    // Pasa por el interceptor: renueva el token que lleva la query. Si la
-    // API tampoco responde, el corte sigue: se espera y se vuelve a probar
+    // Pasa por el interceptor, que renueva el access del vale. Si la API
+    // tampoco responde, el corte sigue y se vuelve a probar
     const intentarDeNuevo = () => {
       reintento = undefined
       serversApi.fetchServer(server.id).then(
@@ -319,14 +320,20 @@ export function useTerminalSocket({
     // Diferido un tick: StrictMode monta, limpia y remonta en el mismo tick;
     // un socket sincrono arrancaria y abortaria un intento SSH en el backend
     const apertura = window.setTimeout(() => {
+      requestSocketTicket(buildTerminalSocketPath(server.id, credencial.id)).then(
+        (vale) => {
+          if (vigente) abrir(vale)
+        },
+        () => {
+          if (vigente) programarReintento()
+        },
+      )
+    }, 0)
+
+    // El vale sirve una vez, así que cada apertura pide uno, también al volver
+    const abrir = (vale: string) => {
       const abierto = new WebSocket(
-        buildTerminalUrl(
-          env.socketUrl,
-          server.id,
-          credencial.id,
-          getAccessToken() ?? '',
-          sesion.current,
-        ),
+        buildTerminalUrl(env.socketUrl, server.id, credencial.id, vale, sesion.current),
       )
       socket.current = abierto
 
@@ -419,7 +426,7 @@ export function useTerminalSocket({
         escribir(`\r\n\x1b[2m— ${motivo} —\x1b[0m\r\n`)
         onEstado({ fase: 'cerrada', codigo: evento.code, motivo, reintentable })
       }
-    }, 0)
+    }
 
     return () => {
       vigente = false

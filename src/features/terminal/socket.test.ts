@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildInitialCommand,
   buildTerminalPath,
+  buildTerminalSocketPath,
   buildTerminalUrl,
   CIERRE,
   describeClose,
@@ -18,16 +19,22 @@ const SERVIDOR = '0f8fad5b-d9cb-469f-a165-70867728950e'
 const CREDENCIAL = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
 
 describe('buildTerminalUrl', () => {
-  it('lleva el token en la query, que es lo unico que admite el handshake', () => {
+  it('lleva el vale en la query, nunca el access', () => {
     expect(buildTerminalUrl('ws://localhost:8000', SERVIDOR, CREDENCIAL, 'abc')).toBe(
-      `ws://localhost:8000/ws/terminal/${SERVIDOR}/${CREDENCIAL}?token=abc`,
+      `ws://localhost:8000/ws/terminal/${SERVIDOR}/${CREDENCIAL}?ticket=abc`,
     )
   })
 
-  it('un token con caracteres raros no rompe la URL', () => {
-    expect(buildTerminalUrl('wss://x', SERVIDOR, CREDENCIAL, 'a+b/c=')).toContain(
-      'token=a%2Bb%2Fc%3D',
+  it('un vale con caracteres raros no rompe la URL', () => {
+    expect(buildTerminalUrl('wss://x', SERVIDOR, CREDENCIAL, 'a+b/c:=')).toContain(
+      'ticket=a%2Bb%2Fc%3A%3D',
     )
+  })
+
+  it('el vale se pide para la misma ruta que abre el socket', () => {
+    const ruta = buildTerminalSocketPath(SERVIDOR, CREDENCIAL)
+
+    expect(buildTerminalUrl('wss://x', SERVIDOR, CREDENCIAL, 'v')).toBe(`wss://x${ruta}?ticket=v`)
   })
 })
 

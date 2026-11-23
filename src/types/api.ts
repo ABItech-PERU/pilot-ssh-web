@@ -96,7 +96,6 @@ export interface SessionTokens {
   /** El dispositivo que abre este login, para reconocerlo en la lista. */
   session_id: string
   access: string
-  refresh: string
   expires_at: string
   user: CurrentUser
 }
@@ -115,9 +114,11 @@ export interface TwoFactorChallenge {
 
 export type LoginResponse = SessionTokens | TwoFactorChallenge
 
+/** El refresh rota en la cookie; el cuerpo solo trae el access. */
 export interface RefreshResponse {
   access: string
-  refresh?: string
+  expires_at: string
+  session_id: string | null
 }
 
 export type LinkKind = 'web' | 'panel' | 'database' | 'repo' | 'docs' | 'other'

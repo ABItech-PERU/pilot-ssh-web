@@ -1,4 +1,4 @@
-import { http } from '@/lib/http'
+import { http, httpConCookie } from '@/lib/http'
 import type {
   AccountActivityList,
   CurrentUser,
@@ -106,9 +106,9 @@ export async function register(input: RegistrationInput) {
   return data
 }
 
-/** El refresh es la credencial: el access puede estar caducado. */
-export async function logout(refresh: string) {
-  await http.post('/auth/logout', { refresh })
+/** Con la cookie y sin Bearer, porque el access puede estar caducado. */
+export async function logout() {
+  await httpConCookie.post('/auth/logout')
 }
 
 export async function fetchCurrentUser() {
@@ -200,12 +200,23 @@ export async function closeSession(id: string) {
   await http.delete(`/auth/sessions/${id}`)
 }
 
-/** Cierra las demás y deja esta abierta. */
-export async function closeOtherSessions(actual: string | null) {
-  const { data } = await http.post<{ revoked: number }>('/auth/sessions/close-others', {
-    keep: actual,
-  })
+/** Cierra las demás y deja esta, que la API reconoce por la cookie. */
+export async function closeOtherSessions() {
+  const { data } = await http.post<{ revoked: number }>(
+    '/auth/sessions/close-others',
+    null,
+    { withCredentials: true },
+  )
   return data
+}
+
+/** Vale de un uso y un minuto para abrir el WebSocket de `path`. */
+export async function requestSocketTicket(path: string) {
+  const { data } = await http.post<{ ticket: string; expires_in: number }>(
+    '/auth/socket-ticket',
+    { path },
+  )
+  return data.ticket
 }
 
 /** Filtros de la actividad; los aplica el servidor, que pagina. */
