@@ -202,11 +202,7 @@ export async function closeSession(id: string) {
 
 /** Cierra las demás y deja esta, que la API reconoce por la cookie. */
 export async function closeOtherSessions() {
-  const { data } = await http.post<{ revoked: number }>(
-    '/auth/sessions/close-others',
-    null,
-    { withCredentials: true },
-  )
+  const { data } = await http.post<{ revoked: number }>('/auth/sessions/close-others')
   return data
 }
 

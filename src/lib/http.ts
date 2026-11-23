@@ -20,10 +20,13 @@ interface RetriableConfig extends InternalAxiosRequestConfig {
   yaReintentada?: boolean
 }
 
+/** Con credenciales, porque la API está en otro origen. Sin ellas el
+ *  navegador descarta la cookie del refresh que pone el login. */
 export const http = axios.create({
   baseURL: `${env.apiUrl}/api`,
   headers: { 'Content-Type': 'application/json' },
   timeout: 20000,
+  withCredentials: true,
 })
 
 /** Para las rutas que leen la cookie del refresh, sin Bearer. La API exige

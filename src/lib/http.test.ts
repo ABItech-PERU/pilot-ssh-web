@@ -112,3 +112,31 @@ describe('peticiones con sesion', () => {
     expect(vistos).toEqual(['Bearer access-viejo', 'Bearer access-nuevo'])
   })
 })
+
+describe('la cookie del refresh entre dominios', () => {
+  it('el login va con credenciales, o el navegador descarta la cookie', async () => {
+    const { http } = await cargar()
+    const authApi = await import('@/features/auth/api')
+    const adaptador = vi.fn<AxiosAdapter>((config) =>
+      responder(config, 200, { ...SESION, user: {} }),
+    )
+    http.defaults.adapter = adaptador
+
+    await authApi.login({ email: 'ana@acme.pe', password: 'clave' })
+
+    expect(adaptador.mock.lastCall?.[0].withCredentials).toBe(true)
+  })
+
+  it('el segundo paso tambien va con credenciales', async () => {
+    const { http } = await cargar()
+    const authApi = await import('@/features/auth/api')
+    const adaptador = vi.fn<AxiosAdapter>((config) =>
+      responder(config, 200, { ...SESION, user: {} }),
+    )
+    http.defaults.adapter = adaptador
+
+    await authApi.verifyTwoFactor({ challenge: 'desafio', code: '123456' })
+
+    expect(adaptador.mock.lastCall?.[0].withCredentials).toBe(true)
+  })
+})
