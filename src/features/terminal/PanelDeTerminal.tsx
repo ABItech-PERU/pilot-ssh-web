@@ -13,16 +13,13 @@ import {
   type Coincidencias,
 } from '@/features/terminal/BuscadorEnTerminal'
 import { leerDelPrompt, leerOsc7 } from '@/features/terminal/carpeta-actual'
-import { fetchPorcentajeDeDescarga } from '@/features/terminal/descarga'
 import { PanelDeArchivos } from '@/features/terminal/PanelDeArchivos'
-import { SelectorDeCarpeta } from '@/features/terminal/SelectorDeCarpeta'
 import { CIERRE, type EstadoTerminal, quotePath } from '@/features/terminal/socket'
 import { fetchPorcentaje } from '@/features/terminal/subida'
 import {
   type Latencias,
   useTerminalSocket,
 } from '@/features/terminal/use-terminal-socket'
-import { formatFileSize } from '@/lib/format'
 import type { Server, ServerUser } from '@/types/api'
 
 /** Hex: xterm no entiende oklch(). Copia de los tokens `--term-*` de
@@ -88,8 +85,6 @@ interface PanelProps {
 }
 
 export interface MandoDeArchivos {
-  subir: (archivos: File[]) => void
-  elegirCarpeta: () => void
   verArchivos: () => void
 }
 
@@ -112,14 +107,13 @@ export function PanelDeTerminal({
   const buscador = useRef<SearchAddon | null>(null)
   const [estado, setEstado] = useState<EstadoTerminal>({ fase: 'conectando' })
   const [buscando, setBuscando] = useState(false)
-  const [arrastrando, setArrastrando] = useState(false)
-  const [eligiendo, setEligiendo] = useState(false)
+  // Adónde iría lo que se arrastra; null si no se arrastra nada encima
+  const [destinoDeArrastre, setDestinoDeArrastre] = useState<string | null>(null)
   // La carpeta en la que se abrió; null con el panel cerrado
   const [explorando, setExplorando] = useState<string | null>(null)
-  const entrada = useRef<HTMLInputElement | null>(null)
+  const zonaDeArchivos = useRef<HTMLDivElement | null>(null)
   // La que anuncia el shell (OSC 7); el prompt es el plan B
   const anunciada = useRef('')
-  const elegida = useRef('')
   const [coincidencias, setCoincidencias] = useState<Coincidencias>(SIN_COINCIDENCIAS)
 
   const avisarLatencia = useCallback(
@@ -129,16 +123,12 @@ export function PanelDeTerminal({
 
   const {
     cambiarArchivo,
-    cancelarDescarga,
     cancelarSubida,
-    descarga,
     descargar,
-    enCola,
     guardarContenido,
     pedirContenido,
     enviarTamano,
     pedirArchivos,
-    pedirCarpetas,
     reconectar,
     subida,
     subirVarios,
@@ -168,18 +158,15 @@ export function PanelDeTerminal({
     )
   }, [credencial.working_directory, terminal])
 
-  const subirAlDestino = useCallback(
-    (archivos: File[]) => void subirVarios(archivos, fetchDestino()),
-    [fetchDestino, subirVarios],
-  )
-
   useEffect(() => {
     onMando(id, {
-      subir: subirAlDestino,
-      elegirCarpeta: () => setEligiendo(true),
       verArchivos: () => setExplorando((abierto) => (abierto ? null : fetchDestino())),
     })
-  }, [id, onMando, subirAlDestino, fetchDestino])
+  }, [id, onMando, fetchDestino])
+
+  /** Sobre el panel de archivos manda su propio aviso, con su carpeta. */
+  const estaSobreElPanel = (objetivo: EventTarget) =>
+    Boolean(zonaDeArchivos.current?.contains(objetivo as Node))
 
   useEffect(() => {
     onArchivosAbiertos(id, explorando !== null)
@@ -191,7 +178,7 @@ export function PanelDeTerminal({
   }
 
   const abrirEnTerminal = (ruta: string) => {
-    teclear(`cd ${quotePath(ruta)}`)
+    teclear(`cd ${quotePath(ruta)}\r`)
     terminal.current?.focus()
   }
 
@@ -290,21 +277,26 @@ export function PanelDeTerminal({
       )}
       role="tabpanel"
       aria-label={`Terminal de ${credencial.username}`}
-      onDragOver={(evento) => {
+      onDragOverCapture={(evento) => {
+        if (estaSobreElPanel(evento.target)) {
+          setDestinoDeArrastre(null)
+          return
+        }
         evento.preventDefault()
-        setArrastrando(true)
+        if (destinoDeArrastre === null) setDestinoDeArrastre(fetchDestino())
       }}
       onDragLeave={(evento) => {
         // Pasar sobre xterm tambien dispara leave: solo cuenta salir del panel
         if (!evento.currentTarget.contains(evento.relatedTarget as Node)) {
-          setArrastrando(false)
+          setDestinoDeArrastre(null)
         }
       }}
+      // En captura: el panel de archivos corta el drop que es suyo
+      onDropCapture={() => setDestinoDeArrastre(null)}
       onDrop={(evento) => {
         evento.preventDefault()
-        setArrastrando(false)
         const soltados = [...evento.dataTransfer.files]
-        if (soltados.length) subirAlDestino(soltados)
+        if (soltados.length) void subirVarios(soltados, fetchDestino())
       }}
     >
       <div ref={contenedor} className="min-h-0 flex-1 overflow-hidden" />
@@ -348,78 +340,49 @@ export function PanelDeTerminal({
         />
       )}
 
-      {arrastrando && (
-        <div className="bg-term-bg/85 absolute inset-2 grid place-items-center rounded-md border border-dashed border-white/25">
-          <p className="text-sm">Suelte el archivo para subirlo a esta carpeta</p>
+      {destinoDeArrastre !== null && (
+        <div
+          className={cn(
+            'bg-term-bg/85 pointer-events-none absolute inset-2 grid place-items-center rounded-md border border-dashed border-white/25',
+            // Con el panel abierto, solo la parte de la terminal que se ve
+            explorando !== null && 'sm:right-[27rem]',
+          )}
+        >
+          <p className="px-4 text-center text-sm">
+            Suelte para subir a{' '}
+            <span className="font-machine break-all">{destinoDeArrastre}</span>, la
+            carpeta donde está la terminal
+          </p>
         </div>
       )}
 
-      {explorando !== null && (
-        <PanelDeArchivos
-          carpetaInicial={explorando}
-          pedirArchivos={pedirArchivos}
-          cambiarArchivo={cambiarArchivo}
-          pedirContenido={pedirContenido}
-          guardarContenido={guardarContenido}
-          descargar={descargar}
-          subir={subirVarios}
-          abrirEnTerminal={abrirEnTerminal}
-          onCerrar={cerrarArchivos}
-        />
-      )}
+      <div ref={zonaDeArchivos} className="contents">
+        {explorando !== null && (
+          <PanelDeArchivos
+            carpetaInicial={explorando}
+            pedirArchivos={pedirArchivos}
+            cambiarArchivo={cambiarArchivo}
+            pedirContenido={pedirContenido}
+            guardarContenido={guardarContenido}
+            descargar={descargar}
+            subir={subirVarios}
+            abrirEnTerminal={abrirEnTerminal}
+            onCerrar={cerrarArchivos}
+          />
+        )}
+      </div>
 
-      {(subida || descarga) && (
-        <div className="absolute inset-x-4 bottom-3 z-30 flex flex-col gap-2">
-          {subida && (
-            <BarraDeAvance
-              porcentaje={fetchPorcentaje(subida)}
-              cancelar="Cancelar la subida"
-              onCancelar={cancelarSubida}
-            >
-              {subida.nombre} <span className="text-term-dim">→ {subida.carpeta}</span>
-            </BarraDeAvance>
-          )}
-          {descarga && (
-            <BarraDeAvance
-              porcentaje={fetchPorcentajeDeDescarga(descarga)}
-              recibido={descarga.recibido}
-              cancelar="Cancelar la descarga"
-              onCancelar={cancelarDescarga}
-            >
-              <span className="text-term-dim">
-                {descarga.total === null ? 'Comprimiendo y descargando' : 'Descargando'}
-              </span>{' '}
-              {descarga.nombre}
-              {enCola > 0 && <span className="text-term-dim"> · {enCola} en cola</span>}
-            </BarraDeAvance>
-          )}
+      {subida && (
+        <div className="absolute inset-x-4 bottom-3 z-30">
+          <BarraDeAvance
+            porcentaje={fetchPorcentaje(subida)}
+            cancelar="Cancelar la subida"
+            onCancelar={cancelarSubida}
+          >
+            {subida.nombre} <span className="text-term-dim">→ {subida.carpeta}</span>
+          </BarraDeAvance>
         </div>
       )}
-
-      <SelectorDeCarpeta
-        abierto={eligiendo}
-        carpeta={fetchDestino()}
-        pedirCarpetas={pedirCarpetas}
-        onCerrar={() => setEligiendo(false)}
-        onElegir={(destino) => {
-          setEligiendo(false)
-          elegida.current = destino
-          entrada.current?.click()
-        }}
-      />
-
-      <input
-        ref={entrada}
-        type="file"
-        className="hidden"
-        multiple
-        onChange={(evento) => {
-          const elegidos = [...(evento.target.files ?? [])]
-          if (elegidos.length) void subirVarios(elegidos, elegida.current)
-          // Repetir el mismo archivo tambien cuenta como cambio
-          evento.target.value = ''
-        }}
-      />
     </div>
   )
 }
@@ -443,16 +406,14 @@ async function pegarDelPortapapeles(teclear: (datos: string) => void) {
   }
 }
 
-/** Cómo va una copia, con su cancelar a mano. Sin porcentaje, cuenta lo recibido. */
+/** Cómo va una subida, con su cancelar a mano. */
 function BarraDeAvance({
   porcentaje,
-  recibido = 0,
   cancelar,
   onCancelar,
   children,
 }: {
-  porcentaje: number | null
-  recibido?: number
+  porcentaje: number
   cancelar: string
   onCancelar: () => void
   children: React.ReactNode
@@ -462,7 +423,7 @@ function BarraDeAvance({
       <div className="flex items-center justify-between gap-3 text-xs">
         <span className="font-machine truncate">{children}</span>
         <span className="text-term-dim ml-auto shrink-0 tabular-nums">
-          {porcentaje === null ? formatFileSize(recibido) : `${porcentaje} %`}
+          {porcentaje} %
         </span>
         <Button
           variant="ghost"
@@ -476,11 +437,8 @@ function BarraDeAvance({
       </div>
       <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
         <div
-          className={cn(
-            'bg-term-ok h-1 rounded-full transition-[width]',
-            porcentaje === null && 'w-1/3 animate-pulse',
-          )}
-          style={porcentaje === null ? undefined : { width: `${porcentaje}%` }}
+          className="bg-term-ok h-1 rounded-full transition-[width]"
+          style={{ width: `${porcentaje}%` }}
         />
       </div>
     </div>

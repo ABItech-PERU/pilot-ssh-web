@@ -15,6 +15,15 @@ Cambios notables de Pilot SSH Web, según Keep a Changelog 1.1 y SemVer 2.0.
 - Panel de plataforma para soporte, finanzas y operaciones.
 - Despliegue continuo a `uat` y publicación en `prod` con etiqueta `vX.Y.Z`.
 
+### Cambiado
+
+- Las descargas de la terminal las baja el gestor de descargas del navegador, directo al disco, sin tope de memoria.
+- Arrastrar un archivo sobre la terminal dice a qué carpeta irá, y los avisos de la terminal salen arriba a la izquierda, sin tapar el panel de archivos.
+
+### Eliminado
+
+- El botón «Subir» de la barra de la terminal: se sube desde el panel de archivos o arrastrando.
+
 ### Seguridad
 
 - La sesión ya no se guarda en `localStorage`: el `access` vive en memoria y el `refresh` en una cookie `httpOnly`.

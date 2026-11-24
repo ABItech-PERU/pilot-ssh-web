@@ -1,14 +1,6 @@
 import { cn } from 'cn'
-import {
-  ChevronDownIcon,
-  CircleQuestionMarkIcon,
-  FolderIcon,
-  FolderOpenIcon,
-  PlusIcon,
-  UploadIcon,
-  XIcon,
-} from 'lucide-react'
-import { useRef, useState } from 'react'
+import { CircleQuestionMarkIcon, FolderOpenIcon, PlusIcon, XIcon } from 'lucide-react'
+import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -35,8 +27,6 @@ interface BarraProps {
   onActivar: (pestana: Pestana) => void
   onCerrar: (pestana: Pestana) => void
   onAbrir: (credentialId: string) => void
-  onSubir: (archivos: File[]) => void
-  onElegirCarpeta: () => void
   onVerArchivos: () => void
   archivosAbiertos: boolean
 }
@@ -49,12 +39,9 @@ export function BarraDePestanas({
   onActivar,
   onCerrar,
   onAbrir,
-  onSubir,
-  onElegirCarpeta,
   onVerArchivos,
   archivosAbiertos,
 }: BarraProps) {
-  const archivo = useRef<HTMLInputElement | null>(null)
   const [viendoAtajos, setViendoAtajos] = useState(false)
   const ordinales = fetchOrdinales(pestanas)
   const hayCupo = pestanas.length < MAXIMO_DE_PESTANAS
@@ -132,19 +119,6 @@ export function BarraDePestanas({
             })}
           </DropdownMenuContent>
         </DropdownMenu>
-
-        <input
-          ref={archivo}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={(evento) => {
-            const elegidos = [...(evento.target.files ?? [])]
-            if (elegidos.length) onSubir(elegidos)
-            // Repetir el mismo archivo tambien cuenta como cambio
-            evento.target.value = ''
-          }}
-        />
       </div>
 
       <div className="my-auto flex shrink-0 items-center pl-1">
@@ -170,46 +144,12 @@ export function BarraDePestanas({
           title="Archivos del servidor: descargar, subir, renombrar y borrar"
           onClick={onVerArchivos}
           className={cn(
-            'hover:text-term-text mr-1 size-6 hover:bg-white/5',
+            'hover:text-term-text size-6 hover:bg-white/5',
             archivosAbiertos ? 'text-term-text bg-white/10' : 'text-term-dim',
           )}
         >
           <FolderOpenIcon className="size-4" />
         </Button>
-
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Subir un archivo"
-          title="Subir un archivo a la carpeta en la que está la terminal"
-          onClick={() => archivo.current?.click()}
-          className="text-term-dim hover:text-term-text size-6 hover:bg-white/5"
-        >
-          <UploadIcon className="size-4" />
-        </Button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Más opciones para subir"
-              className="text-term-dim hover:text-term-text size-5 hover:bg-white/5"
-            >
-              <ChevronDownIcon className="size-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => archivo.current?.click()}>
-              <UploadIcon />
-              Subir aquí
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onElegirCarpeta}>
-              <FolderIcon />
-              Subir a otra carpeta…
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </div>
   )
