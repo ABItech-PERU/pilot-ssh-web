@@ -48,7 +48,7 @@ const SITIO = listado([
 
 const HECHO: MensajeDeArchivo = { type: 'archivo', accion: 'borrar', estado: 'hecho' }
 
-/** Lo que contesta el servidor a cada tarea; una carpeta pequeña por defecto. */
+/** La respuesta del servidor a cada tarea, con una carpeta pequeña. */
 function tareaHecha(medida = { archivos: 3, carpetas: 1, kb: 12 }) {
   return vi.fn(
     async (accion: MensajeDeTarea['accion'], ruta: string): Promise<MensajeDeTarea> => ({
@@ -58,6 +58,7 @@ function tareaHecha(medida = { archivos: 3, carpetas: 1, kb: 12 }) {
       estado: 'hecho',
       ...medida,
       nombre: accion === 'comprimir' ? 'public.tar.gz' : 'sitio',
+      url: accion === 'empaquetar' ? '/ws/descargas/vale' : undefined,
     }),
   )
 }
@@ -308,9 +309,10 @@ describe('PanelDeArchivos', () => {
     expect(cambiarArchivo).toHaveBeenCalledTimes(2)
   })
 
-  it('elegir varios descarga los archivos y deja las carpetas', async () => {
+  it('elegir varios los baja juntos en un solo comprimido', async () => {
     const usuario = userEvent.setup()
-    const { descargar } = montar()
+    const pulsar = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const { descargar, ejecutarTarea } = montar()
     await screen.findByText('notas.txt')
 
     await usuario.click(screen.getByRole('button', { name: 'Elegir varios' }))
@@ -318,8 +320,32 @@ describe('PanelDeArchivos', () => {
     await usuario.click(screen.getByRole('checkbox', { name: 'Elegir notas.txt' }))
     await usuario.click(screen.getByRole('button', { name: 'Descargar' }))
 
-    expect(descargar).toHaveBeenCalledTimes(1)
+    expect(ejecutarTarea).toHaveBeenCalledWith('empaquetar', '/home/deploy', [
+      'public',
+      'notas.txt',
+    ])
+    await vi.waitFor(() => expect(pulsar).toHaveBeenCalled())
+    expect(descargar).not.toHaveBeenCalled()
+    pulsar.mockRestore()
+  })
+
+  it('un solo archivo elegido baja tal cual', async () => {
+    const usuario = userEvent.setup()
+    const { descargar, ejecutarTarea } = montar()
+    await screen.findByText('notas.txt')
+
+    await usuario.click(screen.getByRole('button', { name: 'Elegir varios' }))
+    await usuario.click(screen.getByRole('checkbox', { name: 'Elegir notas.txt' }))
+    await usuario.click(screen.getByRole('button', { name: 'Descargar' }))
+
     expect(descargar).toHaveBeenCalledWith('/home/deploy/notas.txt')
+    expect(ejecutarTarea).not.toHaveBeenCalled()
+  })
+
+  it('ofrece subir una carpeta entera', () => {
+    montar()
+
+    expect(screen.getByRole('button', { name: 'Subir una carpeta' })).toBeInTheDocument()
   })
 
   it('ordena por tamaño de mayor a menor, sin sacar las carpetas de arriba', async () => {

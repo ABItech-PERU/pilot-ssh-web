@@ -15,15 +15,19 @@ import {
 import { leerDelPrompt, leerOsc7 } from '@/features/terminal/carpeta-actual'
 import { PanelDeArchivos } from '@/features/terminal/PanelDeArchivos'
 import { CIERRE, type EstadoTerminal, quotePath } from '@/features/terminal/socket'
-import { fetchPorcentaje } from '@/features/terminal/subida'
+import { DialogoDeConflicto } from '@/features/terminal/DialogoDeConflicto'
+import { PanelDeTransferencias } from '@/features/terminal/PanelDeTransferencias'
+import { leerSoltados } from '@/features/terminal/soltar'
+import { fetchCarpetaDeLaRuta } from '@/features/terminal/subida'
+import { planearSubida } from '@/features/terminal/transferencias'
 import {
   type Latencias,
   useTerminalSocket,
 } from '@/features/terminal/use-terminal-socket'
 import type { Server, ServerUser } from '@/types/api'
 
-/** Hex: xterm no entiende oklch(). Copia de los tokens `--term-*` de
- *  index.css; cambian juntos. */
+/** En hexadecimal, porque xterm no entiende oklch(). Copia de los tokens
+ *  `--term-*` de index.css, que cambian juntos. */
 const TEMA = {
   background: '#141922',
   foreground: '#ecedf1',
@@ -51,7 +55,7 @@ const TEMA = {
 /** Alt+número es de las pestañas; abajo llegaría como un escape suelto. */
 const CAMBIA_DE_PESTANA = /^[1-9]$/
 
-/** Ctrl+C corta el proceso y Ctrl+F mueve el cursor: con Shift son de la
+/** Ctrl+C corta el proceso y Ctrl+F mueve el cursor. Con Shift son de la
  *  ventana, como en cualquier terminal. */
 const ATAJOS_DE_LA_VENTANA = 'fcv'
 
@@ -71,14 +75,14 @@ interface PanelProps {
   id: string
   server: Server
   credencial: ServerUser
-  /** Las de atrás siguen conectadas y recibiendo: solo dejan de verse. */
+  /** Las de atrás siguen conectadas y recibiendo, solo que no se ven. */
   visible: boolean
   onEstado: (id: string, estado: EstadoTerminal) => void
   onLatencia: (id: string, medidas: Latencias) => void
-  /** Cerrar la que acabó: si es la única, se sale de la terminal. */
+  /** Cierra la que acabó, y si es la única, sale de la terminal. */
   onCerrar: () => void
   esLaUnica: boolean
-  /** Sus archivos, a mano de la barra: manda a la terminal que se ve. */
+  /** Sus archivos, a mano de la barra, que manda a la terminal que se ve. */
   onMando: (id: string, mando: MandoDeArchivos) => void
   /** Para que la barra diga si el panel de archivos está abierto. */
   onArchivosAbiertos: (id: string, abiertos: boolean) => void
@@ -123,7 +127,14 @@ export function PanelDeTerminal({
 
   const {
     cambiarArchivo,
-    cancelarSubida,
+    cancelarTodas,
+    cancelarTransferencia,
+    conflicto,
+    decidirConflicto,
+    encolarSubidas,
+    limpiarTransferencias,
+    reintentarTransferencia,
+    transferencias,
     descargar,
     ejecutarTarea,
     guardarContenido,
@@ -131,8 +142,6 @@ export function PanelDeTerminal({
     enviarTamano,
     pedirArchivos,
     reconectar,
-    subida,
-    subirVarios,
     teclear,
   } = useTerminalSocket({
     server,
@@ -146,7 +155,7 @@ export function PanelDeTerminal({
     onEstado(id, estado)
   }, [id, estado, onEstado])
 
-  /** Donde está parada la shell: lo que anuncia, o lo que muestra el prompt. */
+  /** Donde está la shell, según lo que anuncia o lo que muestra el prompt. */
   const fetchDestino = useCallback(() => {
     const vista = terminal.current
     const activa = vista?.buffer.active
@@ -175,6 +184,12 @@ export function PanelDeTerminal({
 
   const cerrarArchivos = () => {
     setExplorando(null)
+    terminal.current?.focus()
+  }
+
+  /** Lleva la shell a la carpeta de lo subido y lo muestra. */
+  const irALaCarpeta = (ruta: string) => {
+    teclear(`cd ${quotePath(fetchCarpetaDeLaRuta(ruta))} && ls -l ${quotePath(ruta)}\r`)
     terminal.current?.focus()
   }
 
@@ -225,9 +240,8 @@ export function PanelDeTerminal({
       setCoincidencias({ actual: resultIndex + 1, total: resultCount }),
     )
 
-    // Oculta mide cero y xterm quedaria en una fila; el ajuste espera a que
-    // se vea. Y tras open el contenedor aun no tiene tamaño: va en el frame
-    // siguiente
+    // Oculta mide cero y xterm quedaría en una fila, así que el ajuste espera
+    // al cuadro siguiente, cuando el contenedor ya tiene tamaño
     let marco = requestAnimationFrame(() => ajuste.fit())
 
     const teclado = vista.onData(teclear)
@@ -287,17 +301,19 @@ export function PanelDeTerminal({
         if (destinoDeArrastre === null) setDestinoDeArrastre(fetchDestino())
       }}
       onDragLeave={(evento) => {
-        // Pasar sobre xterm tambien dispara leave: solo cuenta salir del panel
+        // Pasar sobre xterm también dispara leave, y solo cuenta salir del panel
         if (!evento.currentTarget.contains(evento.relatedTarget as Node)) {
           setDestinoDeArrastre(null)
         }
       }}
-      // En captura: el panel de archivos corta el drop que es suyo
+      // En captura, porque el panel de archivos corta el drop que es suyo
       onDropCapture={() => setDestinoDeArrastre(null)}
       onDrop={(evento) => {
         evento.preventDefault()
-        const soltados = [...evento.dataTransfer.files]
-        if (soltados.length) void subirVarios(soltados, fetchDestino())
+        const destino = fetchDestino()
+        void leerSoltados(evento.dataTransfer).then((soltados) =>
+          encolarSubidas(planearSubida(destino, soltados)),
+        )
       }}
     >
       <div ref={contenedor} className="min-h-0 flex-1 overflow-hidden" />
@@ -367,24 +383,33 @@ export function PanelDeTerminal({
             guardarContenido={guardarContenido}
             descargar={descargar}
             ejecutarTarea={ejecutarTarea}
-            subir={subirVarios}
+            subir={encolarSubidas}
             abrirEnTerminal={abrirEnTerminal}
             onCerrar={cerrarArchivos}
           />
         )}
       </div>
 
-      {subida && (
-        <div className="absolute inset-x-4 bottom-3 z-30">
-          <BarraDeAvance
-            porcentaje={fetchPorcentaje(subida)}
-            cancelar="Cancelar la subida"
-            onCancelar={cancelarSubida}
-          >
-            {subida.nombre} <span className="text-term-dim">→ {subida.carpeta}</span>
-          </BarraDeAvance>
+      {transferencias.length > 0 && (
+        <div
+          className={cn(
+            'absolute inset-x-3 bottom-3 z-30 sm:left-auto',
+            // A la izquierda del panel de archivos, para no tapar su lista
+            explorando !== null && 'sm:right-[27.5rem]',
+          )}
+        >
+          <PanelDeTransferencias
+            transferencias={transferencias}
+            onCancelar={cancelarTransferencia}
+            onCancelarTodo={cancelarTodas}
+            onReintentar={reintentarTransferencia}
+            onIrALaCarpeta={irALaCarpeta}
+            onCerrar={limpiarTransferencias}
+          />
         </div>
       )}
+
+      <DialogoDeConflicto conflicto={conflicto} onDecidir={decidirConflicto} />
     </div>
   )
 }
@@ -395,7 +420,7 @@ async function copiarLoSeleccionado(vista: Terminal) {
   try {
     await navigator.clipboard.writeText(elegido)
   } catch {
-    // Sin permiso queda la selección: se copia con el menú del navegador
+    // Sin permiso queda la selección, que se copia con el menú del navegador
   }
 }
 
@@ -406,45 +431,6 @@ async function pegarDelPortapapeles(teclear: (datos: string) => void) {
   } catch {
     // Sin permiso no se pega; Ctrl+V del navegador sigue funcionando
   }
-}
-
-/** Cómo va una subida, con su cancelar a mano. */
-function BarraDeAvance({
-  porcentaje,
-  cancelar,
-  onCancelar,
-  children,
-}: {
-  porcentaje: number
-  cancelar: string
-  onCancelar: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <div className="border-term-border bg-term-bg rounded-md border px-3 py-2">
-      <div className="flex items-center justify-between gap-3 text-xs">
-        <span className="font-machine truncate">{children}</span>
-        <span className="text-term-dim ml-auto shrink-0 tabular-nums">
-          {porcentaje} %
-        </span>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={cancelar}
-          onClick={onCancelar}
-          className="text-term-dim hover:text-term-text size-5 hover:bg-white/5"
-        >
-          <XIcon className="size-3.5" />
-        </Button>
-      </div>
-      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
-        <div
-          className="bg-term-ok h-1 rounded-full transition-[width]"
-          style={{ width: `${porcentaje}%` }}
-        />
-      </div>
-    </div>
-  )
 }
 
 function BotonDeCierre({ className, ...props }: React.ComponentProps<typeof Button>) {

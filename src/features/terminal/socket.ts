@@ -22,8 +22,10 @@ export type EstadoTerminal =
 /** Cómo va el archivo que se está copiando al servidor. */
 export type MensajeDeSubida = {
   type: 'subida'
-  estado: 'preparada' | 'sigue' | 'guardada' | 'error'
+  estado: 'preparada' | 'sigue' | 'guardada' | 'existe' | 'retomada' | 'error'
   ruta?: string
+  /** Lo que ya llegó de una subida cortada, para seguir desde ahí. */
+  enviado?: number
   message?: string
 }
 
@@ -64,8 +66,8 @@ export type MensajeDeContenido = {
   message?: string
 }
 
-/** El enlace que baja el navegador, o por qué no se pudo. `cortada` llega
- *  si la descarga falla a medias, sin que nadie la haya pedido en ese momento. */
+/** El enlace que baja el navegador, o por qué no se pudo. `cortada` avisa
+ *  de un fallo a medias, sin un pedido pendiente. */
 export type MensajeDeDescarga = {
   type: 'descarga'
   estado: 'preparada' | 'cortada' | 'error'
@@ -86,7 +88,7 @@ export type MensajeDeArchivo = {
   message?: string
 }
 
-export type AccionDeTarea = 'medir' | 'comprimir' | 'extraer' | 'borrar'
+export type AccionDeTarea = 'medir' | 'comprimir' | 'extraer' | 'borrar' | 'empaquetar'
 
 /** Cómo terminó algo que tarda y corre aparte de la shell. `pedida` es la
  *  ruta tal como se pidió, para emparejar la respuesta. */
@@ -99,6 +101,8 @@ export type MensajeDeTarea = {
   ruta?: string
   /** Lo creado al comprimir o extraer. */
   resultado?: string
+  /** El enlace para bajar lo empaquetado. */
+  url?: string
   nombre?: string
   tamano?: number
   archivos?: number
@@ -235,7 +239,14 @@ export function buildInitialCommand(path: string): string | null {
   return `cd ${quotePath(limpio)}\r`
 }
 
-const ESTADOS_DE_SUBIDA = ['preparada', 'sigue', 'guardada', 'error']
+const ESTADOS_DE_SUBIDA = [
+  'preparada',
+  'sigue',
+  'guardada',
+  'existe',
+  'retomada',
+  'error',
+]
 const ESTADOS_DE_DESCARGA = ['preparada', 'cortada', 'error']
 const ACCIONES_DE_ARCHIVO: MensajeDeArchivo['accion'][] = [
   'renombrar',
@@ -244,7 +255,13 @@ const ACCIONES_DE_ARCHIVO: MensajeDeArchivo['accion'][] = [
   'permisos',
 ]
 const ESTADOS_DE_CONTENIDO = ['listo', 'guardado', 'error']
-const ACCIONES_DE_TAREA: AccionDeTarea[] = ['medir', 'comprimir', 'extraer', 'borrar']
+const ACCIONES_DE_TAREA: AccionDeTarea[] = [
+  'medir',
+  'comprimir',
+  'extraer',
+  'borrar',
+  'empaquetar',
+]
 
 const comoNumero = (valor: unknown) => (typeof valor === 'number' ? valor : undefined)
 const TIPOS_DE_ENTRADA: TipoDeEntrada[] = ['carpeta', 'archivo', 'enlace']
@@ -342,6 +359,7 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
         message: dato.message,
         ruta: dato.ruta,
         resultado: typeof resto.resultado === 'string' ? resto.resultado : undefined,
+        url: typeof resto.url === 'string' ? resto.url : undefined,
         nombre: dato.nombre,
         tamano: comoNumero(dato.tamano),
         archivos: comoNumero(resto.archivos),
@@ -366,6 +384,7 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
         type: 'subida',
         estado: dato.estado as MensajeDeSubida['estado'],
         ruta: dato.ruta,
+        enviado: comoNumero((dato as Record<string, unknown>).enviado),
         message: dato.message,
       }
     }

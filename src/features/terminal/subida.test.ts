@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   enviarPorTramos,
   fetchCarpetaDeLaRuta,
-  fetchPorcentaje,
   TAMANO_DE_TRAMO,
 } from '@/features/terminal/subida'
 
@@ -34,19 +33,24 @@ describe('fetchCarpetaDeLaRuta', () => {
   })
 })
 
-describe('fetchPorcentaje', () => {
-  it('cuenta lo que ya salió', () => {
-    expect(fetchPorcentaje({ nombre: 'x', carpeta: '~', enviado: 25, total: 100 })).toBe(
-      25,
-    )
-  })
-
-  it('un archivo vacío no divide entre cero', () => {
-    expect(fetchPorcentaje({ nombre: 'x', carpeta: '~', enviado: 0, total: 0 })).toBe(0)
-  })
-})
-
 describe('enviarPorTramos', () => {
+  it('un archivo de 1 MB sale en cuatro tramos de 256 KB', async () => {
+    const enviados: ArrayBuffer[] = []
+    const socket = {
+      readyState: WebSocket.OPEN,
+      bufferedAmount: 0,
+      send: (datos: ArrayBuffer) => enviados.push(datos),
+    } as unknown as WebSocket
+
+    await enviarPorTramos(socket, buildArchivo(1024 * 1024), {
+      onAvance: () => {},
+      sigueViva: () => true,
+      pedirTurno: async () => {},
+    })
+
+    expect(enviados.map((tramo) => tramo.byteLength)).toEqual(Array(4).fill(256 * 1024))
+  })
+
   it('parte el archivo y avisa de cada tramo', async () => {
     const socket = buildSocket()
     const avances: number[] = []

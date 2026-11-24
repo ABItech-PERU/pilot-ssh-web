@@ -5,7 +5,10 @@ import { toast } from 'sonner'
 import { requestSocketTicket } from '@/features/auth/api'
 import { crearEcoPredictivo } from '@/features/terminal/eco-predictivo'
 import * as serversApi from '@/features/servers/api'
-import { avisarSubida } from '@/features/terminal/AvisoDeSubida'
+import type {
+  Conflicto,
+  DecisionDeConflicto,
+} from '@/features/terminal/DialogoDeConflicto'
 import { abrirDescarga } from '@/features/terminal/descarga'
 import {
   buildInitialCommand,
@@ -23,15 +26,16 @@ import {
   type AccionDeTarea,
   type MensajeDeSubida,
   parseIncoming,
-  quotePath,
   RECONEXION,
   reconnectsAutomatically,
 } from '@/features/terminal/socket'
+import { enviarPorTramos, fetchCarpetaDeLaRuta } from '@/features/terminal/subida'
 import {
-  type AvanceDeSubida,
-  enviarPorTramos,
-  fetchCarpetaDeLaRuta,
-} from '@/features/terminal/subida'
+  type ArchivoParaSubir,
+  calcularVelocidad,
+  type Muestra,
+  type Transferencia,
+} from '@/features/terminal/transferencias'
 import { env } from '@/lib/env'
 import type { Server, ServerUser } from '@/types/api'
 
@@ -66,6 +70,9 @@ export interface Latencias {
 }
 
 const SIN_CONEXION = 'Se perdió la conexión con la terminal.'
+
+/** Muestras recientes para medir la velocidad de una subida. */
+const MUESTRAS_DE_VELOCIDAD = 60
 
 const sinListado = (): MensajeDeArchivos => ({
   type: 'archivos',
@@ -109,19 +116,33 @@ export function useTerminalSocket({
   const latencia = useRef(0)
   const avisada = useRef(0)
   const salto = useRef<number | undefined>(undefined)
-  const [subida, setSubida] = useState<AvanceDeSubida | null>(null)
+  const [transferencias, setTransferencias] = useState<Transferencia[]>([])
+  // Copia síncrona, para que la cola lea lo último sin esperar al render
+  const lista = useRef<Transferencia[]>([])
+  const fijarLista = (cambio: (antes: Transferencia[]) => Transferencia[]) => {
+    lista.current = cambio(lista.current)
+    setTransferencias(lista.current)
+  }
+  const siguienteId = useRef(0)
+  const trabajando = useRef(false)
+  const actual = useRef<number | null>(null)
+  const politica = useRef<DecisionDeConflicto | null>(null)
+  const alVaciar = useRef<(() => void)[]>([])
+  const reanudarCola = useRef<() => void>(() => {})
+  const [conflicto, setConflicto] = useState<Conflicto | null>(null)
+  const alDecidir = useRef<
+    ((suya: { decision: DecisionDeConflicto; aTodos: boolean }) => void) | null
+  >(null)
   const respuesta = useRef<((suya: MensajeDeSubida) => void) | null>(null)
-  // En cola: entrar a una carpeta mientras otra se recarga son dos pedidos
-  // vivos, y el servidor contesta en orden
+  // En cola, porque puede haber dos pedidos vivos y el servidor contesta en orden
   const listadosDeArchivos = useRef<((suyo: MensajeDeArchivos) => void)[]>([])
   const cambio = useRef<((suyo: MensajeDeArchivo) => void) | null>(null)
   const preparada = useRef<((suya: MensajeDeDescarga) => void) | null>(null)
-  // Por acción y ruta: varias corren a la vez y terminan en cualquier orden
+  // Por acción y ruta, porque varias corren a la vez y acaban en cualquier orden
   const tareas = useRef(new Map<string, ((suya: MensajeDeTarea) => void)[]>())
   const turnoDeDescarga = useRef<Promise<void>>(Promise.resolve())
   const contenido = useRef<((suyo: MensajeDeContenido) => void) | null>(null)
   const cancelada = useRef(false)
-  const enCurso = useRef(false)
   const enVuelo = useRef(0)
   const turnos = useRef<(() => void)[]>([])
 
@@ -129,7 +150,7 @@ export function useTerminalSocket({
   const avisar = useRef(onLatencia)
   avisar.current = onLatencia
 
-  /** Falso si no salió: con la conexión caída, nadie va a contestar. */
+  /** Falso si no salió, porque con la conexión caída nadie contestará. */
   const enviar = useCallback((carga: object) => {
     if (socket.current?.readyState !== WebSocket.OPEN) return false
     socket.current.send(JSON.stringify(carga))
@@ -267,9 +288,9 @@ export function useTerminalSocket({
   /** Medir, comprimir, extraer o borrar en grande. Corre en el servidor
    *  aparte de la shell y contesta al terminar. */
   const ejecutarTarea = useCallback(
-    (accion: AccionDeTarea, ruta: string) =>
+    (accion: AccionDeTarea, ruta: string, nombres?: string[]) =>
       new Promise<MensajeDeTarea>((contestar) => {
-        if (!enviar({ tarea: { accion, ruta } })) {
+        if (!enviar({ tarea: { accion, ruta, ...(nombres ? { nombres } : {}) } })) {
           contestar({ type: 'tarea', accion, pedida: ruta, estado: 'error', message: SIN_CONEXION })
           return
         }
@@ -279,9 +300,8 @@ export function useTerminalSocket({
     [enviar],
   )
 
-  /** Tramos sin confirmar. Dos mantienen el canal lleno sin encolar tanto
-   *  que la tecla siguiente espere. */
-  const VENTANA = 2
+  /** Tramos sin confirmar. Con seis, la latencia no frena la copia. */
+  const VENTANA = 6
 
   const pedirTurno = async () => {
     if (enVuelo.current >= VENTANA) {
@@ -301,74 +321,211 @@ export function useTerminalSocket({
     for (const seguir of turnos.current.splice(0)) seguir()
   }
 
-  /** Copia un archivo a la carpeta pedida y avisa cómo terminó. */
-  const subir = useCallback(
-    async (archivo: File, carpeta: string) => {
-      const abierto = socket.current
-      if (!abierto || abierto.readyState !== WebSocket.OPEN) {
-        toast.error('La terminal no está conectada.')
-        return
+  /** El servidor atiende una subida por sesión, así que van en cola. */
+  const actualizar = (id: number, cambios: Partial<Transferencia>) =>
+    fijarLista((antes) =>
+      antes.map((una) => (una.id === id ? { ...una, ...cambios } : una)),
+    )
+
+  const anunciar = (una: Transferencia, siExiste: DecisionDeConflicto | null) => {
+    enviar({
+      subida: {
+        nombre: una.archivo.name,
+        tamano: una.total,
+        carpeta: una.carpeta,
+        crear_carpeta: una.crearCarpeta,
+        ...(siExiste ? { si_existe: siExiste } : {}),
+      },
+    })
+    return esperarRespuesta()
+  }
+
+  const preguntar = (pendiente: Conflicto) =>
+    new Promise<{ decision: DecisionDeConflicto; aTodos: boolean }>((contestar) => {
+      alDecidir.current = contestar
+      setConflicto(pendiente)
+    })
+
+  const decidirConflicto = useCallback(
+    (decision: DecisionDeConflicto, aTodos: boolean) => {
+      setConflicto(null)
+      alDecidir.current?.({ decision, aTodos })
+      alDecidir.current = null
+    },
+    [],
+  )
+
+  /** Una de la cola, de principio a fin; su estado dice cómo terminó. */
+  const subirUna = async (una: Transferencia, abierto: WebSocket) => {
+    actual.current = una.id
+    cancelada.current = false
+    soltarTurnos()
+    const desde = una.retomar ? await pedirRetomar() : 0
+    actualizar(una.id, {
+      estado: 'subiendo',
+      enviado: desde,
+      velocidad: null,
+      motivo: undefined,
+      retomar: false,
+    })
+    const muestras: Muestra[] = [{ instante: performance.now(), enviado: desde }]
+    // Desde aquí el servidor guarda lo que llega, y un corte se puede retomar
+    let enServidor = desde > 0
+
+    try {
+      let preparada: MensajeDeSubida = { type: 'subida', estado: 'preparada' }
+      if (!desde) preparada = await anunciar(una, politica.current)
+      if (preparada.estado === 'existe') {
+        const quedan = lista.current.filter((otra) => otra.estado === 'en-cola').length
+        const { decision, aTodos } = politica.current
+          ? { decision: politica.current, aTodos: true }
+          : await preguntar({
+              nombre: una.archivo.name,
+              carpeta: fetchCarpetaDeLaRuta(preparada.ruta ?? ''),
+              quedan,
+            })
+        if (aTodos) politica.current = decision
+        if (cancelada.current) throw new Error('Se canceló la copia.')
+        if (decision === 'omitir') {
+          actualizar(una.id, { estado: 'omitida' })
+          return
+        }
+        preparada = await anunciar(una, decision)
       }
-      if (enCurso.current) {
-        toast('Los archivos suben de uno en uno.')
-        return
-      }
+      if (preparada.estado !== 'preparada') throw new Error(preparada.message)
+      enServidor = true
 
-      enCurso.current = true
-      cancelada.current = false
-      soltarTurnos()
-      setSubida({ nombre: archivo.name, carpeta, enviado: 0, total: archivo.size })
-
-      try {
-        enviar({ subida: { nombre: archivo.name, tamano: archivo.size, carpeta } })
-        const preparada = await esperarRespuesta()
-        if (preparada.estado === 'error') throw new Error(preparada.message)
-
-        await enviarPorTramos(abierto, archivo, {
-          onAvance: (enviado) =>
-            setSubida({ nombre: archivo.name, carpeta, enviado, total: archivo.size }),
-          sigueViva: () => !cancelada.current,
-          pedirTurno,
-        })
-        enviar({ subida: { fin: true } })
-        const guardada = await esperarRespuesta()
-        if (guardada.estado === 'error') throw new Error(guardada.message)
-
-        const ruta = guardada.ruta ?? ''
-        // La del servidor, ya resuelta: la pedida puede ser `~` o relativa
-        const donde = fetchCarpetaDeLaRuta(ruta)
-        avisarSubida(ruta, () =>
-          enviar({ command: `cd ${quotePath(donde)} && ls -l ${quotePath(ruta)}\r` }),
-        )
-      } catch (error) {
+      await enviarPorTramos(abierto, una.archivo, {
+        desde,
+        onAvance: (enviado) => {
+          muestras.push({ instante: performance.now(), enviado })
+          if (muestras.length > MUESTRAS_DE_VELOCIDAD) muestras.shift()
+          actualizar(una.id, { enviado, velocidad: calcularVelocidad(muestras) })
+        },
+        sigueViva: () => !cancelada.current,
+        pedirTurno,
+      })
+      enviar({ subida: { fin: true } })
+      const guardada = await esperarRespuesta()
+      if (guardada.estado !== 'guardada') throw new Error(guardada.message)
+      actualizar(una.id, { estado: 'lista', enviado: una.total, ruta: guardada.ruta })
+    } catch (error) {
+      if (cancelada.current) {
+        actualizar(una.id, { estado: 'cancelada' })
+      } else if (abierto.readyState !== WebSocket.OPEN) {
+        // Sin conexión no es un fallo, y vuelve a la cola para seguir al volver
+        actualizar(una.id, { estado: 'en-cola', retomar: enServidor, velocidad: null })
+      } else {
         const motivo = error instanceof Error ? error.message : 'No se pudo subir.'
-        // Cancelar es una decisión, no un fallo
-        if (cancelada.current) toast('Copia cancelada.')
-        else toast.error(motivo)
-      } finally {
-        enCurso.current = false
-        soltarTurnos()
-        setSubida(null)
-        // El foco vuelve de la barra o del botón: se sigue tecleando
-        terminal.current?.focus()
+        actualizar(una.id, { estado: 'error', motivo })
       }
+    } finally {
+      actual.current = null
+      soltarTurnos()
+    }
+  }
+
+  /** Cuánto llegó de la subida cortada; cero si el servidor ya no la tiene. */
+  const pedirRetomar = async () => {
+    enviar({ subida: { retomar: true } })
+    const retomada = await esperarRespuesta()
+    return retomada.estado === 'retomada' ? (retomada.enviado ?? 0) : 0
+  }
+
+  /** Sube lo que espera, de a uno. Sin conexión se detiene y sigue al volver. */
+  const procesarCola = async () => {
+    if (trabajando.current) return
+    trabajando.current = true
+    try {
+      for (;;) {
+        const abierto = socket.current
+        if (!abierto || abierto.readyState !== WebSocket.OPEN) return
+        const siguiente = lista.current.find((una) => una.estado === 'en-cola')
+        if (!siguiente) break
+        await subirUna(siguiente, abierto)
+      }
+      politica.current = null
+      for (const listo of alVaciar.current.splice(0)) listo()
+    } finally {
+      trabajando.current = false
+      // El foco vuelve a la terminal para seguir tecleando
+      terminal.current?.focus()
+    }
+  }
+  reanudarCola.current = () => void procesarCola()
+
+  /** Pone en cola y resuelve cuando la cola se vacía, para recargar la lista. */
+  const encolarSubidas = useCallback(
+    (archivos: ArchivoParaSubir[]) => {
+      if (!archivos.length) return Promise.resolve()
+      const nuevas = archivos.map<Transferencia>((uno) => {
+        siguienteId.current += 1
+        return {
+          id: siguienteId.current,
+          archivo: uno.archivo,
+          nombre: uno.nombre,
+          carpeta: uno.carpeta,
+          crearCarpeta: uno.crearCarpeta,
+          estado: 'en-cola',
+          enviado: 0,
+          total: uno.archivo.size,
+          velocidad: null,
+        }
+      })
+      fijarLista((antes) => [...antes, ...nuevas])
+      const vacia = new Promise<void>((listo) => alVaciar.current.push(listo))
+      reanudarCola.current()
+      return vacia
     },
-    [enviar, terminal],
+    [],
   )
 
-  /** De uno en uno: el servidor solo atiende una copia por sesión. */
-  const subirVarios = useCallback(
-    async (archivos: File[], carpeta: string) => {
-      for (const archivo of archivos) await subir(archivo, carpeta)
+  /** La que sube se corta en el servidor, que borra lo escrito; las demás
+   *  salen de la cola. */
+  const cancelarTransferencia = useCallback(
+    (id: number) => {
+      if (actual.current === id) {
+        cancelada.current = true
+        enviar({ subida: { cancelar: true } })
+        if (alDecidir.current) decidirConflicto('omitir', false)
+        return
+      }
+      actualizar(id, { estado: 'cancelada' })
     },
-    [subir],
+    [enviar, decidirConflicto],
   )
 
-  /** Lo que ya se escribió en el servidor lo borra él. */
-  const cancelarSubida = useCallback(() => {
-    cancelada.current = true
-    enviar({ subida: { cancelar: true } })
-  }, [enviar])
+  const cancelarTodas = useCallback(() => {
+    fijarLista((antes) =>
+      antes.map((una) =>
+        una.estado === 'en-cola' ? { ...una, estado: 'cancelada' } : una,
+      ),
+    )
+    if (actual.current !== null) cancelarTransferencia(actual.current)
+  }, [cancelarTransferencia])
+
+  const reintentarTransferencia = useCallback((id: number) => {
+    actualizar(id, { estado: 'en-cola', enviado: 0, velocidad: null, motivo: undefined })
+    reanudarCola.current()
+  }, [])
+
+  const limpiarTransferencias = useCallback(() => {
+    fijarLista((antes) =>
+      antes.filter((una) => una.estado === 'en-cola' || una.estado === 'subiendo'),
+    )
+  }, [])
+
+  const hayEnCurso = transferencias.some(
+    (una) => una.estado === 'en-cola' || una.estado === 'subiendo',
+  )
+
+  // Cerrar la pestaña corta la copia; el navegador pregunta antes
+  useEffect(() => {
+    if (!hayEnCurso) return
+    const avisar = (evento: BeforeUnloadEvent) => evento.preventDefault()
+    window.addEventListener('beforeunload', avisar)
+    return () => window.removeEventListener('beforeunload', avisar)
+  }, [hayEnCurso])
 
   const reconectar = useCallback(() => {
     onEstado({ fase: 'conectando' })
@@ -469,6 +626,7 @@ export function useTerminalSocket({
         terminal.current?.focus()
         enviarTamano()
         medirLatencia()
+        reanudarCola.current()
       }
 
       abierto.onmessage = (evento) => {
@@ -627,16 +785,21 @@ export function useTerminalSocket({
 
   return {
     cambiarArchivo,
-    cancelarSubida,
+    cancelarTodas,
+    cancelarTransferencia,
+    conflicto,
+    decidirConflicto,
     descargar,
+    encolarSubidas,
     ejecutarTarea,
     enviarTamano,
     guardarContenido,
     pedirContenido,
     pedirArchivos,
+    limpiarTransferencias,
     reconectar,
-    subida,
-    subirVarios,
+    reintentarTransferencia,
     teclear,
+    transferencias,
   }
 }

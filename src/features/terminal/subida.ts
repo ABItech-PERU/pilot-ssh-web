@@ -1,19 +1,12 @@
 /** Copiar un archivo a la shell abierta, en tramos por el mismo socket. */
 
-/** 32 KB: lo que se teclea viaja por el mismo socket y espera detrás. */
-export const TAMANO_DE_TRAMO = 32 * 1024
+/** Por debajo del mega por mensaje que aceptan los proxies del WebSocket. */
+export const TAMANO_DE_TRAMO = 256 * 1024
 
-/** Se espera cuando el socket acumula más de esto sin llegar a mandarlo. */
-const COLA_MAXIMA = 96 * 1024
+/** Lo tecleado espera detrás de esta cola, por eso no pasa de dos tramos. */
+const COLA_MAXIMA = 2 * TAMANO_DE_TRAMO
 
 const ESPERA_DE_COLA_MS = 20
-
-export interface AvanceDeSubida {
-  nombre: string
-  carpeta: string
-  enviado: number
-  total: number
-}
 
 /** La carpeta de una ruta ya resuelta por el servidor. */
 export function fetchCarpetaDeLaRuta(ruta: string): string {
@@ -21,11 +14,9 @@ export function fetchCarpetaDeLaRuta(ruta: string): string {
   return corte > 0 ? ruta.slice(0, corte) : '/'
 }
 
-export function fetchPorcentaje({ enviado, total }: AvanceDeSubida): number {
-  return total ? Math.min(100, Math.round((enviado / total) * 100)) : 0
-}
-
 interface Envio {
+  /** Desde dónde seguir una subida cortada; cero para empezar. */
+  desde?: number
   onAvance: (enviado: number) => void
   sigueViva: () => boolean
   /** Turno para el siguiente tramo: lo da el servidor al tomar el anterior. */
@@ -36,9 +27,9 @@ interface Envio {
 export async function enviarPorTramos(
   socket: WebSocket,
   archivo: File,
-  { onAvance, sigueViva, pedirTurno }: Envio,
+  { desde = 0, onAvance, sigueViva, pedirTurno }: Envio,
 ): Promise<void> {
-  let enviado = 0
+  let enviado = desde
 
   while (enviado < archivo.size) {
     if (!sigueViva()) throw new Error('Se canceló la copia.')

@@ -11,6 +11,7 @@ import {
   FilePenLineIcon,
   FolderIcon,
   FolderPlusIcon,
+  FolderUpIcon,
   HouseIcon,
   KeyRoundIcon,
   Link2Icon,
@@ -57,6 +58,7 @@ import {
   quitarOcultos,
   type Sentido,
 } from '@/features/terminal/archivos'
+import { abrirDescarga } from '@/features/terminal/descarga'
 import { DialogoDePermisos } from '@/features/terminal/DialogoDePermisos'
 import { EditorDeArchivo } from '@/features/terminal/EditorDeArchivo'
 import type {
@@ -67,6 +69,8 @@ import type {
   MensajeDeContenido,
   MensajeDeTarea,
 } from '@/features/terminal/socket'
+import { leerElegidos, leerSoltados, type Soltado } from '@/features/terminal/soltar'
+import { type ArchivoParaSubir, planearSubida } from '@/features/terminal/transferencias'
 import type { OrdenDeArchivo } from '@/features/terminal/use-terminal-socket'
 import {
   guardarVista,
@@ -88,8 +92,13 @@ interface Props {
   }) => Promise<MensajeDeContenido>
   descargar: (ruta: string) => void
   /** Medir, comprimir, extraer o borrar en grande, aparte de la shell. */
-  ejecutarTarea: (accion: AccionDeTarea, ruta: string) => Promise<MensajeDeTarea>
-  subir: (archivos: File[], carpeta: string) => Promise<void>
+  ejecutarTarea: (
+    accion: AccionDeTarea,
+    ruta: string,
+    nombres?: string[],
+  ) => Promise<MensajeDeTarea>
+  /** Pone en cola; resuelve cuando la cola termina, para recargar la lista. */
+  subir: (archivos: ArchivoParaSubir[]) => Promise<void>
   /** Lleva la shell a esa carpeta con un `cd`. */
   abrirEnTerminal: (ruta: string) => void
   onCerrar: () => void
@@ -139,6 +148,7 @@ export function PanelDeArchivos({
   const siguienteTarea = useRef(0)
   const [arrastrando, setArrastrando] = useState(false)
   const selector = useRef<HTMLInputElement | null>(null)
+  const selectorDeCarpeta = useRef<HTMLInputElement | null>(null)
   // Estable: si cambiara en cada render, robaría el foco a la búsqueda
   const enfocarAlAbrir = useCallback((nodo: HTMLElement | null) => {
     nodo?.focus({ preventScroll: true })
@@ -174,8 +184,8 @@ export function PanelDeArchivos({
     else setListado(suyo)
   }, [aqui, pedirArchivos])
 
-  const subirAqui = (archivos: File[]) => {
-    if (archivos.length) void subir(archivos, aqui).then(recargar)
+  const subirAqui = (soltados: Soltado[]) => {
+    if (soltados.length) void subir(planearSubida(aqui, soltados)).then(recargar)
   }
 
   const cambiar = async (orden: OrdenDeArchivo, exito: string) => {
@@ -217,11 +227,18 @@ export function PanelDeArchivos({
   }
 
   /** Se ve abajo mientras corre, y la lista se recarga al terminar. */
-  const enSegundoPlano = async (texto: string, accion: AccionDeTarea, ruta: string) => {
+  const enSegundoPlano = async (
+    texto: string,
+    accion: AccionDeTarea,
+    ruta: string,
+    nombres?: string[],
+  ) => {
     siguienteTarea.current += 1
     const id = siguienteTarea.current
     setEnCurso((antes) => [...antes, { id, texto }])
-    const suya = await ejecutarTarea(accion, ruta)
+    const suya = await (nombres
+      ? ejecutarTarea(accion, ruta, nombres)
+      : ejecutarTarea(accion, ruta))
     setEnCurso((antes) => antes.filter((una) => una.id !== id))
     return suya
   }
@@ -343,15 +360,30 @@ export function PanelDeArchivos({
     setElegidos(new Set())
   }
 
-  const descargarElegidos = () => {
-    const archivos = deLaSeleccion.filter((entrada) => entrada.tipo !== 'carpeta')
-    for (const entrada of archivos) descargar(joinRuta(aqui, entrada.nombre))
-    if (archivos.length < deLaSeleccion.length) {
-      toast.info('Las carpetas no se descargan directo.', {
-        description: 'Comprímalas desde su menú y baje el .tar.gz.',
-      })
-    }
+  /** Un archivo baja tal cual; varios, o una carpeta, en un solo .tar.gz. */
+  const descargarElegidos = async () => {
+    const elegidos = deLaSeleccion
     salirDeLaSeleccion()
+    const [unico] = elegidos
+    if (elegidos.length === 1 && unico && unico.tipo !== 'carpeta') {
+      descargar(joinRuta(aqui, unico.nombre))
+      return
+    }
+    const que = elegidos.length === 1 ? unico?.nombre : `${elegidos.length} elementos`
+    const suya = await enSegundoPlano(
+      `Preparando la descarga de ${que}…`,
+      'empaquetar',
+      aqui,
+      elegidos.map((entrada) => entrada.nombre),
+    )
+    if (suya.estado !== 'hecho' || !suya.url) {
+      toast.error(suya.message ?? 'No se pudo preparar la descarga.')
+      return
+    }
+    abrirDescarga(suya.url)
+    toast.info(`Descargando ${suya.nombre ?? 'la selección'}`, {
+      description: 'Sigue mientras la terminal esté abierta.',
+    })
   }
 
   const medicion: Medicion =
@@ -391,7 +423,7 @@ export function PanelDeArchivos({
         // Que la terminal de detrás no lo suba también a su carpeta
         evento.stopPropagation()
         setArrastrando(false)
-        subirAqui([...evento.dataTransfer.files])
+        void leerSoltados(evento.dataTransfer).then(subirAqui)
       }}
     >
       <header className="border-term-border flex items-center gap-0.5 border-b py-1.5 pr-1.5 pl-3">
@@ -401,6 +433,12 @@ export function PanelDeArchivos({
         </BotonDelPanel>
         <BotonDelPanel etiqueta="Subir aquí" onClick={() => selector.current?.click()}>
           <UploadIcon className="size-4" />
+        </BotonDelPanel>
+        <BotonDelPanel
+          etiqueta="Subir una carpeta"
+          onClick={() => selectorDeCarpeta.current?.click()}
+        >
+          <FolderUpIcon className="size-4" />
         </BotonDelPanel>
         <BotonDelPanel
           etiqueta="Abrir esta carpeta en la terminal"
@@ -661,7 +699,7 @@ export function PanelDeArchivos({
             size="sm"
             variant="outline"
             disabled={!deLaSeleccion.length}
-            onClick={descargarElegidos}
+            onClick={() => void descargarElegidos()}
             className="border-term-border text-term-text h-7 bg-transparent hover:bg-white/5"
           >
             <DownloadIcon />
@@ -698,8 +736,20 @@ export function PanelDeArchivos({
         multiple
         className="hidden"
         onChange={(evento) => {
-          subirAqui([...(evento.target.files ?? [])])
+          subirAqui(leerElegidos([...(evento.target.files ?? [])]))
           // Elegir otra vez el mismo archivo también cuenta como cambio
+          evento.target.value = ''
+        }}
+      />
+
+      <input
+        ref={selectorDeCarpeta}
+        type="file"
+        // Elige una carpeta entera; cada archivo trae su ruta dentro de ella
+        {...{ webkitdirectory: '' }}
+        className="hidden"
+        onChange={(evento) => {
+          subirAqui(leerElegidos([...(evento.target.files ?? [])]))
           evento.target.value = ''
         }}
       />
