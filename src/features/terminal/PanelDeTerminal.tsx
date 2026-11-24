@@ -26,8 +26,8 @@ import {
 } from '@/features/terminal/use-terminal-socket'
 import type { Server, ServerUser } from '@/types/api'
 
-/** Hex: xterm no entiende oklch(). Copia de los tokens `--term-*` de
- *  index.css; cambian juntos. */
+/** En hexadecimal, porque xterm no entiende oklch(). Copia de los tokens
+ *  `--term-*` de index.css, que cambian juntos. */
 const TEMA = {
   background: '#141922',
   foreground: '#ecedf1',
@@ -55,7 +55,7 @@ const TEMA = {
 /** Alt+número es de las pestañas; abajo llegaría como un escape suelto. */
 const CAMBIA_DE_PESTANA = /^[1-9]$/
 
-/** Ctrl+C corta el proceso y Ctrl+F mueve el cursor: con Shift son de la
+/** Ctrl+C corta el proceso y Ctrl+F mueve el cursor. Con Shift son de la
  *  ventana, como en cualquier terminal. */
 const ATAJOS_DE_LA_VENTANA = 'fcv'
 
@@ -75,14 +75,14 @@ interface PanelProps {
   id: string
   server: Server
   credencial: ServerUser
-  /** Las de atrás siguen conectadas y recibiendo: solo dejan de verse. */
+  /** Las de atrás siguen conectadas y recibiendo, solo que no se ven. */
   visible: boolean
   onEstado: (id: string, estado: EstadoTerminal) => void
   onLatencia: (id: string, medidas: Latencias) => void
-  /** Cerrar la que acabó: si es la única, se sale de la terminal. */
+  /** Cierra la que acabó, y si es la única, sale de la terminal. */
   onCerrar: () => void
   esLaUnica: boolean
-  /** Sus archivos, a mano de la barra: manda a la terminal que se ve. */
+  /** Sus archivos, a mano de la barra, que manda a la terminal que se ve. */
   onMando: (id: string, mando: MandoDeArchivos) => void
   /** Para que la barra diga si el panel de archivos está abierto. */
   onArchivosAbiertos: (id: string, abiertos: boolean) => void
@@ -155,7 +155,7 @@ export function PanelDeTerminal({
     onEstado(id, estado)
   }, [id, estado, onEstado])
 
-  /** Donde está parada la shell: lo que anuncia, o lo que muestra el prompt. */
+  /** Donde está la shell, según lo que anuncia o lo que muestra el prompt. */
   const fetchDestino = useCallback(() => {
     const vista = terminal.current
     const activa = vista?.buffer.active
@@ -240,9 +240,8 @@ export function PanelDeTerminal({
       setCoincidencias({ actual: resultIndex + 1, total: resultCount }),
     )
 
-    // Oculta mide cero y xterm quedaria en una fila; el ajuste espera a que
-    // se vea. Y tras open el contenedor aun no tiene tamaño: va en el frame
-    // siguiente
+    // Oculta mide cero y xterm quedaría en una fila, así que el ajuste espera
+    // al cuadro siguiente, cuando el contenedor ya tiene tamaño
     let marco = requestAnimationFrame(() => ajuste.fit())
 
     const teclado = vista.onData(teclear)
@@ -302,7 +301,7 @@ export function PanelDeTerminal({
         if (destinoDeArrastre === null) setDestinoDeArrastre(fetchDestino())
       }}
       onDragLeave={(evento) => {
-        // Pasar sobre xterm tambien dispara leave: solo cuenta salir del panel
+        // Pasar sobre xterm también dispara leave, y solo cuenta salir del panel
         if (!evento.currentTarget.contains(evento.relatedTarget as Node)) {
           setDestinoDeArrastre(null)
         }
@@ -421,7 +420,7 @@ async function copiarLoSeleccionado(vista: Terminal) {
   try {
     await navigator.clipboard.writeText(elegido)
   } catch {
-    // Sin permiso queda la selección: se copia con el menú del navegador
+    // Sin permiso queda la selección, que se copia con el menú del navegador
   }
 }
 
