@@ -34,6 +34,7 @@ import {
   type ArchivoParaSubir,
   calcularVelocidad,
   type Muestra,
+  suavizarVelocidad,
   type Transferencia,
 } from '@/features/terminal/transferencias'
 import { env } from '@/lib/env'
@@ -73,6 +74,9 @@ const SIN_CONEXION = 'Se perdió la conexión con la terminal.'
 
 /** Muestras recientes para medir la velocidad de una subida. */
 const MUESTRAS_DE_VELOCIDAD = 60
+
+/** Cada cuánto cambia la velocidad mostrada, como en un gestor de descargas. */
+const REFRESCO_DE_VELOCIDAD_MS = 1000
 
 const sinListado = (): MensajeDeArchivos => ({
   type: 'archivos',
@@ -369,6 +373,8 @@ export function useTerminalSocket({
       retomar: false,
     })
     const muestras: Muestra[] = [{ instante: performance.now(), enviado: desde }]
+    let velocidad: number | null = null
+    let ultimaMedida = performance.now()
     // Desde aquí el servidor guarda lo que llega, y un corte se puede retomar
     let enServidor = desde > 0
 
@@ -398,9 +404,17 @@ export function useTerminalSocket({
       await enviarPorTramos(abierto, una.archivo, {
         desde,
         onAvance: (enviado) => {
-          muestras.push({ instante: performance.now(), enviado })
+          const ahora = performance.now()
+          muestras.push({ instante: ahora, enviado })
           if (muestras.length > MUESTRAS_DE_VELOCIDAD) muestras.shift()
-          actualizar(una.id, { enviado, velocidad: calcularVelocidad(muestras) })
+          // La barra avanza con cada tramo; la velocidad cambia una vez por segundo
+          const medida = calcularVelocidad(muestras)
+          if (medida !== null && ahora - ultimaMedida >= REFRESCO_DE_VELOCIDAD_MS) {
+            const segundos = (ahora - ultimaMedida) / 1000
+            velocidad = suavizarVelocidad(velocidad, medida, segundos)
+            ultimaMedida = ahora
+          }
+          actualizar(una.id, { enviado, velocidad })
         },
         sigueViva: () => !cancelada.current,
         pedirTurno,

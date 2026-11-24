@@ -5,6 +5,7 @@ import {
   describirRestante,
   estimarRestante,
   planearSubida,
+  suavizarVelocidad,
   resumirTransferencias,
   type Transferencia,
 } from '@/features/terminal/transferencias'
@@ -50,6 +51,28 @@ describe('calcularVelocidad', () => {
   })
 })
 
+describe('suavizarVelocidad', () => {
+  it('la primera medida se toma tal cual', () => {
+    expect(suavizarVelocidad(null, 5_000_000, 1)).toBe(5_000_000)
+  })
+
+  it('un salto de la red mueve la velocidad mostrada solo un poco', () => {
+    const mostrada = suavizarVelocidad(5_000_000, 6_000_000, 1)
+
+    expect(mostrada).toBeGreaterThan(5_000_000)
+    expect(mostrada).toBeLessThan(5_300_000)
+  })
+
+  it('si la red cambia de verdad, la alcanza en unos segundos', () => {
+    let mostrada = 5_000_000
+    for (let segundo = 0; segundo < 15; segundo++) {
+      mostrada = suavizarVelocidad(mostrada, 2_000_000, 1)
+    }
+
+    expect(mostrada).toBeLessThan(2_200_000)
+  })
+})
+
 describe('estimarRestante', () => {
   it('divide lo que falta entre la velocidad', () => {
     expect(estimarRestante(100, 40, 20)).toBe(3)
@@ -62,7 +85,8 @@ describe('estimarRestante', () => {
 
 describe('describirRestante', () => {
   it('en segundos, minutos u horas, como un gestor de descargas', () => {
-    expect(describirRestante(42.2)).toBe('quedan 43 s')
+    expect(describirRestante(8.2)).toBe('quedan 9 s')
+    expect(describirRestante(42.2)).toBe('quedan 45 s')
     expect(describirRestante(150)).toBe('quedan 3 min')
     expect(describirRestante(5400)).toBe('quedan 1,5 h')
   })
