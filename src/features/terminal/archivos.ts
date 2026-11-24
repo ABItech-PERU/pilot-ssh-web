@@ -1,6 +1,7 @@
 /** Rutas del servidor remoto, siempre con «/», sin mirar el sistema local. */
 
 import type { TipoDeEntrada } from '@/features/terminal/socket'
+import { formatFileSize } from '@/lib/format'
 
 export interface Miga {
   nombre: string
@@ -45,9 +46,41 @@ export function describeBorrado(tipo: TipoDeEntrada): { accion: string; detalles
   }
   const sinVuelta = 'Se borra del servidor. No hay papelera para recuperarlo.'
   if (tipo === 'carpeta') {
-    return { accion: 'Borrar carpeta', detalles: [sinVuelta, 'Solo se borra si está vacía.'] }
+    return {
+      accion: 'Borrar carpeta y su contenido',
+      detalles: [sinVuelta, 'Se borra con todo lo que tiene dentro.'],
+    }
   }
   return { accion: 'Borrar archivo', detalles: [sinVuelta] }
+}
+
+/** Lo que el servidor sabe extraer, con `tar` o con `unzip`. */
+const COMPRIMIDOS = /.\.(tar\.gz|tar\.bz2|tar\.xz|tgz|tbz2|txz|tar|zip)$/i
+
+export function esComprimido(nombre: string): boolean {
+  return COMPRIMIDOS.test(nombre)
+}
+
+export interface Medida {
+  archivos: number
+  carpetas: number
+  kb: number
+}
+
+const contar = (cuantos: number, uno: string, varios: string) =>
+  `${cuantos} ${cuantos === 1 ? uno : varios}`
+
+/** Lo que hay dentro de una carpeta, para decir qué se borra. */
+export function describeMedida({ archivos, carpetas, kb }: Medida): string {
+  if (!archivos && !carpetas) return 'Está vacía'
+  return `${contar(archivos, 'archivo', 'archivos')}, ${contar(carpetas, 'carpeta', 'carpetas')} y ${formatFileSize(kb * 1024)}`
+}
+
+/** Con muchos archivos, o sin saber cuántos, un clic no basta para borrar. */
+export const ARCHIVOS_PARA_ESCRIBIR_EL_NOMBRE = 100
+
+export function pideEscribirElNombre(medida: Medida | null): boolean {
+  return !medida || medida.archivos > ARCHIVOS_PARA_ESCRIBIR_EL_NOMBRE
 }
 
 export type CriterioDeOrden = 'nombre' | 'tamano' | 'fecha'

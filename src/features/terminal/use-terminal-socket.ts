@@ -19,6 +19,8 @@ import {
   type MensajeDeArchivos,
   type MensajeDeContenido,
   type MensajeDeDescarga,
+  type MensajeDeTarea,
+  type AccionDeTarea,
   type MensajeDeSubida,
   parseIncoming,
   quotePath,
@@ -114,6 +116,8 @@ export function useTerminalSocket({
   const listadosDeArchivos = useRef<((suyo: MensajeDeArchivos) => void)[]>([])
   const cambio = useRef<((suyo: MensajeDeArchivo) => void) | null>(null)
   const preparada = useRef<((suya: MensajeDeDescarga) => void) | null>(null)
+  // Por acción y ruta: varias corren a la vez y terminan en cualquier orden
+  const tareas = useRef(new Map<string, ((suya: MensajeDeTarea) => void)[]>())
   const turnoDeDescarga = useRef<Promise<void>>(Promise.resolve())
   const contenido = useRef<((suyo: MensajeDeContenido) => void) | null>(null)
   const cancelada = useRef(false)
@@ -230,10 +234,10 @@ export function useTerminalSocket({
   )
 
   const pedirEnlace = useCallback(
-    (ruta: string, comprimir: boolean) =>
+    (ruta: string) =>
       new Promise<MensajeDeDescarga>((contestar) => {
         preparada.current = contestar
-        if (!enviar({ descarga: comprimir ? { ruta, comprimir: true } : { ruta } })) {
+        if (!enviar({ descarga: { ruta } })) {
           preparada.current = null
           contestar({ type: 'descarga', estado: 'error', message: SIN_CONEXION })
         }
@@ -241,13 +245,12 @@ export function useTerminalSocket({
     [enviar],
   )
 
-  /** Un archivo tal cual, o una carpeta en `.tar.gz`. El servidor prepara el
-   *  enlace y el navegador lo baja con su gestor, directo al disco. Se piden
-   *  de a uno porque el servidor contesta en orden. */
+  /** El servidor prepara el enlace y el navegador lo baja con su gestor,
+   *  directo al disco. Se piden de a uno porque el servidor contesta en orden. */
   const descargar = useCallback(
-    (ruta: string, comprimir = false) => {
+    (ruta: string) => {
       turnoDeDescarga.current = turnoDeDescarga.current.then(async () => {
-        const suya = await pedirEnlace(ruta, comprimir)
+        const suya = await pedirEnlace(ruta)
         if (suya.estado !== 'preparada' || !suya.url) {
           toast.error(suya.message ?? 'No se pudo descargar.')
           return
@@ -259,6 +262,21 @@ export function useTerminalSocket({
       })
     },
     [pedirEnlace],
+  )
+
+  /** Medir, comprimir, extraer o borrar en grande. Corre en el servidor
+   *  aparte de la shell y contesta al terminar. */
+  const ejecutarTarea = useCallback(
+    (accion: AccionDeTarea, ruta: string) =>
+      new Promise<MensajeDeTarea>((contestar) => {
+        if (!enviar({ tarea: { accion, ruta } })) {
+          contestar({ type: 'tarea', accion, pedida: ruta, estado: 'error', message: SIN_CONEXION })
+          return
+        }
+        const clave = JSON.stringify([accion, ruta])
+        tareas.current.set(clave, [...(tareas.current.get(clave) ?? []), contestar])
+      }),
+    [enviar],
   )
 
   /** Tramos sin confirmar. Dos mantienen el canal lleno sin encolar tanto
@@ -466,6 +484,13 @@ export function useTerminalSocket({
           contestar?.(mensaje)
           return
         }
+        if (mensaje.type === 'tarea') {
+          const clave = JSON.stringify([mensaje.accion, mensaje.pedida])
+          const esperando = tareas.current.get(clave) ?? []
+          esperando.shift()?.(mensaje)
+          if (!esperando.length) tareas.current.delete(clave)
+          return
+        }
         if (mensaje.type === 'descarga') {
           if (mensaje.estado === 'cortada') {
             toast.error(mensaje.message ?? 'La descarga se cortó.')
@@ -519,6 +544,13 @@ export function useTerminalSocket({
         escribir(eco.current.limpiar())
         soltarTurnos()
         preparada.current?.({ type: 'descarga', estado: 'error', message: SIN_CONEXION })
+        for (const [clave, esperando] of tareas.current) {
+          const [accion, pedida] = JSON.parse(clave) as [AccionDeTarea, string]
+          for (const contestar of esperando) {
+            contestar({ type: 'tarea', accion, pedida, estado: 'error', message: SIN_CONEXION })
+          }
+        }
+        tareas.current.clear()
         preparada.current = null
         contenido.current?.({
           type: 'contenido',
@@ -597,6 +629,7 @@ export function useTerminalSocket({
     cambiarArchivo,
     cancelarSubida,
     descargar,
+    ejecutarTarea,
     enviarTamano,
     guardarContenido,
     pedirContenido,

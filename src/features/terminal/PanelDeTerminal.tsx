@@ -125,6 +125,7 @@ export function PanelDeTerminal({
     cambiarArchivo,
     cancelarSubida,
     descargar,
+    ejecutarTarea,
     guardarContenido,
     pedirContenido,
     enviarTamano,
@@ -365,6 +366,7 @@ export function PanelDeTerminal({
             pedirContenido={pedirContenido}
             guardarContenido={guardarContenido}
             descargar={descargar}
+            ejecutarTarea={ejecutarTarea}
             subir={subirVarios}
             abrirEnTerminal={abrirEnTerminal}
             onCerrar={cerrarArchivos}

@@ -86,6 +86,26 @@ export type MensajeDeArchivo = {
   message?: string
 }
 
+export type AccionDeTarea = 'medir' | 'comprimir' | 'extraer' | 'borrar'
+
+/** Cómo terminó algo que tarda y corre aparte de la shell. `pedida` es la
+ *  ruta tal como se pidió, para emparejar la respuesta. */
+export type MensajeDeTarea = {
+  type: 'tarea'
+  accion: AccionDeTarea
+  pedida: string
+  estado: 'hecho' | 'error'
+  message?: string
+  ruta?: string
+  /** Lo creado al comprimir o extraer. */
+  resultado?: string
+  nombre?: string
+  tamano?: number
+  archivos?: number
+  carpetas?: number
+  kb?: number
+}
+
 /** Respuesta al ping: con su número se mide la ida y vuelta de verdad. */
 type MensajeDePong = { type: 'pong'; ping: number }
 
@@ -98,6 +118,7 @@ export type MensajeEntrante =
   | MensajeDeDescarga
   | MensajeDeArchivo
   | MensajeDeContenido
+  | MensajeDeTarea
   | MensajeDePong
 
 /** La ruta del WebSocket. El vale se pide para esta misma ruta. */
@@ -223,6 +244,9 @@ const ACCIONES_DE_ARCHIVO: MensajeDeArchivo['accion'][] = [
   'permisos',
 ]
 const ESTADOS_DE_CONTENIDO = ['listo', 'guardado', 'error']
+const ACCIONES_DE_TAREA: AccionDeTarea[] = ['medir', 'comprimir', 'extraer', 'borrar']
+
+const comoNumero = (valor: unknown) => (typeof valor === 'number' ? valor : undefined)
 const TIPOS_DE_ENTRADA: TipoDeEntrada[] = ['carpeta', 'archivo', 'enlace']
 
 function parseEntrada(cruda: unknown): EntradaDeArchivo {
@@ -304,6 +328,25 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
         ruta: dato.ruta,
         url: dato.url,
         message: dato.message,
+      }
+    }
+    if (dato.type === 'tarea') {
+      const accion = ACCIONES_DE_TAREA.find((una) => una === dato.accion)
+      if (!accion) return null
+      const resto = dato as Record<string, unknown>
+      return {
+        type: 'tarea',
+        accion,
+        pedida: String(resto.pedida ?? ''),
+        estado: dato.estado === 'hecho' ? 'hecho' : 'error',
+        message: dato.message,
+        ruta: dato.ruta,
+        resultado: typeof resto.resultado === 'string' ? resto.resultado : undefined,
+        nombre: dato.nombre,
+        tamano: comoNumero(dato.tamano),
+        archivos: comoNumero(resto.archivos),
+        carpetas: comoNumero(resto.carpetas),
+        kb: comoNumero(resto.kb),
       }
     }
     if (dato.type === 'archivo') {

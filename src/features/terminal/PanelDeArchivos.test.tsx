@@ -8,6 +8,7 @@ import type {
   MensajeDeArchivo,
   MensajeDeArchivos,
   MensajeDeContenido,
+  MensajeDeTarea,
 } from '@/features/terminal/socket'
 
 const entrada = (
@@ -42,12 +43,28 @@ const SITIO = listado([
   entrada('.env', 'archivo', 31),
   entrada('app.log', 'archivo', 2_500_000),
   entrada('notas.txt', 'archivo', 8),
+  entrada('sitio.tar.gz', 'archivo', 2048),
 ])
 
 const HECHO: MensajeDeArchivo = { type: 'archivo', accion: 'borrar', estado: 'hecho' }
 
-function montar(primero: MensajeDeArchivos = SITIO) {
+/** Lo que contesta el servidor a cada tarea; una carpeta pequeña por defecto. */
+function tareaHecha(medida = { archivos: 3, carpetas: 1, kb: 12 }) {
+  return vi.fn(
+    async (accion: MensajeDeTarea['accion'], ruta: string): Promise<MensajeDeTarea> => ({
+      type: 'tarea',
+      accion,
+      pedida: ruta,
+      estado: 'hecho',
+      ...medida,
+      nombre: accion === 'comprimir' ? 'public.tar.gz' : 'sitio',
+    }),
+  )
+}
+
+function montar(primero: MensajeDeArchivos = SITIO, ejecutarTarea = tareaHecha()) {
   const props = {
+    ejecutarTarea,
     pedirArchivos: vi.fn().mockResolvedValue(primero),
     cambiarArchivo: vi.fn().mockResolvedValue(HECHO),
     pedirContenido: vi.fn().mockResolvedValue({
@@ -90,7 +107,13 @@ describe('PanelDeArchivos', () => {
     await screen.findByText('notas.txt')
 
     expect(pedirArchivos).toHaveBeenCalledWith('~')
-    expect(nombresVisibles()).toEqual(['public', '.env', 'app.log', 'notas.txt'])
+    expect(nombresVisibles()).toEqual([
+      'public',
+      '.env',
+      'app.log',
+      'notas.txt',
+      'sitio.tar.gz',
+    ])
   })
 
   it('cada fila se nombra por su archivo y lo describe con tamaño y permisos', async () => {
@@ -146,15 +169,80 @@ describe('PanelDeArchivos', () => {
     expect(descargar).toHaveBeenCalledWith('/home/deploy/notas.txt')
   })
 
-  it('una carpeta se descarga comprimida desde su menú', async () => {
+  it('comprimir una carpeta crea su .tar.gz en el servidor y recarga la lista', async () => {
     const usuario = userEvent.setup()
-    const { descargar } = montar()
+    const { ejecutarTarea, pedirArchivos } = montar()
     await screen.findByText('public')
 
     const menu = await menuDe(usuario, 'public')
-    await usuario.click(within(menu).getByRole('menuitem', { name: 'Descargar comprimida' }))
+    await usuario.click(within(menu).getByRole('menuitem', { name: 'Comprimir' }))
 
-    expect(descargar).toHaveBeenCalledWith('/home/deploy/public', true)
+    expect(ejecutarTarea).toHaveBeenCalledWith('comprimir', '/home/deploy/public')
+    await vi.waitFor(() => expect(pedirArchivos).toHaveBeenCalledTimes(2))
+  })
+
+  it('mientras comprime, el panel lo dice', async () => {
+    const usuario = userEvent.setup()
+    const sinTerminar = vi.fn(() => new Promise<MensajeDeTarea>(() => {}))
+    montar(SITIO, sinTerminar)
+    await screen.findByText('public')
+
+    const menu = await menuDe(usuario, 'public')
+    await usuario.click(within(menu).getByRole('menuitem', { name: 'Comprimir' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Comprimiendo public')
+  })
+
+  it('extraer solo se ofrece en los comprimidos', async () => {
+    const usuario = userEvent.setup()
+    const { ejecutarTarea } = montar()
+    await screen.findByText('notas.txt')
+
+    const deNotas = await menuDe(usuario, 'notas.txt')
+    expect(within(deNotas).queryByRole('menuitem', { name: 'Extraer aquí' })).toBeNull()
+    await usuario.keyboard('{Escape}')
+
+    const delSitio = await menuDe(usuario, 'sitio.tar.gz')
+    await usuario.click(within(delSitio).getByRole('menuitem', { name: 'Extraer aquí' }))
+
+    expect(ejecutarTarea).toHaveBeenCalledWith('extraer', '/home/deploy/sitio.tar.gz')
+  })
+
+  it('borrar una carpeta mide lo que tiene y lo dice antes', async () => {
+    const usuario = userEvent.setup()
+    const { ejecutarTarea } = montar()
+    await screen.findByText('public')
+
+    const menu = await menuDe(usuario, 'public')
+    await usuario.click(within(menu).getByRole('menuitem', { name: 'Borrar…' }))
+    const dialogo = await screen.findByRole('alertdialog', { name: '¿Borrar public?' })
+
+    expect(await within(dialogo).findByText('3 archivos, 1 carpeta y 12 KB')).toBeVisible()
+    await usuario.click(
+      within(dialogo).getByRole('button', { name: 'Borrar carpeta y su contenido' }),
+    )
+    expect(ejecutarTarea).toHaveBeenCalledWith('medir', '/home/deploy/public')
+    expect(ejecutarTarea).toHaveBeenCalledWith('borrar', '/home/deploy/public')
+  })
+
+  it('una carpeta con más de 100 archivos pide escribir su nombre', async () => {
+    const usuario = userEvent.setup()
+    montar(SITIO, tareaHecha({ archivos: 1566, carpetas: 12, kb: 455_000 }))
+    await screen.findByText('public')
+
+    const menu = await menuDe(usuario, 'public')
+    await usuario.click(within(menu).getByRole('menuitem', { name: 'Borrar…' }))
+    const dialogo = await screen.findByRole('alertdialog', { name: '¿Borrar public?' })
+    const nombre = await within(dialogo).findByRole('textbox', {
+      name: 'Escriba public para confirmar',
+    })
+    const borrar = within(dialogo).getByRole('button', {
+      name: 'Borrar carpeta y su contenido',
+    })
+
+    expect(borrar).toBeDisabled()
+    await usuario.type(nombre, 'public')
+    expect(borrar).toBeEnabled()
   })
 
   it('renombra en la misma fila', async () => {
@@ -220,7 +308,7 @@ describe('PanelDeArchivos', () => {
     expect(cambiarArchivo).toHaveBeenCalledTimes(2)
   })
 
-  it('elegir varios los descarga, y una carpeta va comprimida', async () => {
+  it('elegir varios descarga los archivos y deja las carpetas', async () => {
     const usuario = userEvent.setup()
     const { descargar } = montar()
     await screen.findByText('notas.txt')
@@ -230,8 +318,8 @@ describe('PanelDeArchivos', () => {
     await usuario.click(screen.getByRole('checkbox', { name: 'Elegir notas.txt' }))
     await usuario.click(screen.getByRole('button', { name: 'Descargar' }))
 
-    expect(descargar).toHaveBeenCalledWith('/home/deploy/public', true)
-    expect(descargar).toHaveBeenCalledWith('/home/deploy/notas.txt', false)
+    expect(descargar).toHaveBeenCalledTimes(1)
+    expect(descargar).toHaveBeenCalledWith('/home/deploy/notas.txt')
   })
 
   it('ordena por tamaño de mayor a menor, sin sacar las carpetas de arriba', async () => {
@@ -244,7 +332,7 @@ describe('PanelDeArchivos', () => {
     await usuario.click(screen.getByRole('button', { name: 'Ordenar y filtrar' }))
     await usuario.click(await screen.findByRole('menuitemradio', { name: 'De mayor a menor' }))
 
-    expect(nombresVisibles()).toEqual(['public', 'app.log', '.env', 'notas.txt'])
+    expect(nombresVisibles()).toEqual(['public', 'app.log', 'sitio.tar.gz', '.env', 'notas.txt'])
   })
 
   it('ocultar los ocultos deja un enlace para volver a verlos', async () => {
