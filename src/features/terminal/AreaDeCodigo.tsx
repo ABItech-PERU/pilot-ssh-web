@@ -31,6 +31,18 @@ interface Props {
   soloElFinal: boolean
   onCambiar: (texto: string) => void
   onLenguaje: (lenguaje: string) => void
+  onCursor: (cursor: Cursor) => void
+}
+
+export interface Cursor {
+  linea: number
+  columna: number
+}
+
+function fetchCursor(estado: EditorState): Cursor {
+  const cabeza = estado.selection.main.head
+  const linea = estado.doc.lineAt(cabeza)
+  return { linea: linea.number, columna: cabeza - linea.from + 1 }
 }
 
 /** Archivos de servidor sin extensión que el catálogo no reconoce. */
@@ -180,10 +192,11 @@ export default function AreaDeCodigo({
   soloElFinal,
   onCambiar,
   onLenguaje,
+  onCursor,
 }: Props) {
   const contenedor = useRef<HTMLDivElement | null>(null)
-  const avisos = useRef({ onCambiar, onLenguaje })
-  avisos.current = { onCambiar, onLenguaje }
+  const avisos = useRef({ onCambiar, onLenguaje, onCursor })
+  avisos.current = { onCambiar, onLenguaje, onCursor }
 
   // El texto inicial se toma una vez; recargar el archivo monta otro editor
   useEffect(() => {
@@ -215,6 +228,9 @@ export default function AreaDeCodigo({
           EditorView.contentAttributes.of({ 'aria-label': `Contenido de ${nombre}` }),
           EditorView.updateListener.of((cambio) => {
             if (cambio.docChanged) avisos.current.onCambiar(cambio.state.doc.toString())
+            if (cambio.docChanged || cambio.selectionSet) {
+              avisos.current.onCursor(fetchCursor(cambio.state))
+            }
           }),
           TEMA,
         ],
@@ -222,6 +238,7 @@ export default function AreaDeCodigo({
     })
     if (soloElFinal) vista.dispatch({ effects: EditorView.scrollIntoView(fin, { y: 'end' }) })
     vista.focus()
+    avisos.current.onCursor(fetchCursor(vista.state))
 
     let vigente = true
     const descripcion = buscarLenguaje(nombre)
@@ -240,7 +257,7 @@ export default function AreaDeCodigo({
   return (
     <div
       ref={contenedor}
-      className="font-machine [&_.cm-panels]:font-sans border-term-border focus-within:ring-ring h-full overflow-hidden rounded-md border focus-within:ring-2"
+      className="font-machine [&_.cm-panels]:font-sans h-full overflow-hidden"
     />
   )
 }

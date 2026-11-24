@@ -77,6 +77,30 @@ describe('EditorDeArchivo', () => {
     expect(await screen.findByText(/YAML/)).toBeInTheDocument()
   })
 
+  it('mientras abre, ya dice qué archivo es', () => {
+    render(
+      <EditorDeArchivo
+        ruta={RUTA}
+        pedirContenido={() => new Promise(() => {})}
+        guardarContenido={vi.fn()}
+        descargar={vi.fn()}
+        onCerrar={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('dialog', { name: '.env' })).toBeVisible()
+    expect(screen.getByRole('status', { name: 'Abriendo el archivo' })).toBeInTheDocument()
+  })
+
+  it('dice en qué línea y columna está el cursor', async () => {
+    montar()
+    const { vista } = await abrirEditor()
+
+    vista.dispatch({ selection: { anchor: 5 } })
+
+    expect(await screen.findByText('Lín 1, col 6')).toBeInTheDocument()
+  })
+
   it('sin cambios no deja guardar', async () => {
     montar()
 
