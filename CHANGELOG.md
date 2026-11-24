@@ -32,6 +32,8 @@ Cambios notables de Pilot SSH Web, según Keep a Changelog 1.1 y SemVer 2.0.
 - «Detalles» de un archivo o carpeta, con tamaño exacto, propietario, grupo, permisos explicados y a dónde apunta un enlace.
 - Las descargas de la terminal las baja el gestor de descargas del navegador, directo al disco, sin tope de memoria.
 - Arrastrar un archivo sobre la terminal dice a qué carpeta irá, y los avisos de la terminal salen en el centro de la cabecera, sin tapar la shell ni el panel de archivos.
+- Una reconexión ya no escribe líneas en la terminal: se ve en el estado y, si tarda, en un aviso que se va solo.
+- Al volver a la pestaña, la terminal comprueba la conexión y, si no contesta en 4 s, vuelve a la misma shell.
 
 ### Eliminado
 

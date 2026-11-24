@@ -144,6 +144,10 @@ describe('parseIncoming', () => {
   it('sin message no hay nada que pintar', () => {
     expect(parseIncoming('{"type":"output"}')).toBeNull()
   })
+
+  it('reconoce el latido del servidor, que no se pinta', () => {
+    expect(parseIncoming('{"type":"latido"}')).toEqual({ type: 'latido' })
+  })
 })
 
 describe('buildTerminalUrl con sesión', () => {

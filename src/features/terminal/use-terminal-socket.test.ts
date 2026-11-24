@@ -23,6 +23,9 @@ class SocketFalso {
   static creados: SocketFalso[] = []
 
   readyState = SocketFalso.CONNECTING
+  /** Como el servidor, que contesta cada ping; en falso, la conexión está muerta. */
+  contestaPings = true
+  cerradoCon: number | undefined
   bufferedAmount = 0
   binaryType = 'blob'
   enviados: (string | ArrayBuffer)[] = []
@@ -36,9 +39,13 @@ class SocketFalso {
 
   send(datos: string | ArrayBuffer) {
     this.enviados.push(datos)
+    if (typeof datos !== 'string' || !this.contestaPings) return
+    const { ping } = JSON.parse(datos) as { ping?: number }
+    if (ping !== undefined) queueMicrotask(() => this.contestar({ type: 'pong', ping }))
   }
 
-  close() {
+  close(codigo?: number) {
+    this.cerradoCon = codigo
     this.readyState = SocketFalso.CLOSED
   }
 
@@ -54,6 +61,12 @@ class SocketFalso {
   cortar() {
     this.readyState = SocketFalso.CLOSED
     this.onclose?.({ code: 1006 })
+  }
+
+  get mensajes(): Record<string, unknown>[] {
+    return this.enviados
+      .filter((dato): dato is string => typeof dato === 'string')
+      .map((dato) => JSON.parse(dato) as Record<string, unknown>)
   }
 
   /** Lo que la web pidió sobre subidas, sin los pings. */
@@ -210,5 +223,73 @@ describe('useTerminalSocket, cola de subidas', () => {
     // Solo lo que falta, y luego el cierre
     await waitFor(() => expect(vuelta.subidas.at(-1)).toEqual({ fin: true }))
     expect(vuelta.tramos).toHaveLength(3)
+  })
+})
+
+describe('useTerminalSocket, conexión viva', () => {
+  const volverALaPestana = () =>
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    Object.defineProperty(document, 'hidden', { value: false, configurable: true })
+    OPCIONES.onEstado.mockClear()
+    vi.mocked(vista.write).mockClear()
+  })
+
+  afterEach(() => vi.useRealTimers())
+
+  it('contesta el latido del servidor al recibirlo', async () => {
+    montar()
+    const socket = await conectar()
+
+    act(() => socket.contestar({ type: 'latido' }))
+
+    expect(socket.mensajes).toContainEqual({ latido: true })
+  })
+
+  it('al volver a la pestaña, una conexión que no contesta se rehace sobre la misma shell', async () => {
+    montar()
+    const socket = await conectar()
+    act(() => socket.contestar({ type: 'sesion', id: 'shell-1' }))
+    socket.contestaPings = false
+
+    volverALaPestana()
+    act(() => {
+      vi.advanceTimersByTime(4000)
+    })
+
+    expect(socket.cerradoCon).toBe(4000)
+    expect(OPCIONES.onEstado).toHaveBeenCalledWith({ fase: 'reconectando' })
+    await waitFor(() => expect(SocketFalso.creados[1]).toBeDefined(), { timeout: 3000 })
+    expect(SocketFalso.creados[1]!.url).toContain('sesion=shell-1')
+  })
+
+  it('al volver a la pestaña, si contesta, sigue con la misma conexión', async () => {
+    montar()
+    const socket = await conectar()
+
+    volverALaPestana()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4000)
+    })
+
+    expect(socket.cerradoCon).toBeUndefined()
+    expect(SocketFalso.creados).toHaveLength(1)
+  })
+
+  it('un corte no ensucia la terminal: lo dice el estado', async () => {
+    montar()
+    const socket = await conectar()
+
+    act(() => socket.cortar())
+    expect(OPCIONES.onEstado).toHaveBeenCalledWith({ fase: 'reconectando' })
+    await conectar(1)
+
+    const escrito = vi.mocked(vista.write).mock.calls.map(([texto]) => String(texto)).join('')
+    expect(escrito).not.toMatch(/Se perdió|Reconectado/)
+    expect(OPCIONES.onEstado).toHaveBeenLastCalledWith({ fase: 'conectada' })
   })
 })

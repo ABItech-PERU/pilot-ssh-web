@@ -219,12 +219,14 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
                 'size-2 rounded-full',
                 estado?.fase === 'conectada' && 'bg-term-ok',
                 estado?.fase === 'cerrada' && 'bg-term-root',
-                (!estado || estado.fase === 'conectando') && 'bg-term-arg animate-pulse',
+                (!estado || estado.fase === 'conectando' || estado.fase === 'reconectando') &&
+                  'bg-term-arg animate-pulse',
               )}
               aria-hidden
             />
             <span className="text-term-dim hidden sm:inline">
               {!estado || estado.fase === 'conectando' ? 'Conectando' : null}
+              {estado?.fase === 'reconectando' && 'Reconectando…'}
               {estado?.fase === 'conectada' && 'Conectado'}
               {estado?.fase === 'cerrada' && estado.motivo}
             </span>
