@@ -253,9 +253,8 @@ export function useTerminalSocket({
           return
         }
         abrirDescarga(suya.url)
-        toast(`Descargando ${suya.nombre ?? 'el archivo'}`, {
-          description:
-            'El navegador muestra el avance. Sigue mientras la terminal esté abierta.',
+        toast.info(`Descargando ${suya.nombre ?? 'el archivo'}`, {
+          description: 'Sigue mientras la terminal esté abierta.',
         })
       })
     },

@@ -110,12 +110,12 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
     setLatencias((actuales) => ({ ...actuales, [id]: medidas }))
   }, [])
 
-  // Arriba a la izquierda, bajo las pestañas, los avisos no tapan el panel
-  // de archivos de la derecha ni el prompt de abajo
+  // En el centro de la cabecera, libre entre el nombre y el estado, los avisos
+  // no tapan la salida de la shell ni el panel de archivos
   const [bordeDeAvisos, setBordeDeAvisos] = useState<number | null>(null)
-  useUbicacionDeAvisos('top-left', bordeDeAvisos)
-  const medirPestanas = useCallback((barra: HTMLDivElement | null) => {
-    if (barra) setBordeDeAvisos(Math.round(barra.getBoundingClientRect().bottom) + 8)
+  useUbicacionDeAvisos('top-center', bordeDeAvisos)
+  const medirCabecera = useCallback((cabecera: HTMLElement | null) => {
+    if (cabecera) setBordeDeAvisos(Math.round(cabecera.getBoundingClientRect().top) + 6)
   }, [])
 
   // Lo que pide la barra va a la shell que se ve, no a las de atrás
@@ -180,7 +180,10 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
     // Sin scroll de pagina: desplaza xterm por dentro. El recorte absorbe los
     // pixeles de mas que xterm mide en sus filas (evita una segunda barra)
     <div className="bg-term-bg text-term-text flex h-pantalla flex-col overflow-hidden">
-      <header className="border-term-border flex h-12 shrink-0 items-center gap-3 border-b px-3">
+      <header
+        ref={medirCabecera}
+        className="border-term-border flex h-12 shrink-0 items-center gap-3 border-b px-3"
+      >
         <Button
           variant="ghost"
           size="icon-sm"
@@ -256,19 +259,17 @@ function EspacioDeTerminales({ server, credencial }: EspacioProps) {
         </div>
       </header>
 
-      <div ref={medirPestanas} className="shrink-0">
-        <BarraDePestanas
-          pestanas={pestanas}
-          activa={activa.id}
-          estados={estados}
-          credenciales={server.users}
-          onActivar={setActiva}
-          onCerrar={cerrar}
-          onAbrir={abrir}
-          onVerArchivos={() => mandos.current[activa.id]?.verArchivos()}
-          archivosAbiertos={Boolean(archivosAbiertos[activa.id])}
-        />
-      </div>
+      <BarraDePestanas
+        pestanas={pestanas}
+        activa={activa.id}
+        estados={estados}
+        credenciales={server.users}
+        onActivar={setActiva}
+        onCerrar={cerrar}
+        onAbrir={abrir}
+        onVerArchivos={() => mandos.current[activa.id]?.verArchivos()}
+        archivosAbiertos={Boolean(archivosAbiertos[activa.id])}
+      />
 
       {pestanas.map((pestana) => {
         const suya = server.users.find((una) => una.id === pestana.credentialId)

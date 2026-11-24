@@ -18,7 +18,7 @@ Cambios notables de Pilot SSH Web, según Keep a Changelog 1.1 y SemVer 2.0.
 ### Cambiado
 
 - Las descargas de la terminal las baja el gestor de descargas del navegador, directo al disco, sin tope de memoria.
-- Arrastrar un archivo sobre la terminal dice a qué carpeta irá, y los avisos de la terminal salen arriba a la izquierda, sin tapar el panel de archivos.
+- Arrastrar un archivo sobre la terminal dice a qué carpeta irá, y los avisos de la terminal salen en el centro de la cabecera, sin tapar la shell ni el panel de archivos.
 
 ### Eliminado
 
