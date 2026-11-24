@@ -22,8 +22,10 @@ export type EstadoTerminal =
 /** Cómo va el archivo que se está copiando al servidor. */
 export type MensajeDeSubida = {
   type: 'subida'
-  estado: 'preparada' | 'sigue' | 'guardada' | 'existe' | 'error'
+  estado: 'preparada' | 'sigue' | 'guardada' | 'existe' | 'retomada' | 'error'
   ruta?: string
+  /** Lo que ya llegó de una subida cortada, para seguir desde ahí. */
+  enviado?: number
   message?: string
 }
 
@@ -237,7 +239,14 @@ export function buildInitialCommand(path: string): string | null {
   return `cd ${quotePath(limpio)}\r`
 }
 
-const ESTADOS_DE_SUBIDA = ['preparada', 'sigue', 'guardada', 'existe', 'error']
+const ESTADOS_DE_SUBIDA = [
+  'preparada',
+  'sigue',
+  'guardada',
+  'existe',
+  'retomada',
+  'error',
+]
 const ESTADOS_DE_DESCARGA = ['preparada', 'cortada', 'error']
 const ACCIONES_DE_ARCHIVO: MensajeDeArchivo['accion'][] = [
   'renombrar',
@@ -375,6 +384,7 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
         type: 'subida',
         estado: dato.estado as MensajeDeSubida['estado'],
         ruta: dato.ruta,
+        enviado: comoNumero((dato as Record<string, unknown>).enviado),
         message: dato.message,
       }
     }

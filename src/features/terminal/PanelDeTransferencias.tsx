@@ -209,7 +209,18 @@ function FilaDeTransferencia({
   )
 }
 
-function describirEstado({ estado, total, motivo, ruta, archivo }: Transferencia): string {
+function describirEstado({
+  estado,
+  total,
+  enviado,
+  motivo,
+  ruta,
+  archivo,
+  retomar,
+}: Transferencia): string {
+  if (estado === 'en-cola' && retomar) {
+    return `Esperando la conexión · ${Math.round((enviado / (total || 1)) * 100)} %`
+  }
   if (estado === 'en-cola') return `En cola · ${formatFileSize(total)}`
   if (estado === 'lista') {
     // «Conservar ambos» lo guarda con otro nombre, y se avisa cuál

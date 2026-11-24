@@ -360,16 +360,21 @@ export function useTerminalSocket({
     actual.current = una.id
     cancelada.current = false
     soltarTurnos()
+    const desde = una.retomar ? await pedirRetomar() : 0
     actualizar(una.id, {
       estado: 'subiendo',
-      enviado: 0,
+      enviado: desde,
       velocidad: null,
       motivo: undefined,
+      retomar: false,
     })
-    const muestras: Muestra[] = [{ instante: performance.now(), enviado: 0 }]
+    const muestras: Muestra[] = [{ instante: performance.now(), enviado: desde }]
+    // Desde aquí el servidor guarda lo que llega, y un corte se puede retomar
+    let enServidor = desde > 0
 
     try {
-      let preparada = await anunciar(una, politica.current)
+      let preparada: MensajeDeSubida = { type: 'subida', estado: 'preparada' }
+      if (!desde) preparada = await anunciar(una, politica.current)
       if (preparada.estado === 'existe') {
         const quedan = lista.current.filter((otra) => otra.estado === 'en-cola').length
         const { decision, aTodos } = politica.current
@@ -388,8 +393,10 @@ export function useTerminalSocket({
         preparada = await anunciar(una, decision)
       }
       if (preparada.estado !== 'preparada') throw new Error(preparada.message)
+      enServidor = true
 
       await enviarPorTramos(abierto, una.archivo, {
+        desde,
         onAvance: (enviado) => {
           muestras.push({ instante: performance.now(), enviado })
           if (muestras.length > MUESTRAS_DE_VELOCIDAD) muestras.shift()
@@ -405,6 +412,9 @@ export function useTerminalSocket({
     } catch (error) {
       if (cancelada.current) {
         actualizar(una.id, { estado: 'cancelada' })
+      } else if (abierto.readyState !== WebSocket.OPEN) {
+        // Sin conexión no es un fallo, y vuelve a la cola para seguir al volver
+        actualizar(una.id, { estado: 'en-cola', retomar: enServidor, velocidad: null })
       } else {
         const motivo = error instanceof Error ? error.message : 'No se pudo subir.'
         actualizar(una.id, { estado: 'error', motivo })
@@ -413,6 +423,13 @@ export function useTerminalSocket({
       actual.current = null
       soltarTurnos()
     }
+  }
+
+  /** Cuánto llegó de la subida cortada; cero si el servidor ya no la tiene. */
+  const pedirRetomar = async () => {
+    enviar({ subida: { retomar: true } })
+    const retomada = await esperarRespuesta()
+    return retomada.estado === 'retomada' ? (retomada.enviado ?? 0) : 0
   }
 
   /** Sube lo que espera, de a uno. Sin conexión se detiene y sigue al volver. */

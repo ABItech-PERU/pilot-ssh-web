@@ -108,6 +108,12 @@ describe('PanelDeTransferencias', () => {
     expect(screen.getByRole('listitem')).toHaveTextContent('Subido como notas (1).txt')
   })
 
+  it('cortada la conexión, espera para seguir donde iba', () => {
+    montar([transferencia({ estado: 'en-cola', retomar: true, enviado: 4, total: 10 })])
+
+    expect(screen.getByRole('listitem')).toHaveTextContent('Esperando la conexión · 40 %')
+  })
+
   it('un fallo dice por qué y deja reintentar', async () => {
     const usuario = userEvent.setup()
     const { onReintentar } = montar([

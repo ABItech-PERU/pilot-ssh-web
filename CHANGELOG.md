@@ -20,6 +20,7 @@ Cambios notables de Pilot SSH Web, según Keep a Changelog 1.1 y SemVer 2.0.
 
 - Subir un archivo desde la terminal va unas veinte veces más rápido, hasta 5 GB.
 - Panel de subidas con cola, velocidad, tiempo restante, cancelar y reintentar por archivo.
+- Si la red se corta a media subida, al volver sigue desde lo que ya llegó.
 - Si el archivo ya existe, se elige entre reemplazar, conservar ambos u omitir, también para todos.
 - Subir una carpeta entera, soltándola o con «Subir una carpeta», y bajar varios elegidos en un solo `.tar.gz`.
 - Las carpetas se comprimen en el servidor con «Comprimir» y se bajan como `.tar.gz` con avance real; «Descargar comprimida» desaparece.

@@ -18,6 +18,8 @@ export interface Transferencia {
   total: number
   /** Bytes por segundo; null hasta tener con qué medirla. */
   velocidad: number | null
+  /** Se cortó la conexión con parte ya en el servidor, que sigue desde ahí. */
+  retomar?: boolean
   /** La del servidor, ya resuelta, al terminar. */
   ruta?: string
   motivo?: string

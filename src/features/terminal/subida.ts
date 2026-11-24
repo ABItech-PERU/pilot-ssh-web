@@ -15,6 +15,8 @@ export function fetchCarpetaDeLaRuta(ruta: string): string {
 }
 
 interface Envio {
+  /** Desde dónde seguir una subida cortada; cero para empezar. */
+  desde?: number
   onAvance: (enviado: number) => void
   sigueViva: () => boolean
   /** Turno para el siguiente tramo: lo da el servidor al tomar el anterior. */
@@ -25,9 +27,9 @@ interface Envio {
 export async function enviarPorTramos(
   socket: WebSocket,
   archivo: File,
-  { onAvance, sigueViva, pedirTurno }: Envio,
+  { desde = 0, onAvance, sigueViva, pedirTurno }: Envio,
 ): Promise<void> {
-  let enviado = 0
+  let enviado = desde
 
   while (enviado < archivo.size) {
     if (!sigueViva()) throw new Error('Se canceló la copia.')
