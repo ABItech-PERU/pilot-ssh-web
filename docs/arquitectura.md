@@ -67,6 +67,11 @@ xterm una sola vez y `useTerminalSocket` lleva el WebSocket.
   dos minutos, y antes del reloj si vuelve la red o la pestaña. Como xterm no
   se desmonta, lo escrito sigue en pantalla; la API devuelve la misma sesión
   y reenvía lo que salió mientras tanto.
+- **Una conexión muda se rehace sin esperar al navegador.** El servidor late
+  cada 25 s y la web contesta, así que ni Cloudflare ni una VPN la cortan por
+  inactividad. Si un ping queda sin respuesta 4 s con la pestaña delante, o
+  falta el latido 60 s con ella oculta, la web la suelta y vuelve. La vuelta
+  se ve en el estado, nunca en el texto de la terminal.
 - **Varias shells en pestañas.** Hasta seis por ventana, con cualquier
   credencial del servidor; `Alt+1`…`Alt+9` cambia de una a otra. Las de atrás
   siguen conectadas y recibiendo. Abrir más no cuesta más: el cobro cuenta

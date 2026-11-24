@@ -63,6 +63,17 @@ const PING_CADA_MS = 2000
 const PING_AL_ABRIR_MS = 500
 const PINGS_SEGUIDOS = 4
 
+/** Sin respuesta en este plazo, la conexión se da por muerta y se rehace. */
+const PLAZO_DE_RESPUESTA_MS = 4000
+
+/** Con la pestaña oculta los relojes van frenados, así que lo que dice si
+ *  la conexión vive es el latido del servidor, que llega cada 25 s. */
+const SIN_LATIDO_MS = 60_000
+
+/** Un reloj que llega tan tarde delata una pestaña pausada; lo de antes no
+ *  se juzga, se vuelve a preguntar. */
+const ATRASO_DE_PAUSA_MS = 1000
+
 export interface Latencias {
   /** Navegador hasta el panel. */
   red: number
@@ -542,7 +553,7 @@ export function useTerminalSocket({
   }, [hayEnCurso])
 
   const reconectar = useCallback(() => {
-    onEstado({ fase: 'conectando' })
+    onEstado({ fase: reconexiones.current > 0 ? 'reconectando' : 'conectando' })
     setIntento((actual) => actual + 1)
   }, [onEstado])
 
@@ -552,6 +563,8 @@ export function useTerminalSocket({
     let vigente = true
     let reintento: number | undefined
     let reloj: number | undefined
+    let vigia: number | undefined
+    let comprobarConexion = () => {}
     let inicialPendiente = buildInitialCommand(rutaInicial)
 
     const escribir = (texto: string) => terminal.current?.write(texto)
@@ -570,7 +583,7 @@ export function useTerminalSocket({
       }
       const espera = fetchEsperaDeReconexion(reconexiones.current)
       reconexiones.current += 1
-      onEstado({ fase: 'conectando' })
+      onEstado({ fase: 'reconectando' })
       reintento = window.setTimeout(intentarDeNuevo, espera)
     }
 
@@ -588,14 +601,20 @@ export function useTerminalSocket({
       )
     }
 
-    // Con la red de vuelta o la pestaña delante, no se espera al reloj
-    const reintentarYa = () => {
-      if (reintento === undefined || document.hidden) return
+    // Con la red de vuelta o la pestaña delante no se espera al reloj. Si
+    // hay un reintento pendiente sale ya; si no, se comprueba la conexión
+    const alVolver = () => {
+      if (document.hidden) return
+      if (reintento === undefined) {
+        comprobarConexion()
+        return
+      }
       window.clearTimeout(reintento)
       intentarDeNuevo()
     }
-    window.addEventListener('online', reintentarYa)
-    document.addEventListener('visibilitychange', reintentarYa)
+    window.addEventListener('online', alVolver)
+    window.addEventListener('focus', alVolver)
+    document.addEventListener('visibilitychange', alVolver)
 
     // Diferido un tick: StrictMode monta, limpia y remonta en el mismo tick;
     // un socket sincrono arrancaria y abortaria un intento SSH en el backend
@@ -616,25 +635,65 @@ export function useTerminalSocket({
         buildTerminalUrl(env.socketUrl, server.id, credencial.id, vale, sesion.current),
       )
       socket.current = abierto
+      pings.current.clear()
 
       let numeroDePing = 0
+      // Desde cuándo espera respuesta un ping; cualquier mensaje la da
+      let sinRespuestaDesde: number | null = null
+      let ultimaSenal = performance.now()
+      // Una API anterior no late; sin latido no se juzga la pestaña oculta
+      let hayLatido = false
+
       const medirLatencia = () => {
         if (abierto.readyState !== WebSocket.OPEN) return
         numeroDePing += 1
         pings.current.set(numeroDePing, performance.now())
+        sinRespuestaDesde ??= performance.now()
         abierto.send(JSON.stringify({ ping: numeroDePing }))
       }
+
+      const sigueViva = () => {
+        const ahora = performance.now()
+        if (document.hidden) return !hayLatido || ahora - ultimaSenal < SIN_LATIDO_MS
+        return sinRespuestaDesde === null || ahora - sinRespuestaDesde < PLAZO_DE_RESPUESTA_MS
+      }
+
+      // Pregunta de nuevo y espera el plazo: lo de antes de una pausa no cuenta
+      comprobarConexion = () => {
+        if (abierto.readyState !== WebSocket.OPEN || vigia !== undefined) return
+        sinRespuestaDesde = null
+        medirLatencia()
+        vigia = window.setTimeout(() => {
+          vigia = undefined
+          if (!sigueViva()) darPorCaida()
+        }, PLAZO_DE_RESPUESTA_MS)
+      }
+
       const programarMedida = () => {
         const espera = numeroDePing < PINGS_SEGUIDOS ? PING_AL_ABRIR_MS : PING_CADA_MS
+        const previsto = performance.now() + espera
         reloj = window.setTimeout(() => {
+          if (performance.now() - previsto > ATRASO_DE_PAUSA_MS) comprobarConexion()
+          else if (!sigueViva()) {
+            darPorCaida()
+            return
+          }
           medirLatencia()
           programarMedida()
         }, espera)
       }
       programarMedida()
 
+      // El navegador tarda en notar una conexión muerta; se suelta sin esperarlo
+      const darPorCaida = () => {
+        abierto.onopen = null
+        abierto.onmessage = null
+        abierto.onclose = null
+        abierto.close(CIERRE.SIN_RESPUESTA)
+        alCortarse(CIERRE.ANORMAL)
+      }
+
       abierto.onopen = () => {
-        if (reconexiones.current > 0) escribir('\r\n\x1b[2m— Reconectado —\x1b[0m\r\n')
         reconexiones.current = 0
         onEstado({ fase: 'conectada' })
         terminal.current?.focus()
@@ -644,8 +703,15 @@ export function useTerminalSocket({
       }
 
       abierto.onmessage = (evento) => {
+        ultimaSenal = performance.now()
+        sinRespuestaDesde = null
         const mensaje = parseIncoming(String(evento.data))
         if (!mensaje) return
+        if (mensaje.type === 'latido') {
+          hayLatido = true
+          abierto.send(JSON.stringify({ latido: true }))
+          return
+        }
         if (mensaje.type === 'archivos') {
           listadosDeArchivos.current.shift()?.(mensaje)
           return
@@ -712,7 +778,11 @@ export function useTerminalSocket({
         }
       }
 
-      abierto.onclose = (evento) => {
+      const alCortarse = (codigo: number) => {
+        window.clearTimeout(reloj)
+        window.clearTimeout(vigia)
+        vigia = undefined
+        comprobarConexion = () => {}
         escribir(eco.current.limpiar())
         soltarTurnos()
         preparada.current?.({ type: 'descarga', estado: 'error', message: SIN_CONEXION })
@@ -746,27 +816,28 @@ export function useTerminalSocket({
           estado: 'error',
           message: 'Se perdió la conexión durante la copia.',
         })
-        if (reconnectsAutomatically(evento.code, reconexiones.current)) {
-          if (reconexiones.current === 0) {
-            escribir('\r\n\x1b[2m— Se perdió la conexión. Reconectando… —\x1b[0m\r\n')
-          }
+        // La vuelta se ve en el estado, no en la terminal: lo escrito es del usuario
+        if (reconnectsAutomatically(codigo, reconexiones.current)) {
           programarReintento()
           return
         }
 
-        const { motivo, reintentable } = describeClose(evento.code)
+        const { motivo, reintentable } = describeClose(codigo)
         escribir(`\r\n\x1b[2m— ${motivo} —\x1b[0m\r\n`)
-        onEstado({ fase: 'cerrada', codigo: evento.code, motivo, reintentable })
+        onEstado({ fase: 'cerrada', codigo, motivo, reintentable })
       }
+      abierto.onclose = (evento) => alCortarse(evento.code)
     }
 
     return () => {
       vigente = false
-      window.removeEventListener('online', reintentarYa)
-      document.removeEventListener('visibilitychange', reintentarYa)
+      window.removeEventListener('online', alVolver)
+      window.removeEventListener('focus', alVolver)
+      document.removeEventListener('visibilitychange', alVolver)
       window.clearTimeout(apertura)
       window.clearTimeout(reintento)
       window.clearTimeout(reloj)
+      window.clearTimeout(vigia)
       window.clearTimeout(esperaDeEco.current)
 
       const abierto = socket.current

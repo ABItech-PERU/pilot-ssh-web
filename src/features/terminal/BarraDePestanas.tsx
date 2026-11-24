@@ -162,7 +162,8 @@ function Punto({ estado }: { estado?: EstadoTerminal }) {
         'size-1.5 shrink-0 rounded-full',
         estado?.fase === 'conectada' && 'bg-term-ok',
         estado?.fase === 'cerrada' && 'bg-term-root',
-        (!estado || estado.fase === 'conectando') && 'bg-term-arg animate-pulse',
+        (!estado || estado.fase === 'conectando' || estado.fase === 'reconectando') &&
+          'bg-term-arg animate-pulse',
       )}
       aria-hidden
     />

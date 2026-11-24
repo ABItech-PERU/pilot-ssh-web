@@ -12,6 +12,7 @@ import {
   BuscadorEnTerminal,
   type Coincidencias,
 } from '@/features/terminal/BuscadorEnTerminal'
+import { AvisoDeReconexion } from '@/features/terminal/AvisoDeReconexion'
 import { leerDelPrompt, leerOsc7 } from '@/features/terminal/carpeta-actual'
 import { PanelDeArchivos } from '@/features/terminal/PanelDeArchivos'
 import { CIERRE, type EstadoTerminal, quotePath } from '@/features/terminal/socket'
@@ -352,6 +353,8 @@ export function PanelDeTerminal({
     >
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col p-2">
         <div ref={contenedor} className="min-h-0 flex-1 overflow-hidden" />
+
+        <AvisoDeReconexion fase={estado.fase} />
 
         {estado.fase === 'cerrada' && (
           <div className="border-term-border bg-term-bg relative z-10 mt-2 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">

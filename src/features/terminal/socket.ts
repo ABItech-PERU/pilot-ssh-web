@@ -6,6 +6,9 @@ export const CIERRE = {
   ANORMAL: 1006,
   SERVIDOR: 1011,
   REINICIO: 1012,
+  /** La web da por muerta una conexión que no contesta. No es 1000, así que
+   *  el servidor guarda la shell para retomarla. */
+  SIN_RESPUESTA: 4000,
   NO_AUTENTICADO: 4401,
   ORGANIZACION_SUSPENDIDA: 4402,
   SIN_PERMISO: 4403,
@@ -16,6 +19,8 @@ export const CIERRE = {
 
 export type EstadoTerminal =
   | { fase: 'conectando' }
+  /** Tras un corte, vuelve sola a la misma shell. */
+  | { fase: 'reconectando' }
   | { fase: 'conectada' }
   | { fase: 'cerrada'; codigo: number; motivo: string; reintentable: boolean }
 
@@ -129,6 +134,7 @@ export type MensajeEntrante =
   | MensajeDeContenido
   | MensajeDeTarea
   | MensajeDePong
+  | { type: 'latido' }
 
 /** La ruta del WebSocket. El vale se pide para esta misma ruta. */
 export function buildTerminalSocketPath(serverId: string, credentialId: string): string {
@@ -315,6 +321,7 @@ export function parseIncoming(raw: string): MensajeEntrante | null {
       if (typeof dato.id !== 'string') return null
       return { type: 'sesion', id: dato.id, saltoMs: dato.salto_ms ?? undefined }
     }
+    if (dato.type === 'latido') return { type: 'latido' }
     if (dato.type === 'pong') {
       return typeof dato.ping === 'number' ? { type: 'pong', ping: dato.ping } : null
     }
