@@ -1,6 +1,7 @@
 import { cn } from 'cn'
 import {
   CheckSquareIcon,
+  ChevronDownIcon,
   ChevronRightIcon,
   CopyIcon,
   CornerLeftUpIcon,
@@ -13,6 +14,7 @@ import {
   FolderPlusIcon,
   FolderUpIcon,
   HouseIcon,
+  InfoIcon,
   KeyRoundIcon,
   Link2Icon,
   Loader2Icon,
@@ -24,7 +26,6 @@ import {
   SquareTerminalIcon,
   Trash2Icon,
   UploadIcon,
-  XIcon,
 } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -54,11 +55,13 @@ import {
   joinRuta,
   type Medida,
   ordenarEntradas,
+  partirNombre,
   pideEscribirElNombre,
   quitarOcultos,
   type Sentido,
 } from '@/features/terminal/archivos'
 import { abrirDescarga } from '@/features/terminal/descarga'
+import { DialogoDeDetalles } from '@/features/terminal/DialogoDeDetalles'
 import { DialogoDePermisos } from '@/features/terminal/DialogoDePermisos'
 import { EditorDeArchivo } from '@/features/terminal/EditorDeArchivo'
 import type {
@@ -138,6 +141,7 @@ export function PanelDeArchivos({
   const [porBorrar, setPorBorrar] = useState<EntradaDeArchivo[]>([])
   const [editando, setEditando] = useState<string | null>(null)
   const [conPermisos, setConPermisos] = useState<EntradaDeArchivo | null>(null)
+  const [conDetalles, setConDetalles] = useState<EntradaDeArchivo | null>(null)
   const [cambiando, setCambiando] = useState(false)
   // Lo que tienen las carpetas por borrar; mientras no sea de esta lista, se mide
   const [medida, setMedida] = useState<{ de: EntradaDeArchivo[]; total: Medida | null }>({
@@ -393,18 +397,18 @@ export function PanelDeArchivos({
   const borrado = describirLoQueSeBorra(porBorrar, medicion)
 
   return (
-    <aside
+    <section
       // El foco entra al abrir, así Escape cierra sin hacer clic antes
       ref={enfocarAlAbrir}
       tabIndex={-1}
       aria-label="Archivos del servidor"
-      className="border-term-border bg-term-bg text-term-text absolute inset-2 z-20 flex flex-col rounded-md border shadow-lg outline-none sm:left-auto sm:w-[26rem]"
+      className="relative flex min-h-0 flex-1 flex-col outline-none"
       onKeyDown={(evento) => {
         if (evento.key !== 'Escape' || renombrando || creando || escribiendoRuta) return
         // Los diálogos viven en un portal, pero React les sube el teclado hasta
         // aquí. Su Escape es suyo, o el panel cerraría el editor sin preguntar
         const deUnDialogo = !evento.currentTarget.contains(evento.target as Node)
-        if (deUnDialogo || editando || conPermisos || porBorrar.length) return
+        if (deUnDialogo || editando || conPermisos || conDetalles || porBorrar.length) return
         if (eligiendo) salirDeLaSeleccion()
         else onCerrar()
       }}
@@ -426,20 +430,48 @@ export function PanelDeArchivos({
         void leerSoltados(evento.dataTransfer).then(subirAqui)
       }}
     >
-      <header className="border-term-border flex items-center gap-0.5 border-b py-1.5 pr-1.5 pl-3">
-        <h2 className="flex-1 text-sm font-medium">Archivos</h2>
-        <BotonDelPanel etiqueta="Nueva carpeta" onClick={() => setCreando(true)}>
-          <FolderPlusIcon className="size-4" />
-        </BotonDelPanel>
-        <BotonDelPanel etiqueta="Subir aquí" onClick={() => selector.current?.click()}>
-          <UploadIcon className="size-4" />
-        </BotonDelPanel>
-        <BotonDelPanel
-          etiqueta="Subir una carpeta"
-          onClick={() => selectorDeCarpeta.current?.click()}
+      <div
+        role="toolbar"
+        aria-label="Acciones de la carpeta"
+        className="border-term-border flex items-center gap-0.5 border-b px-1.5 py-1"
+      >
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => setCreando(true)}
+          className="text-term-dim hover:text-term-text h-8 px-2 hover:bg-white/5 pointer-coarse:h-10"
         >
-          <FolderUpIcon className="size-4" />
-        </BotonDelPanel>
+          <FolderPlusIcon />
+          Nueva carpeta
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-term-dim hover:text-term-text data-[state=open]:text-term-text h-8 gap-1 pointer-coarse:h-10 px-2 hover:bg-white/5 data-[state=open]:bg-white/5"
+            >
+              <UploadIcon />
+              Subir
+              <ChevronDownIcon className="size-3.5 opacity-70" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-52">
+            <DropdownMenuItem onSelect={() => selector.current?.click()}>
+              <FileIcon />
+              Archivos…
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => selectorDeCarpeta.current?.click()}>
+              <FolderUpIcon />
+              Una carpeta entera…
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
+              También puede soltarlos en la lista.
+            </DropdownMenuLabel>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <span className="flex-1" />
         <BotonDelPanel
           etiqueta="Abrir esta carpeta en la terminal"
           onClick={() => abrirEnTerminal(aqui)}
@@ -449,10 +481,7 @@ export function PanelDeArchivos({
         <BotonDelPanel etiqueta="Actualizar la lista" onClick={() => void navegar(aqui)}>
           <RefreshCwIcon className={cn('size-4', cargando && 'animate-spin')} />
         </BotonDelPanel>
-        <BotonDelPanel etiqueta="Cerrar los archivos" onClick={onCerrar}>
-          <XIcon className="size-4" />
-        </BotonDelPanel>
-      </header>
+      </div>
 
       {escribiendoRuta ? (
         <CampoDeRuta
@@ -483,12 +512,13 @@ export function PanelDeArchivos({
                   variant="ghost"
                   aria-current={posicion === migas.length - 1 ? 'location' : undefined}
                   className={cn(
-                    'font-machine hover:text-term-text h-7 px-1.5 hover:bg-white/5',
+                    'hover:text-term-text h-7 max-w-48 px-1.5 hover:bg-white/5',
                     posicion === migas.length - 1 ? 'text-term-text' : 'text-term-dim',
                   )}
                   onClick={() => void navegar(miga.ruta)}
+                  title={miga.ruta}
                 >
-                  {miga.nombre}
+                  <span className="truncate">{miga.nombre}</span>
                 </Button>
               </span>
             ))}
@@ -520,7 +550,7 @@ export function PanelDeArchivos({
           aria-pressed={eligiendo}
           onClick={() => (eligiendo ? salirDeLaSeleccion() : setEligiendo(true))}
           className={cn(
-            'hover:text-term-text size-8 shrink-0 hover:bg-white/5',
+            'hover:text-term-text size-8 shrink-0 pointer-coarse:size-10 hover:bg-white/5',
             eligiendo ? 'text-term-text bg-white/10' : 'text-term-dim',
           )}
         >
@@ -630,6 +660,7 @@ export function PanelDeArchivos({
                       onCopiarRuta={() => void copiarRuta(ruta)}
                       onRenombrar={() => setRenombrando(entrada.nombre)}
                       onPermisos={() => setConPermisos(entrada)}
+                      onDetalles={() => setConDetalles(entrada)}
                       onBorrar={() => setPorBorrar([entrada])}
                     />
                   )}
@@ -786,7 +817,16 @@ export function PanelDeArchivos({
         onGuardar={(ruta, modo) => void cambiarPermisos(ruta, modo)}
         onCerrar={() => setConPermisos(null)}
       />
-    </aside>
+
+      <DialogoDeDetalles
+        entrada={
+          conDetalles ? { ...conDetalles, ruta: joinRuta(aqui, conDetalles.nombre) } : null
+        }
+        medir={(ruta) => ejecutarTarea('medir', ruta)}
+        onCopiarRuta={(ruta) => void copiarRuta(ruta)}
+        onCerrar={() => setConDetalles(null)}
+      />
+    </section>
   )
 }
 
@@ -846,7 +886,7 @@ function MenuDeVista({
           size="icon-sm"
           aria-label="Ordenar y filtrar"
           title="Ordenar y filtrar"
-          className="text-term-dim hover:text-term-text size-8 shrink-0 hover:bg-white/5"
+          className="text-term-dim hover:text-term-text size-8 shrink-0 pointer-coarse:size-10 hover:bg-white/5"
         >
           <SlidersHorizontalIcon className="size-4" />
         </Button>
@@ -900,6 +940,7 @@ function FilaDeEntrada({
   onCopiarRuta,
   onRenombrar,
   onPermisos,
+  onDetalles,
   onBorrar,
 }: {
   entrada: EntradaDeArchivo
@@ -915,6 +956,7 @@ function FilaDeEntrada({
   onCopiarRuta: () => void
   onRenombrar: () => void
   onPermisos: () => void
+  onDetalles: () => void
   onBorrar: () => void
 }) {
   const Icono = ICONO_DEL_TIPO[entrada.tipo]
@@ -959,7 +1001,7 @@ function FilaDeEntrada({
           aria-hidden
         />
         <span className="min-w-0 flex-1">
-          <span className="font-machine block truncate text-sm">{entrada.nombre}</span>
+          <NombreDeArchivo nombre={entrada.nombre} />
           <span id={idDelDetalle} className="sr-only">
             {descripcion}
           </span>
@@ -988,7 +1030,7 @@ function FilaDeEntrada({
               variant="ghost"
               size="icon-sm"
               aria-label={`Más acciones de ${entrada.nombre}`}
-              className="text-term-dim hover:text-term-text size-8 shrink-0 hover:bg-white/10"
+              className="text-term-dim hover:text-term-text size-8 shrink-0 pointer-coarse:size-10 hover:bg-white/10"
             >
               <EllipsisVerticalIcon className="size-4" />
             </Button>
@@ -1027,6 +1069,10 @@ function FilaDeEntrada({
               <CopyIcon />
               Copiar ruta
             </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onDetalles}>
+              <InfoIcon />
+              Detalles
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={onRenombrar}>
               <PencilIcon />
@@ -1046,6 +1092,18 @@ function FilaDeEntrada({
         </DropdownMenu>
       )}
     </div>
+  )
+}
+
+/** Recortado por el medio: la extensión y el final siguen a la vista. El
+ *  nombre entero sale al pasar el puntero. */
+function NombreDeArchivo({ nombre }: { nombre: string }) {
+  const { inicio, final } = partirNombre(nombre)
+  return (
+    <span className="flex min-w-0 text-sm leading-5" title={nombre}>
+      <span className="truncate">{inicio}</span>
+      {final && <span className="shrink-0 whitespace-pre">{final}</span>}
+    </span>
   )
 }
 
@@ -1181,7 +1239,7 @@ function BotonDelPanel({
       aria-label={etiqueta}
       title={etiqueta}
       onClick={onClick}
-      className="text-term-dim hover:text-term-text size-8 shrink-0 hover:bg-white/5"
+      className="text-term-dim hover:text-term-text size-8 shrink-0 pointer-coarse:size-10 hover:bg-white/5"
     >
       {children}
     </Button>

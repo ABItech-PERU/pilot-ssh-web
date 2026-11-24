@@ -257,6 +257,23 @@ describe('parseIncoming de archivos', () => {
     expect(listado?.type === 'archivos' && listado.entradas[0]?.tipo).toBe('archivo')
   })
 
+  it('conserva propietario, grupo y destino para los detalles', () => {
+    const enlace = {
+      nombre: 'sitio',
+      tipo: 'enlace',
+      propietario: 'deploy',
+      grupo: 'www-data',
+      destino: '/var/www',
+    }
+    const listado = parseIncoming(JSON.stringify({ type: 'archivos', entradas: [enlace] }))
+
+    expect(listado?.type === 'archivos' && listado.entradas[0]).toMatchObject({
+      propietario: 'deploy',
+      grupo: 'www-data',
+      destino: '/var/www',
+    })
+  })
+
   it('lee el enlace de una descarga preparada', () => {
     const mensaje = {
       type: 'descarga',

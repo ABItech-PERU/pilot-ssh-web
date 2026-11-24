@@ -389,3 +389,11 @@ button[data-slot='ampliar-barra']:not(:disabled) {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Mientras se arrastra el divisor del panel, el cursor no cambia al cruzar
+   la terminal y no se selecciona texto. */
+body.arrastrando-divisor,
+body.arrastrando-divisor * {
+  cursor: col-resize !important;
+  user-select: none;
+}

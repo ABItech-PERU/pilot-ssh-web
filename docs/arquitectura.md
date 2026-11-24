@@ -91,6 +91,15 @@ xterm una sola vez y `useTerminalSocket` lleva el WebSocket.
 - **Cuando la shell termina, el texto sigue ahí.** En vez de taparlo con un
   cartel, una barra sobre la terminal ofrece volver a conectar, cerrar esa
   pestaña o salir; lo escrito se puede leer y copiar.
+- **El panel lateral empuja a la terminal desde 1024 px.** Va al lado, con
+  un divisor que se arrastra como en VS Code o con las flechas del teclado
+  (`DivisorDePanel`), entre 300 px y el 60 % del ancho; el ancho se guarda en
+  el navegador y el doble clic lo devuelve a 416 px. Más estrecho, la
+  terminal quedaría en pocas columnas, así que el panel va encima. Mientras
+  se arrastra, la shell solo recibe el tamaño cuando cambian columnas o filas.
+- **El panel lateral es un contenedor de pestañas** (`PanelLateral`). Hoy
+  lleva «Archivos»; una herramienta nueva es una pestaña más, y las de atrás
+  siguen montadas sin perder lo que tenían.
 - **En el móvil cabe todo.** Las pestañas se desplazan pero los botones de
   la ventana se quedan fijos, y la barra de sesión cerrada apila sus acciones
   en vez de salirse.

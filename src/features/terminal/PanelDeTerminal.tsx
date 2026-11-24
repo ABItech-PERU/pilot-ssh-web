@@ -3,8 +3,8 @@ import { SearchAddon } from '@xterm/addon-search'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal } from '@xterm/xterm'
 import { cn } from 'cn'
-import { CoinsIcon, RotateCwIcon, XIcon } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { CoinsIcon, FolderIcon, RotateCwIcon, XIcon } from 'lucide-react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,17 @@ import { leerDelPrompt, leerOsc7 } from '@/features/terminal/carpeta-actual'
 import { PanelDeArchivos } from '@/features/terminal/PanelDeArchivos'
 import { CIERRE, type EstadoTerminal, quotePath } from '@/features/terminal/socket'
 import { DialogoDeConflicto } from '@/features/terminal/DialogoDeConflicto'
+import { DivisorDePanel } from '@/features/terminal/DivisorDePanel'
+import {
+  ANCHO_INICIAL,
+  ANCHO_MINIMO,
+  fetchAnchoMaximo,
+  guardarAncho,
+  leerAncho,
+  limitarAncho,
+  useHayLugarAlLado,
+} from '@/features/terminal/panel-lateral'
+import { PanelLateral } from '@/features/terminal/PanelLateral'
 import { PanelDeTransferencias } from '@/features/terminal/PanelDeTransferencias'
 import { leerSoltados } from '@/features/terminal/soltar'
 import { fetchCarpetaDeLaRuta } from '@/features/terminal/subida'
@@ -116,6 +127,12 @@ export function PanelDeTerminal({
   // La carpeta en la que se abrió; null con el panel cerrado
   const [explorando, setExplorando] = useState<string | null>(null)
   const zonaDeArchivos = useRef<HTMLDivElement | null>(null)
+  const raiz = useRef<HTMLDivElement | null>(null)
+  const idDelPanel = useId()
+  const hayLugarAlLado = useHayLugarAlLado()
+  const [ancho, setAncho] = useState(leerAncho)
+  // Lo que mide la pestaña; con ella oculta se conserva la última medida
+  const [disponible, setDisponible] = useState(0)
   // La que anuncia el shell (OSC 7); el prompt es el plan B
   const anunciada = useRef('')
   const [coincidencias, setCoincidencias] = useState<Coincidencias>(SIN_COINCIDENCIAS)
@@ -187,6 +204,19 @@ export function PanelDeTerminal({
     terminal.current?.focus()
   }
 
+  useEffect(() => {
+    const nodo = raiz.current
+    if (!nodo) return
+    const observador = new ResizeObserver(() => {
+      if (nodo.clientWidth) setDisponible(nodo.clientWidth)
+    })
+    observador.observe(nodo)
+    return () => observador.disconnect()
+  }, [])
+
+  const acoplado = explorando !== null && hayLugarAlLado
+  const anchoDelPanel = disponible ? limitarAncho(ancho, disponible) : ancho
+
   /** Lleva la shell a la carpeta de lo subido y lo muestra. */
   const irALaCarpeta = (ruta: string) => {
     teclear(`cd ${quotePath(fetchCarpetaDeLaRuta(ruta))} && ls -l ${quotePath(ruta)}\r`)
@@ -246,11 +276,17 @@ export function PanelDeTerminal({
 
     const teclado = vista.onData(teclear)
 
+    // Arrastrar el divisor redimensiona en cada cuadro, y la shell solo se
+    // entera cuando cambian las columnas o las filas
+    let medida = ''
     const observador = new ResizeObserver(() => {
       if (!nodo.clientWidth) return
       cancelAnimationFrame(marco)
       marco = requestAnimationFrame(() => {
         ajuste.fit()
+        const nueva = `${vista.cols}x${vista.rows}`
+        if (nueva === medida) return
+        medida = nueva
         enviarTamano()
       })
     })
@@ -286,10 +322,8 @@ export function PanelDeTerminal({
 
   return (
     <div
-      className={cn(
-        'relative flex min-h-0 flex-1 flex-col overflow-hidden p-2',
-        !visible && 'hidden',
-      )}
+      ref={raiz}
+      className={cn('relative flex min-h-0 flex-1 overflow-hidden', !visible && 'hidden')}
       role="tabpanel"
       aria-label={`Terminal de ${credencial.username}`}
       onDragOverCapture={(evento) => {
@@ -316,98 +350,135 @@ export function PanelDeTerminal({
         )
       }}
     >
-      <div ref={contenedor} className="min-h-0 flex-1 overflow-hidden" />
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col p-2">
+        <div ref={contenedor} className="min-h-0 flex-1 overflow-hidden" />
 
-      {estado.fase === 'cerrada' && (
-        <div className="border-term-border bg-term-bg relative z-10 mt-2 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
-          <span className="bg-term-root size-2 shrink-0 rounded-full" aria-hidden />
-          <span className="min-w-0 flex-1 text-sm">{estado.motivo}</span>
-          <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
-            {estado.reintentable && (
-              <BotonDeCierre className="flex-1 sm:flex-none" onClick={reconectar}>
-                <RotateCwIcon />
-                <span className="sm:hidden">Reconectar</span>
-                <span className="hidden sm:inline">Volver a conectar</span>
+        {estado.fase === 'cerrada' && (
+          <div className="border-term-border bg-term-bg relative z-10 mt-2 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
+            <span className="bg-term-root size-2 shrink-0 rounded-full" aria-hidden />
+            <span className="min-w-0 flex-1 text-sm">{estado.motivo}</span>
+            <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
+              {estado.reintentable && (
+                <BotonDeCierre className="flex-1 sm:flex-none" onClick={reconectar}>
+                  <RotateCwIcon />
+                  <span className="sm:hidden">Reconectar</span>
+                  <span className="hidden sm:inline">Volver a conectar</span>
+                </BotonDeCierre>
+              )}
+              {estado.codigo === CIERRE.SIN_SALDO && (
+                <BotonDeCierre className="flex-1 sm:flex-none" asChild>
+                  <Link to="/app/credits">
+                    <CoinsIcon />
+                    Ver créditos
+                  </Link>
+                </BotonDeCierre>
+              )}
+              <BotonDeCierre className="flex-1 sm:flex-none" onClick={onCerrar}>
+                <XIcon />
+                <span className="sm:hidden">{esLaUnica ? 'Salir' : 'Cerrar'}</span>
+                <span className="hidden sm:inline">
+                  {esLaUnica ? 'Salir de la terminal' : 'Cerrar pestaña'}
+                </span>
               </BotonDeCierre>
-            )}
-            {estado.codigo === CIERRE.SIN_SALDO && (
-              <BotonDeCierre className="flex-1 sm:flex-none" asChild>
-                <Link to="/app/credits">
-                  <CoinsIcon />
-                  Ver créditos
-                </Link>
-              </BotonDeCierre>
-            )}
-            <BotonDeCierre className="flex-1 sm:flex-none" onClick={onCerrar}>
-              <XIcon />
-              <span className="sm:hidden">{esLaUnica ? 'Salir' : 'Cerrar'}</span>
-              <span className="hidden sm:inline">
-                {esLaUnica ? 'Salir de la terminal' : 'Cerrar pestaña'}
-              </span>
-            </BotonDeCierre>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {buscando && (
-        <BuscadorEnTerminal
-          coincidencias={coincidencias}
-          onBuscar={buscar}
-          onCerrar={cerrarBusqueda}
-        />
-      )}
-
-      {destinoDeArrastre !== null && (
-        <div
-          className={cn(
-            'bg-term-bg/85 pointer-events-none absolute inset-2 grid place-items-center rounded-md border border-dashed border-white/25',
-            // Con el panel abierto, solo la parte de la terminal que se ve
-            explorando !== null && 'sm:right-[27rem]',
-          )}
-        >
-          <p className="px-4 text-center text-sm">
-            Suelte para subir a{' '}
-            <span className="font-machine break-all">{destinoDeArrastre}</span>, la
-            carpeta donde está la terminal
-          </p>
-        </div>
-      )}
-
-      <div ref={zonaDeArchivos} className="contents">
-        {explorando !== null && (
-          <PanelDeArchivos
-            carpetaInicial={explorando}
-            pedirArchivos={pedirArchivos}
-            cambiarArchivo={cambiarArchivo}
-            pedirContenido={pedirContenido}
-            guardarContenido={guardarContenido}
-            descargar={descargar}
-            ejecutarTarea={ejecutarTarea}
-            subir={encolarSubidas}
-            abrirEnTerminal={abrirEnTerminal}
-            onCerrar={cerrarArchivos}
+        {buscando && (
+          <BuscadorEnTerminal
+            coincidencias={coincidencias}
+            onBuscar={buscar}
+            onCerrar={cerrarBusqueda}
           />
+        )}
+
+        {destinoDeArrastre !== null && (
+          <div
+            className={cn(
+              'bg-term-bg/85 pointer-events-none absolute inset-2 grid place-items-center rounded-md border border-dashed border-white/25',
+              // Con el panel encima, solo la parte de la terminal que se ve
+              explorando !== null && !acoplado && 'sm:right-[27rem]',
+            )}
+          >
+            <p className="px-4 text-center text-sm">
+              Suelte para subir a{' '}
+              <span className="font-machine break-all">{destinoDeArrastre}</span>, la
+              carpeta donde está la terminal
+            </p>
+          </div>
+        )}
+
+        {transferencias.length > 0 && (
+          <div
+            className={cn(
+              'absolute inset-x-3 bottom-3 z-30 sm:left-auto',
+              // A la izquierda del panel encima, para no tapar su lista
+              explorando !== null && !acoplado && 'sm:right-[27.5rem]',
+            )}
+          >
+            <PanelDeTransferencias
+              transferencias={transferencias}
+              onCancelar={cancelarTransferencia}
+              onCancelarTodo={cancelarTodas}
+              onReintentar={reintentarTransferencia}
+              onIrALaCarpeta={irALaCarpeta}
+              onCerrar={limpiarTransferencias}
+            />
+          </div>
         )}
       </div>
 
-      {transferencias.length > 0 && (
-        <div
-          className={cn(
-            'absolute inset-x-3 bottom-3 z-30 sm:left-auto',
-            // A la izquierda del panel de archivos, para no tapar su lista
-            explorando !== null && 'sm:right-[27.5rem]',
-          )}
-        >
-          <PanelDeTransferencias
-            transferencias={transferencias}
-            onCancelar={cancelarTransferencia}
-            onCancelarTodo={cancelarTodas}
-            onReintentar={reintentarTransferencia}
-            onIrALaCarpeta={irALaCarpeta}
-            onCerrar={limpiarTransferencias}
-          />
-        </div>
-      )}
+      <div ref={zonaDeArchivos} className="contents">
+        {explorando !== null && (
+          <>
+            {acoplado && (
+              <DivisorDePanel
+                ancho={anchoDelPanel}
+                minimo={ANCHO_MINIMO}
+                maximo={fetchAnchoMaximo(disponible)}
+                controla={idDelPanel}
+                onCambiar={setAncho}
+                onTerminar={() => guardarAncho(anchoDelPanel)}
+                onReiniciar={() => {
+                  setAncho(ANCHO_INICIAL)
+                  guardarAncho(ANCHO_INICIAL)
+                }}
+              />
+            )}
+            <PanelLateral
+              id={idDelPanel}
+              onCerrar={cerrarArchivos}
+              style={acoplado ? { width: anchoDelPanel } : undefined}
+              className={
+                acoplado
+                  ? 'shrink-0'
+                  : 'border-term-border absolute inset-2 z-20 rounded-md border shadow-lg sm:left-auto sm:w-[26rem]'
+              }
+              pestanas={[
+                {
+                  id: 'archivos',
+                  etiqueta: 'Archivos',
+                  icono: FolderIcon,
+                  contenido: (
+                    <PanelDeArchivos
+                      carpetaInicial={explorando}
+                      pedirArchivos={pedirArchivos}
+                      cambiarArchivo={cambiarArchivo}
+                      pedirContenido={pedirContenido}
+                      guardarContenido={guardarContenido}
+                      descargar={descargar}
+                      ejecutarTarea={ejecutarTarea}
+                      subir={encolarSubidas}
+                      abrirEnTerminal={abrirEnTerminal}
+                      onCerrar={cerrarArchivos}
+                    />
+                  ),
+                },
+              ]}
+            />
+          </>
+        )}
+      </div>
 
       <DialogoDeConflicto conflicto={conflicto} onDecidir={decidirConflicto} />
     </div>
