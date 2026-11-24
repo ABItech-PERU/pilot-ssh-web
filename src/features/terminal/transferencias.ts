@@ -44,6 +44,21 @@ export function calcularVelocidad(muestras: Muestra[]): number | null {
   )
 }
 
+/** Segundos que tarda la cifra mostrada en seguir un cambio de la red. */
+const SUAVIZADO_S = 5
+
+/** Promedio que se mueve de a poco, así un tramo más lento no hace parpadear
+ *  la cifra. Con un cambio real de la red, la alcanza en unos segundos. */
+export function suavizarVelocidad(
+  anterior: number | null,
+  medida: number,
+  segundos: number,
+): number {
+  if (anterior === null) return medida
+  const peso = 1 - Math.exp(-segundos / SUAVIZADO_S)
+  return anterior + (medida - anterior) * peso
+}
+
 /** Segundos que faltan; null sin velocidad para estimarlo. */
 export function estimarRestante(
   total: number,
@@ -54,8 +69,11 @@ export function estimarRestante(
   return Math.max(0, total - enviado) / velocidad
 }
 
+/** Pasados diez segundos va de cinco en cinco, para que baje parejo. */
 export function describirRestante(segundos: number): string {
-  if (segundos < 60) return `quedan ${Math.ceil(segundos)} s`
+  if (segundos < 10) return `quedan ${Math.ceil(segundos)} s`
+  const redondeados = Math.ceil(segundos / 5) * 5
+  if (redondeados < 60) return `quedan ${redondeados} s`
   if (segundos < 3600) return `quedan ${Math.ceil(segundos / 60)} min`
   const horas = new Intl.NumberFormat('es', { maximumFractionDigits: 1 }).format(
     segundos / 3600,

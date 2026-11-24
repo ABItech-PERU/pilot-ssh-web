@@ -58,7 +58,7 @@ describe('PanelDeTransferencias', () => {
 
     expect(panel).toHaveTextContent('Subiendo 2 de 3')
     expect(panel).toHaveTextContent('5 MB/s')
-    expect(panel).toHaveTextContent('quedan 11 s')
+    expect(panel).toHaveTextContent('quedan 15 s')
   })
 
   it('con un solo archivo no repite su avance en la cabecera', () => {
