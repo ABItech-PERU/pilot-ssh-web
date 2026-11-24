@@ -38,6 +38,11 @@ export interface EntradaDeArchivo {
   /** ISO en UTC; null si el servidor no la da. */
   modificado: string | null
   permisos: string
+  /** Por su nombre, como en `ls -l`. Una API anterior no los manda. */
+  propietario?: string
+  grupo?: string
+  /** A dónde apunta un enlace. */
+  destino?: string
 }
 
 /** Lo que hay en una carpeta, carpetas primero, como lo ordena el servidor. */
@@ -264,6 +269,7 @@ const ACCIONES_DE_TAREA: AccionDeTarea[] = [
 ]
 
 const comoNumero = (valor: unknown) => (typeof valor === 'number' ? valor : undefined)
+const comoTexto = (valor: unknown) => (typeof valor === 'string' ? valor : undefined)
 const TIPOS_DE_ENTRADA: TipoDeEntrada[] = ['carpeta', 'archivo', 'enlace']
 
 function parseEntrada(cruda: unknown): EntradaDeArchivo {
@@ -275,6 +281,9 @@ function parseEntrada(cruda: unknown): EntradaDeArchivo {
     tamano: Number(dato.tamano ?? 0),
     modificado: typeof dato.modificado === 'string' ? dato.modificado : null,
     permisos: String(dato.permisos ?? ''),
+    propietario: comoTexto(dato.propietario),
+    grupo: comoTexto(dato.grupo),
+    destino: comoTexto(dato.destino),
   }
 }
 

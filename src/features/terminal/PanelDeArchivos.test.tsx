@@ -129,7 +129,7 @@ describe('PanelDeArchivos', () => {
     montar(listado([]))
 
     expect(await screen.findByText('Esta carpeta está vacía.')).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: 'Subir aquí' })).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'Subir aquí' })).toBeInTheDocument()
   })
 
   it('si no se puede leer, lo dice y deja volver al inicio', async () => {
@@ -342,10 +342,15 @@ describe('PanelDeArchivos', () => {
     expect(ejecutarTarea).not.toHaveBeenCalled()
   })
 
-  it('ofrece subir una carpeta entera', () => {
+  it('el botón Subir ofrece archivos o una carpeta entera', async () => {
+    const usuario = userEvent.setup()
     montar()
 
-    expect(screen.getByRole('button', { name: 'Subir una carpeta' })).toBeInTheDocument()
+    await usuario.click(screen.getByRole('button', { name: 'Subir' }))
+    const menu = await screen.findByRole('menu')
+
+    expect(within(menu).getByRole('menuitem', { name: 'Archivos…' })).toBeVisible()
+    expect(within(menu).getByRole('menuitem', { name: 'Una carpeta entera…' })).toBeVisible()
   })
 
   it('ordena por tamaño de mayor a menor, sin sacar las carpetas de arriba', async () => {
@@ -419,5 +424,26 @@ describe('PanelDeArchivos', () => {
 
     expect(await screen.findByRole('alertdialog', { name: '¿Cerrar sin guardar?' })).toBeVisible()
     expect(onCerrar).not.toHaveBeenCalled()
+  })
+
+  it('Detalles muestra la ficha del elegido', async () => {
+    const usuario = userEvent.setup()
+    montar()
+    await screen.findByText('notas.txt')
+
+    const menu = await menuDe(usuario, 'notas.txt')
+    await usuario.click(within(menu).getByRole('menuitem', { name: 'Detalles' }))
+
+    const ficha = await screen.findByRole('dialog', { name: 'notas.txt' })
+    expect(within(ficha).getByText('/home/deploy')).toBeVisible()
+  })
+
+  it('el nombre largo deja la extensión a la vista y entero en la pista', async () => {
+    const largo = 'respaldo-de-la-base-de-produccion-2026-11-20.sql.gz'
+    montar(listado([entrada(largo)]))
+
+    const fila = await screen.findByRole('button', { name: largo })
+    expect(within(fila).getByText('1-20.sql.gz')).toBeVisible()
+    expect(within(fila).getByTitle(largo)).toBeVisible()
   })
 })

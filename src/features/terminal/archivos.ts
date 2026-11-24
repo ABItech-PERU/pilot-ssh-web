@@ -61,6 +61,24 @@ export function esComprimido(nombre: string): boolean {
   return COMPRIMIDOS.test(nombre)
 }
 
+/** Una o dos extensiones, como «.sql» o «.tar.gz». */
+const EXTENSION = /(?:\.[a-z0-9]{1,5}){1,2}$/i
+/** Lo que queda a la vista antes de la extensión al recortar. */
+const COLA_VISIBLE = 4
+const COLA_SIN_EXTENSION = 6
+/** Con menos de esto antes de la cola, el nombre no se parte. */
+const INICIO_MINIMO = 8
+
+/** Parte un nombre para recortarlo por el medio, como Finder. El final y la
+ *  extensión siguen a la vista y dicen qué archivo es. */
+export function partirNombre(nombre: string): { inicio: string; final: string } {
+  const extension = EXTENSION.exec(nombre)
+  const cola =
+    extension && extension.index > 0 ? extension[0].length + COLA_VISIBLE : COLA_SIN_EXTENSION
+  if (nombre.length <= cola + INICIO_MINIMO) return { inicio: nombre, final: '' }
+  return { inicio: nombre.slice(0, -cola), final: nombre.slice(-cola) }
+}
+
 export interface Medida {
   archivos: number
   carpetas: number
@@ -163,6 +181,29 @@ export function fetchOctalDeCuadricula(cuadricula: Cuadricula): string {
     const acceso = cuadricula[quien]
     return (acceso.leer ? 4 : 0) + (acceso.escribir ? 2 : 0) + (acceso.ejecutar ? 1 : 0)
   }).join('')
+}
+
+const QUIEN_SE_LLAMA = { propietario: 'Propietario', grupo: 'Grupo', otros: 'Otros' }
+
+const enLista = new Intl.ListFormat('es', { type: 'conjunction' })
+
+/** Qué puede hacer cada quien, en palabras. En una carpeta, ejecutar es
+ *  entrar en ella. */
+export function describeAccesos(
+  permisos: string,
+  tipo: TipoDeEntrada,
+): { quien: string; puede: string }[] {
+  const cuadricula = fetchCuadricula(fetchOctal(permisos))
+  return QUIENES.map((quien) => {
+    const { leer, escribir, ejecutar } = cuadricula[quien]
+    const verbos = [
+      leer && 'leer',
+      escribir && 'escribir',
+      ejecutar && (tipo === 'carpeta' ? 'entrar' : 'ejecutar'),
+    ].filter((verbo): verbo is string => Boolean(verbo))
+    const puede = verbos.length ? enLista.format(verbos) : 'nada'
+    return { quien: QUIEN_SE_LLAMA[quien], puede: puede[0]!.toUpperCase() + puede.slice(1) }
+  })
 }
 
 /** «755» da «rwxr-xr-x», como lo muestra `ls -l`. */

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   aplicarFinDeLinea,
+  describeAccesos,
   describeBorrado,
   describeMedida,
   describePermisos,
@@ -15,6 +16,7 @@ import {
   filtrarEntradas,
   joinRuta,
   ordenarEntradas,
+  partirNombre,
   pideEscribirElNombre,
   quitarOcultos,
 } from '@/features/terminal/archivos'
@@ -215,5 +217,50 @@ describe('fin de línea', () => {
   it('devuelve los finales de Windows que el editor del navegador quita', () => {
     expect(aplicarFinDeLinea('a\nb\n', '\r\n')).toBe('a\r\nb\r\n')
     expect(aplicarFinDeLinea('a\nb\n', '\n')).toBe('a\nb\n')
+  })
+})
+
+describe('partirNombre', () => {
+  it('aparta la extensión y el final del nombre, que no se recortan', () => {
+    expect(partirNombre('respaldo-de-la-base-2026-11-20.sql')).toEqual({
+      inicio: 'respaldo-de-la-base-2026-1',
+      final: '1-20.sql',
+    })
+  })
+
+  it('trata .tar.gz como una sola extensión', () => {
+    expect(partirNombre('pilot-ssh-api-produccion.tar.gz')).toEqual({
+      inicio: 'pilot-ssh-api-produc',
+      final: 'cion.tar.gz',
+    })
+  })
+
+  it('no parte un nombre corto ni un oculto sin extensión', () => {
+    expect(partirNombre('notas.txt')).toEqual({ inicio: 'notas.txt', final: '' })
+    expect(partirNombre('.env')).toEqual({ inicio: '.env', final: '' })
+  })
+
+  it('sin extensión guarda los últimos caracteres', () => {
+    expect(partirNombre('carpeta-de-proyectos-antiguos')).toEqual({
+      inicio: 'carpeta-de-proyectos-an',
+      final: 'tiguos',
+    })
+  })
+})
+
+describe('describeAccesos', () => {
+  it('dice qué puede hacer cada quien con un archivo', () => {
+    expect(describeAccesos('rw-r-----', 'archivo')).toEqual([
+      { quien: 'Propietario', puede: 'Leer y escribir' },
+      { quien: 'Grupo', puede: 'Leer' },
+      { quien: 'Otros', puede: 'Nada' },
+    ])
+  })
+
+  it('en una carpeta, ejecutar es entrar', () => {
+    expect(describeAccesos('rwxr-xr-x', 'carpeta')[0]).toEqual({
+      quien: 'Propietario',
+      puede: 'Leer, escribir y entrar',
+    })
   })
 })
