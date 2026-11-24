@@ -48,18 +48,24 @@ export function PanelDeTransferencias({
   const enCurso = resumen.activas > 0
   const empezadas = transferencias.filter((una) => una.estado !== 'en-cola').length
 
+  const unico = resumen.total === 1
+
   const titulo = enCurso
-    ? `Subiendo ${empezadas} de ${resumen.total}`
+    ? unico
+      ? 'Subiendo 1 archivo'
+      : `Subiendo ${empezadas} de ${resumen.total}`
     : describirFinal(transferencias)
-  const detalle = enCurso
-    ? [
-        `${resumen.porcentaje} %`,
-        resumen.velocidad ? `${formatFileSize(resumen.velocidad)}/s` : null,
-        resumen.restante !== null ? describirRestante(resumen.restante) : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : null
+  // Con un solo archivo, su fila ya lo dice, salvo con la lista plegada
+  const detalle =
+    enCurso && (!unico || plegado)
+      ? [
+          `${resumen.porcentaje} %`,
+          resumen.velocidad ? `${formatFileSize(resumen.velocidad)}/s` : null,
+          resumen.restante !== null ? describirRestante(resumen.restante) : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : null
 
   return (
     <section
