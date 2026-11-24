@@ -1,13 +1,21 @@
-import { DownloadIcon, Loader2Icon, RefreshCwIcon, TriangleAlertIcon } from 'lucide-react'
+import {
+  DownloadIcon,
+  FileCodeIcon,
+  FileWarningIcon,
+  Loader2Icon,
+  RefreshCwIcon,
+  TriangleAlertIcon,
+} from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormDialogContent } from '@/components/form-dialog'
-import { LineaEsqueleto } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { aplicarFinDeLinea, type FinDeLinea, fetchFinDeLinea } from '@/features/terminal/archivos'
+import type { Cursor } from '@/features/terminal/AreaDeCodigo'
+import { EsqueletoDeCodigo } from '@/features/terminal/EsqueletoDeCodigo'
 import type { MensajeDeContenido } from '@/features/terminal/socket'
 import { formatFileSize } from '@/lib/format'
 
@@ -53,6 +61,8 @@ export function EditorDeArchivo({
   const [lenguaje, setLenguaje] = useState<string | null>(null)
   // Cada lectura monta un editor nuevo con su texto
   const [lectura, setLectura] = useState(0)
+  const [cursor, setCursor] = useState<Cursor | null>(null)
+  const partes = partirRuta(ruta ?? '')
 
   const cambiado = Boolean(abierto?.editable) && texto !== guardado
 
@@ -125,7 +135,7 @@ export function EditorDeArchivo({
     <>
       <Dialog open={ruta !== null} onOpenChange={(sigue) => !sigue && pedirCierre()}>
         <FormDialogContent
-          className="flex h-[calc(100dvh-2rem)] flex-col gap-3 overflow-hidden sm:max-w-5xl"
+          className="flex h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl"
           onEscapeKeyDown={(evento) => {
             // Escape en el buscador lo cierra a él, no al archivo
             if (evento.target instanceof Element && evento.target.closest('.cm-panels')) {
@@ -139,24 +149,32 @@ export function EditorDeArchivo({
             }
           }}
         >
-          <DialogHeader>
-            <DialogTitle className="font-machine truncate">
-              {abierto?.nombre ?? 'Abriendo…'}
-              {cambiado && (
-                <span className="text-muted-foreground ml-2 font-sans text-sm font-normal">
-                  Sin guardar
+          <DialogHeader className="flex-row items-center gap-3 border-b px-5 py-3.5 text-left">
+            <span className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-md">
+              <FileCodeIcon className="size-[18px]" aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1 space-y-1">
+              <DialogTitle className="flex min-w-0 items-center gap-2.5 text-base leading-tight">
+                <span className="font-machine truncate">{abierto?.nombre ?? partes.nombre}</span>
+                {cambiado && (
+                  <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1.5 text-xs font-normal">
+                    <span className="bg-warning size-2 rounded-full" aria-hidden />
+                    Sin guardar
+                  </span>
+                )}
+              </DialogTitle>
+              <DialogDescription className="flex min-w-0 items-center gap-1.5 text-xs">
+                <span className="font-machine truncate" title={ruta ?? undefined}>
+                  {partes.carpeta}
                 </span>
-              )}
-            </DialogTitle>
-            <DialogDescription className="font-machine truncate">
-              {ruta}
-              {abierto && ` · ${formatFileSize(abierto.tamano)}`}
-            </DialogDescription>
+                {abierto && <span className="shrink-0">· {formatFileSize(abierto.tamano)}</span>}
+              </DialogDescription>
+            </div>
           </DialogHeader>
 
           {abierto?.recortado && (
-            <p className="bg-muted flex items-center gap-2 rounded-md px-3 py-2 text-sm">
-              <TriangleAlertIcon className="size-4 shrink-0" aria-hidden />
+            <p className="bg-warning/10 flex items-center gap-2.5 border-b px-5 py-2 text-sm">
+              <TriangleAlertIcon className="text-warning size-4 shrink-0" aria-hidden />
               <span className="flex-1">
                 Es grande. Se ve solo el final, sin poder editarlo aquí.
               </span>
@@ -173,17 +191,16 @@ export function EditorDeArchivo({
           )}
 
           <div className="min-h-0 flex-1">
-            {cargando && (
-              <div className="space-y-3 p-2" aria-hidden>
-                <LineaEsqueleto className="w-2/3" />
-                <LineaEsqueleto className="w-1/2" />
-                <LineaEsqueleto className="w-3/4" />
-              </div>
-            )}
+            {cargando && <EsqueletoDeCodigo />}
 
             {!cargando && aviso && (
-              <div className="space-y-3 p-2 text-sm">
-                <p role="alert">{aviso}</p>
+              <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+                <span className="bg-muted text-muted-foreground grid size-12 place-items-center rounded-full">
+                  <FileWarningIcon className="size-5" aria-hidden />
+                </span>
+                <p role="alert" className="max-w-sm text-sm">
+                  {aviso}
+                </p>
                 {ruta && (
                   <Button variant="outline" size="sm" onClick={() => descargar(ruta)}>
                     <DownloadIcon />
@@ -194,7 +211,7 @@ export function EditorDeArchivo({
             )}
 
             {!cargando && abierto && (
-              <Suspense fallback={<LineaEsqueleto className="m-2 w-2/3" />}>
+              <Suspense fallback={<EsqueletoDeCodigo />}>
                 <AreaDeCodigo
                   key={lectura}
                   texto={guardado}
@@ -203,39 +220,44 @@ export function EditorDeArchivo({
                   soloElFinal={abierto.recortado}
                   onCambiar={setTexto}
                   onLenguaje={setLenguaje}
+                  onCursor={setCursor}
                 />
               </Suspense>
             )}
           </div>
 
-          {abierto && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-muted-foreground mr-auto text-xs">
-                {[
-                  lenguaje,
-                  abierto.editable
-                    ? abierto.fin === '\r\n'
-                      ? 'Fin de línea de Windows (CRLF)'
-                      : 'Fin de línea Unix (LF)'
-                    : 'Solo lectura',
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-                <span className="pointer-coarse:hidden">
-                  {abierto.editable ? ' · Ctrl+F busca · Ctrl+S guarda' : ' · Ctrl+F busca'}
-                </span>
-              </span>
-              {abierto.editable && (
+          {!aviso && (
+            <footer className="text-muted-foreground flex min-h-13 items-center gap-x-4 border-t px-5 py-2 text-xs">
+              {abierto && (
+                <>
+                  {lenguaje && <span className="text-foreground font-medium">{lenguaje}</span>}
+                  {cursor && !abierto.recortado && (
+                    <span className="tabular-nums max-sm:hidden">
+                      Lín {cursor.linea}, col {cursor.columna}
+                    </span>
+                  )}
+                  <span>{abierto.fin === '\r\n' ? 'Windows (CRLF)' : 'Unix (LF)'}</span>
+                  {!abierto.editable && (
+                    <span className="rounded border px-1.5 py-0.5">Solo lectura</span>
+                  )}
+                  <span className="ml-auto flex items-center gap-3 max-md:hidden pointer-coarse:hidden">
+                    <Atajo teclas="Ctrl F">buscar</Atajo>
+                    {abierto.editable && <Atajo teclas="Ctrl S">guardar</Atajo>}
+                  </span>
+                </>
+              )}
+              {abierto?.editable && (
                 <Button
+                  size="sm"
                   onClick={() => void guardar()}
                   disabled={!cambiado || guardando}
-                  className="min-w-28"
+                  className="ml-auto min-w-24 md:ml-0"
                 >
                   {guardando ? <Loader2Icon className="animate-spin" /> : null}
                   {guardando ? 'Guardando' : 'Guardar'}
                 </Button>
               )}
-            </div>
+            </footer>
           )}
         </FormDialogContent>
       </Dialog>
@@ -254,4 +276,21 @@ export function EditorDeArchivo({
       />
     </>
   )
+}
+
+function Atajo({ teclas, children }: { teclas: string; children: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <kbd className="bg-muted rounded border px-1.5 py-px font-sans text-[11px] font-medium">
+        {teclas}
+      </kbd>
+      {children}
+    </span>
+  )
+}
+
+/** «/srv/app/.env» da la carpeta «/srv/app» y el nombre «.env». */
+function partirRuta(ruta: string): { carpeta: string; nombre: string } {
+  const corte = ruta.lastIndexOf('/')
+  return { carpeta: ruta.slice(0, corte) || '/', nombre: ruta.slice(corte + 1) }
 }
