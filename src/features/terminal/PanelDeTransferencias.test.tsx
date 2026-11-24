@@ -61,6 +61,33 @@ describe('PanelDeTransferencias', () => {
     expect(panel).toHaveTextContent('quedan 11 s')
   })
 
+  it('con un solo archivo no repite su avance en la cabecera', () => {
+    montar([
+      transferencia({
+        nombre: 'sitio.tar.gz',
+        estado: 'subiendo',
+        enviado: 13,
+        total: 100,
+        velocidad: 5,
+      }),
+    ])
+
+    const panel = screen.getByRole('region', { name: 'Subidas' })
+
+    expect(panel).toHaveTextContent('Subiendo 1 archivo')
+    expect(panel).not.toHaveTextContent('1 de 1')
+    expect(screen.getAllByText(/13 %/)).toHaveLength(1)
+  })
+
+  it('plegado, el avance de ese archivo pasa a la cabecera', async () => {
+    const usuario = userEvent.setup()
+    montar([transferencia({ estado: 'subiendo', enviado: 13, total: 100, velocidad: 5 })])
+
+    await usuario.click(screen.getByRole('button', { name: 'Ocultar la lista' }))
+
+    expect(screen.getByRole('region', { name: 'Subidas' })).toHaveTextContent('13 %')
+  })
+
   it('cada archivo muestra su estado', () => {
     montar(EN_CURSO)
 
