@@ -15,6 +15,7 @@ import {
   KeyRoundIcon,
   Link2Icon,
   Loader2Icon,
+  PackageOpenIcon,
   PencilIcon,
   RefreshCwIcon,
   SearchIcon,
@@ -45,20 +46,26 @@ import {
 import {
   type CriterioDeOrden,
   describeBorrado,
+  describeMedida,
+  esComprimido,
   fetchMigas,
   filtrarEntradas,
   joinRuta,
+  type Medida,
   ordenarEntradas,
+  pideEscribirElNombre,
   quitarOcultos,
   type Sentido,
 } from '@/features/terminal/archivos'
 import { DialogoDePermisos } from '@/features/terminal/DialogoDePermisos'
 import { EditorDeArchivo } from '@/features/terminal/EditorDeArchivo'
 import type {
+  AccionDeTarea,
   EntradaDeArchivo,
   MensajeDeArchivo,
   MensajeDeArchivos,
   MensajeDeContenido,
+  MensajeDeTarea,
 } from '@/features/terminal/socket'
 import type { OrdenDeArchivo } from '@/features/terminal/use-terminal-socket'
 import {
@@ -79,7 +86,9 @@ interface Props {
     texto: string
     version: string
   }) => Promise<MensajeDeContenido>
-  descargar: (ruta: string, comprimir?: boolean) => void
+  descargar: (ruta: string) => void
+  /** Medir, comprimir, extraer o borrar en grande, aparte de la shell. */
+  ejecutarTarea: (accion: AccionDeTarea, ruta: string) => Promise<MensajeDeTarea>
   subir: (archivos: File[], carpeta: string) => Promise<void>
   /** Lleva la shell a esa carpeta con un `cd`. */
   abrirEnTerminal: (ruta: string) => void
@@ -102,6 +111,7 @@ export function PanelDeArchivos({
   pedirContenido,
   guardarContenido,
   descargar,
+  ejecutarTarea,
   subir,
   abrirEnTerminal,
   onCerrar,
@@ -120,6 +130,13 @@ export function PanelDeArchivos({
   const [editando, setEditando] = useState<string | null>(null)
   const [conPermisos, setConPermisos] = useState<EntradaDeArchivo | null>(null)
   const [cambiando, setCambiando] = useState(false)
+  // Lo que tienen las carpetas por borrar; mientras no sea de esta lista, se mide
+  const [medida, setMedida] = useState<{ de: EntradaDeArchivo[]; total: Medida | null }>({
+    de: [],
+    total: null,
+  })
+  const [enCurso, setEnCurso] = useState<{ id: number; texto: string }[]>([])
+  const siguienteTarea = useRef(0)
   const [arrastrando, setArrastrando] = useState(false)
   const selector = useRef<HTMLInputElement | null>(null)
   // Estable: si cambiara en cada render, robaría el foco a la búsqueda
@@ -199,14 +216,79 @@ export function PanelDeArchivos({
     }
   }
 
-  /** De uno en uno y con un solo aviso al final, diga lo que diga cada uno. */
+  /** Se ve abajo mientras corre, y la lista se recarga al terminar. */
+  const enSegundoPlano = async (texto: string, accion: AccionDeTarea, ruta: string) => {
+    siguienteTarea.current += 1
+    const id = siguienteTarea.current
+    setEnCurso((antes) => [...antes, { id, texto }])
+    const suya = await ejecutarTarea(accion, ruta)
+    setEnCurso((antes) => antes.filter((una) => una.id !== id))
+    return suya
+  }
+
+  const comprimir = async (entrada: EntradaDeArchivo) => {
+    const ruta = joinRuta(aqui, entrada.nombre)
+    const suya = await enSegundoPlano(`Comprimiendo ${entrada.nombre}…`, 'comprimir', ruta)
+    if (suya.estado === 'error') {
+      toast.error(suya.message ?? `No se pudo comprimir ${entrada.nombre}.`)
+      return
+    }
+    toast.success(`${suya.nombre ?? 'El comprimido'} está listo.`, {
+      description: 'Ya está en la lista para descargarlo.',
+    })
+    await recargar()
+  }
+
+  const extraer = async (entrada: EntradaDeArchivo) => {
+    const ruta = joinRuta(aqui, entrada.nombre)
+    const suya = await enSegundoPlano(`Extrayendo ${entrada.nombre}…`, 'extraer', ruta)
+    if (suya.estado === 'error') {
+      toast.error(suya.message ?? `No se pudo extraer ${entrada.nombre}.`)
+      return
+    }
+    toast.success(`${entrada.nombre} extraído en la carpeta ${suya.nombre ?? ''}.`)
+    await recargar()
+  }
+
+  // Al pedir borrar carpetas, se mide qué tienen antes de dejar confirmar
+  useEffect(() => {
+    const carpetas = porBorrar.filter((entrada) => entrada.tipo === 'carpeta')
+    if (!carpetas.length) return
+    let vigente = true
+    void Promise.all(
+      carpetas.map((carpeta) => ejecutarTarea('medir', joinRuta(aqui, carpeta.nombre))),
+    ).then((medidas) => {
+      if (!vigente) return
+      const total = medidas.every((una) => una.estado === 'hecho')
+        ? medidas.reduce<Medida>(
+            (suma, una) => ({
+              archivos: suma.archivos + (una.archivos ?? 0),
+              carpetas: suma.carpetas + (una.carpetas ?? 0),
+              kb: suma.kb + (una.kb ?? 0),
+            }),
+            { archivos: 0, carpetas: 0, kb: 0 },
+          )
+        : null
+      setMedida({ de: porBorrar, total })
+    })
+    return () => {
+      vigente = false
+    }
+  }, [porBorrar, aqui, ejecutarTarea])
+
+  /** De uno en uno y con un solo aviso al final, diga lo que diga cada uno.
+   *  Una carpeta se borra entera en el servidor; lo demás, por SFTP. */
   const borrar = async () => {
     const lista = porBorrar
     setCambiando(true)
     let borrados = 0
     let motivo = ''
     for (const entrada of lista) {
-      const respuesta = await cambiarArchivo({ borrar: { ruta: joinRuta(aqui, entrada.nombre) } })
+      const ruta = joinRuta(aqui, entrada.nombre)
+      const respuesta =
+        entrada.tipo === 'carpeta'
+          ? await ejecutarTarea('borrar', ruta)
+          : await cambiarArchivo({ borrar: { ruta } })
       if (respuesta.estado === 'hecho') borrados += 1
       else motivo ||= respuesta.message ?? ''
     }
@@ -262,13 +344,21 @@ export function PanelDeArchivos({
   }
 
   const descargarElegidos = () => {
-    for (const entrada of deLaSeleccion) {
-      descargar(joinRuta(aqui, entrada.nombre), entrada.tipo === 'carpeta')
+    const archivos = deLaSeleccion.filter((entrada) => entrada.tipo !== 'carpeta')
+    for (const entrada of archivos) descargar(joinRuta(aqui, entrada.nombre))
+    if (archivos.length < deLaSeleccion.length) {
+      toast.info('Las carpetas no se descargan directo.', {
+        description: 'Comprímalas desde su menú y baje el .tar.gz.',
+      })
     }
     salirDeLaSeleccion()
   }
 
-  const borrado = describirLoQueSeBorra(porBorrar)
+  const medicion: Medicion =
+    medida.de === porBorrar
+      ? { midiendo: false, total: medida.total }
+      : { midiendo: porBorrar.some((entrada) => entrada.tipo === 'carpeta'), total: null }
+  const borrado = describirLoQueSeBorra(porBorrar, medicion)
 
   return (
     <aside
@@ -492,7 +582,12 @@ export function PanelDeArchivos({
                         entrada.tipo === 'archivo' ? setEditando(ruta) : void navegar(ruta)
                       }
                       onDescargar={() => descargar(ruta)}
-                      onComprimir={() => descargar(ruta, true)}
+                      onComprimir={() => void comprimir(entrada)}
+                      onExtraer={
+                        esComprimido(entrada.nombre) && entrada.tipo === 'archivo'
+                          ? () => void extraer(entrada)
+                          : undefined
+                      }
                       onAbrirEnTerminal={() => abrirEnTerminal(ruta)}
                       onCopiarRuta={() => void copiarRuta(ruta)}
                       onRenombrar={() => setRenombrando(entrada.nombre)}
@@ -542,6 +637,20 @@ export function PanelDeArchivos({
           </p>
         )}
       </div>
+
+      {enCurso.length > 0 && (
+        <div
+          role="status"
+          className="border-term-border text-term-dim space-y-1 border-t px-3 py-2 text-xs"
+        >
+          {enCurso.map((tarea) => (
+            <p key={tarea.id} className="flex items-center gap-2">
+              <Loader2Icon className="size-3.5 shrink-0 animate-spin" aria-hidden />
+              <span className="truncate">{tarea.texto}</span>
+            </p>
+          ))}
+        </div>
+      )}
 
       {eligiendo ? (
         <div className="border-term-border flex items-center gap-1.5 border-t px-3 py-2">
@@ -602,8 +711,9 @@ export function PanelDeArchivos({
         descripcion={borrado.descripcion}
         detalles={borrado.detalles}
         accion={borrado.accion}
+        confirmacion={borrado.confirmacion}
         destructiva
-        pendiente={cambiando}
+        pendiente={cambiando || medicion.midiendo}
         onConfirmar={() => void borrar()}
       />
 
@@ -630,21 +740,44 @@ export function PanelDeArchivos({
   )
 }
 
-/** Uno se nombra; varios se cuentan, como pide la regla de bajas. */
-function describirLoQueSeBorra(lista: EntradaDeArchivo[]) {
+interface Medicion {
+  midiendo: boolean
+  total: Medida | null
+}
+
+/** Lo que tienen dentro las carpetas, o por qué todavía no se sabe. */
+function describirContenido({ midiendo, total }: Medicion): string {
+  if (midiendo) return 'Midiendo lo que tiene dentro…'
+  return total ? describeMedida(total) : 'No se pudo medir lo que tiene dentro.'
+}
+
+/** Uno se nombra; varios se cuentan, como pide la regla de bajas. Con muchos
+ *  archivos dentro, o sin poder medirlos, hay que escribir para confirmar. */
+function describirLoQueSeBorra(lista: EntradaDeArchivo[], medicion: Medicion) {
   const [unico] = lista
+  const carpetas = lista.filter((entrada) => entrada.tipo === 'carpeta').length
+  const pideEscribir = carpetas > 0 && !medicion.midiendo && pideEscribirElNombre(medicion.total)
   if (lista.length === 1 && unico) {
     const { accion, detalles } = describeBorrado(unico.tipo)
-    return { titulo: `¿Borrar ${unico.nombre}?`, descripcion: unico.nombre, accion, detalles }
+    return {
+      titulo: `¿Borrar ${unico.nombre}?`,
+      descripcion: carpetas ? describirContenido(medicion) : unico.nombre,
+      accion,
+      detalles,
+      confirmacion: pideEscribir ? unico.nombre : undefined,
+    }
   }
-  const carpetas = lista.filter((entrada) => entrada.tipo === 'carpeta').length
   const detalles = ['Se borran del servidor. No hay papelera para recuperarlos.']
-  if (carpetas) detalles.push('Las carpetas solo se borran si están vacías.')
+  if (carpetas) {
+    const contenido = describirContenido(medicion)
+    detalles.push(`Las carpetas se borran con todo lo que tienen. ${contenido}`)
+  }
   return {
     titulo: `¿Borrar ${lista.length} elementos?`,
     descripcion: 'Se borran uno por uno. Si alguno falla, el aviso dice por qué.',
     accion: `Borrar ${lista.length}`,
     detalles,
+    confirmacion: pideEscribir ? 'borrar' : undefined,
   }
 }
 
@@ -712,6 +845,7 @@ function FilaDeEntrada({
   onAbrir,
   onDescargar,
   onComprimir,
+  onExtraer,
   onAbrirEnTerminal,
   onCopiarRuta,
   onRenombrar,
@@ -725,6 +859,8 @@ function FilaDeEntrada({
   onAbrir: () => void
   onDescargar: () => void
   onComprimir: () => void
+  /** Solo en los comprimidos que el servidor sabe abrir. */
+  onExtraer?: () => void
   onAbrirEnTerminal: () => void
   onCopiarRuta: () => void
   onRenombrar: () => void
@@ -818,20 +954,24 @@ function FilaDeEntrada({
                   <DownloadIcon />
                   Descargar
                 </DropdownMenuItem>
-              </>
-            ) : (
-              <>
-                <DropdownMenuItem onSelect={onAbrirEnTerminal}>
-                  <SquareTerminalIcon />
-                  Abrir en la terminal
-                </DropdownMenuItem>
-                {entrada.tipo === 'carpeta' && (
-                  <DropdownMenuItem onSelect={onComprimir}>
-                    <FileArchiveIcon />
-                    Descargar comprimida
+                {onExtraer && (
+                  <DropdownMenuItem onSelect={onExtraer}>
+                    <PackageOpenIcon />
+                    Extraer aquí
                   </DropdownMenuItem>
                 )}
               </>
+            ) : (
+              <DropdownMenuItem onSelect={onAbrirEnTerminal}>
+                <SquareTerminalIcon />
+                Abrir en la terminal
+              </DropdownMenuItem>
+            )}
+            {entrada.tipo !== 'enlace' && (
+              <DropdownMenuItem onSelect={onComprimir}>
+                <FileArchiveIcon />
+                Comprimir
+              </DropdownMenuItem>
             )}
             <DropdownMenuItem onSelect={onCopiarRuta}>
               <CopyIcon />

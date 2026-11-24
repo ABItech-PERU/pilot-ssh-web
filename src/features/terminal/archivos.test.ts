@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import {
   aplicarFinDeLinea,
   describeBorrado,
+  describeMedida,
   describePermisos,
+  esComprimido,
   esModoValido,
   fetchCuadricula,
   fetchFinDeLinea,
@@ -13,6 +15,7 @@ import {
   filtrarEntradas,
   joinRuta,
   ordenarEntradas,
+  pideEscribirElNombre,
   quitarOcultos,
 } from '@/features/terminal/archivos'
 import type { EntradaDeArchivo } from '@/features/terminal/socket'
@@ -65,10 +68,53 @@ describe('filtrarEntradas', () => {
   })
 })
 
+describe('esComprimido', () => {
+  it('reconoce lo que se puede extraer', () => {
+    for (const nombre of ['sitio.tar.gz', 'a.TGZ', 'b.tar', 'c.tar.bz2', 'd.tar.xz', 'fotos.zip']) {
+      expect(esComprimido(nombre)).toBe(true)
+    }
+  })
+
+  it('lo demás no se ofrece para extraer', () => {
+    for (const nombre of ['notas.txt', 'app.gz', '.tar.gz', 'zip']) {
+      expect(esComprimido(nombre)).toBe(false)
+    }
+  })
+})
+
+describe('describeMedida', () => {
+  it('cuenta archivos, carpetas y tamaño en palabras', () => {
+    expect(describeMedida({ archivos: 1566, carpetas: 12, kb: 455_000 })).toBe(
+      '1566 archivos, 12 carpetas y 444,3 MB',
+    )
+  })
+
+  it('en singular cuando hay uno', () => {
+    expect(describeMedida({ archivos: 1, carpetas: 1, kb: 4 })).toBe(
+      '1 archivo, 1 carpeta y 4 KB',
+    )
+  })
+
+  it('una carpeta vacía lo dice así', () => {
+    expect(describeMedida({ archivos: 0, carpetas: 0, kb: 4 })).toBe('Está vacía')
+  })
+})
+
+describe('pideEscribirElNombre', () => {
+  it('con más de 100 archivos hay que escribir el nombre', () => {
+    expect(pideEscribirElNombre({ archivos: 101, carpetas: 0, kb: 1 })).toBe(true)
+    expect(pideEscribirElNombre({ archivos: 100, carpetas: 0, kb: 1 })).toBe(false)
+  })
+
+  it('si no se pudo medir, también', () => {
+    expect(pideEscribirElNombre(null)).toBe(true)
+  })
+})
+
 describe('describeBorrado', () => {
   it('nombra lo que se borra en el botón', () => {
     expect(describeBorrado('archivo').accion).toBe('Borrar archivo')
-    expect(describeBorrado('carpeta').accion).toBe('Borrar carpeta')
+    expect(describeBorrado('carpeta').accion).toBe('Borrar carpeta y su contenido')
     expect(describeBorrado('enlace').accion).toBe('Borrar enlace')
   })
 

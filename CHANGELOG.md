@@ -11,12 +11,15 @@ Cambios notables de Pilot SSH Web, según Keep a Changelog 1.1 y SemVer 2.0.
 - Terminal SSH en el navegador que se reconecta cuando la API se actualiza.
 - Panel «Archivos» junto a la terminal para explorar, descargar, renombrar, borrar y subir archivos del servidor.
 - En el panel de archivos, editor de texto, permisos, carpetas comprimidas, elegir varios, orden, ocultos e ir a una ruta.
+- «Extraer aquí» para abrir en el servidor un `.tar.gz`, `.tgz`, `.tar` o `.zip`.
 - Recargas de créditos con Mercado Pago.
 - Panel de plataforma para soporte, finanzas y operaciones.
 - Despliegue continuo a `uat` y publicación en `prod` con etiqueta `vX.Y.Z`.
 
 ### Cambiado
 
+- Las carpetas se comprimen en el servidor con «Comprimir» y se bajan como `.tar.gz` con avance real; «Descargar comprimida» desaparece.
+- Borrar una carpeta con contenido la mide antes y, con más de 100 archivos, pide escribir su nombre.
 - Las descargas de la terminal las baja el gestor de descargas del navegador, directo al disco, sin tope de memoria.
 - Arrastrar un archivo sobre la terminal dice a qué carpeta irá, y los avisos de la terminal salen en el centro de la cabecera, sin tapar la shell ni el panel de archivos.
 

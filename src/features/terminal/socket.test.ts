@@ -276,6 +276,24 @@ describe('parseIncoming de archivos', () => {
     ).toMatchObject({ type: 'descarga', estado: 'cortada', message: 'No se pudo.' })
   })
 
+  it('lee cómo terminó una tarea, con la ruta tal como se pidió', () => {
+    const mensaje = {
+      type: 'tarea',
+      accion: 'medir',
+      pedida: '/home/deploy/sitio',
+      estado: 'hecho',
+      archivos: 3,
+      carpetas: 1,
+      kb: 12,
+    }
+
+    expect(parseIncoming(JSON.stringify(mensaje))).toMatchObject(mensaje)
+  })
+
+  it('una tarea desconocida se ignora', () => {
+    expect(parseIncoming('{"type":"tarea","accion":"formatear","estado":"hecho"}')).toBeNull()
+  })
+
   it('un estado de descarga desconocido se ignora', () => {
     expect(parseIncoming('{"type":"descarga","estado":"lista"}')).toBeNull()
   })

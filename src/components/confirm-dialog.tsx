@@ -53,22 +53,24 @@ export function ConfirmDialog({
 }: Props) {
   const idConfirmacion = useId()
   const [tecleado, setTecleado] = useState('')
-  const [ultimo, setUltimo] = useState({ titulo, descripcion, detalles, confirmacion })
   const [copiado, setCopiado] = useState(false)
   const entrada = useRef<HTMLInputElement>(null)
+  const actual = { titulo, descripcion, detalles, confirmacion, accion }
+  // Lo último que se vio abierto, para que nada cambie mientras se desvanece
+  const ultimo = useRef(actual)
 
-  // Cada apertura empieza en blanco y congela lo mostrado, para que el
-  // titulo no se vacie mientras el dialogo se desvanece. Abierto, mandan
-  // las props
+  useEffect(() => {
+    if (open) ultimo.current = actual
+  })
+
+  // Cada apertura empieza en blanco
   useEffect(() => {
     if (!open) return
     setTecleado('')
     setCopiado(false)
-    setUltimo({ titulo, descripcion, detalles, confirmacion })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  const mostrado = open ? { titulo, descripcion, detalles, confirmacion } : ultimo
+  const mostrado = open ? actual : ultimo.current
   const habilitado =
     !pendiente && (!mostrado.confirmacion || tecleado.trim() === mostrado.confirmacion)
 
@@ -179,7 +181,7 @@ export function ConfirmDialog({
             }}
           >
             {pendiente && <Loader2Icon className="animate-spin" />}
-            {accion}
+            {mostrado.accion}
           </AlertDialogAction>
           <AlertDialogCancel variant="outline" disabled={pendiente}>
             Cancelar
