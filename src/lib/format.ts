@@ -129,14 +129,20 @@ export function formatMonth(fecha: string): string {
   return mesSinZona.format(new Date(`${fecha}T12:00:00Z`))
 }
 
-/** El peso de un archivo como se lee: «245 KB», «1,2 MB». */
+/** El peso de un archivo como se lee, «245 KB», «1,2 MB» o «1,04 GB». */
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
 
   const kb = bytes / 1024
   if (kb < 1024) return `${Math.round(kb)} KB`
 
-  return `${new Intl.NumberFormat('es', { maximumFractionDigits: 1 }).format(kb / 1024)} MB`
+  const mb = kb / 1024
+  if (mb < 1024) {
+    return `${new Intl.NumberFormat('es', { maximumFractionDigits: 1 }).format(mb)} MB`
+  }
+
+  // Tres cifras significativas, como el explorador de Windows
+  return `${new Intl.NumberFormat('es', { maximumSignificantDigits: 3 }).format(mb / 1024)} GB`
 }
 
 /** Iniciales para el avatar: primera y última palabra; con una sola, sus

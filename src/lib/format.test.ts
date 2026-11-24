@@ -16,6 +16,17 @@ describe('formatFileSize', () => {
     expect(formatFileSize(1_258_291)).toBe('1,2 MB')
     expect(formatFileSize(5 * 1024 * 1024)).toBe('5 MB')
   })
+
+  it('desde un giga pasa a GB con tres cifras, como Windows', () => {
+    const mega = 1024 * 1024
+    expect(formatFileSize(1065.4 * mega)).toBe('1,04 GB')
+    expect(formatFileSize(10.44 * 1024 * mega)).toBe('10,4 GB')
+    expect(formatFileSize(104.4 * 1024 * mega)).toBe('104 GB')
+  })
+
+  it('justo por debajo de un giga sigue en MB', () => {
+    expect(formatFileSize(1023 * 1024 * 1024)).toBe('1023 MB')
+  })
 })
 
 describe('buildInitials', () => {
