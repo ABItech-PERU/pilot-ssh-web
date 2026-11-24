@@ -28,6 +28,7 @@ Cambios notables de Pilot SSH Web, según Keep a Changelog 1.1 y SemVer 2.0.
 - En una laptop o más ancho, el panel de archivos va al lado de la terminal y la estrecha; su ancho se arrastra, se recuerda y vuelve al inicial con doble clic.
 - El panel lateral tiene pestañas, listo para sumar herramientas junto a «Archivos».
 - Los nombres largos se leen en la letra de la interfaz y se recortan por el medio, sin perder la extensión.
+- El editor de archivos numera las líneas, colorea según el lenguaje, pliega bloques y busca o reemplaza con Ctrl+F.
 - «Detalles» de un archivo o carpeta, con tamaño exacto, propietario, grupo, permisos explicados y a dónde apunta un enlace.
 - Las descargas de la terminal las baja el gestor de descargas del navegador, directo al disco, sin tope de memoria.
 - Arrastrar un archivo sobre la terminal dice a qué carpeta irá, y los avisos de la terminal salen en el centro de la cabecera, sin tapar la shell ni el panel de archivos.

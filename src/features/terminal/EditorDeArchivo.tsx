@@ -1,5 +1,5 @@
 import { DownloadIcon, Loader2Icon, RefreshCwIcon, TriangleAlertIcon } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -10,6 +10,8 @@ import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '@/componen
 import { aplicarFinDeLinea, type FinDeLinea, fetchFinDeLinea } from '@/features/terminal/archivos'
 import type { MensajeDeContenido } from '@/features/terminal/socket'
 import { formatFileSize } from '@/lib/format'
+
+const AreaDeCodigo = lazy(() => import('@/features/terminal/AreaDeCodigo'))
 
 interface Props {
   /** El archivo abierto; null con el editor cerrado. */
@@ -48,16 +50,11 @@ export function EditorDeArchivo({
   const [cargando, setCargando] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [descartando, setDescartando] = useState(false)
-  const area = useRef<HTMLTextAreaElement | null>(null)
+  const [lenguaje, setLenguaje] = useState<string | null>(null)
+  // Cada lectura monta un editor nuevo con su texto
+  const [lectura, setLectura] = useState(0)
 
   const cambiado = Boolean(abierto?.editable) && texto !== guardado
-
-  // De un log importa lo último: se abre por el final, como `tail`
-  useEffect(() => {
-    if (!cargando && abierto?.recortado && area.current) {
-      area.current.scrollTop = area.current.scrollHeight
-    }
-  }, [cargando, abierto])
 
   const cargar = useCallback(
     async (suya: string) => {
@@ -83,6 +80,8 @@ export function EditorDeArchivo({
       const visible = original.replace(/\r\n/g, '\n')
       setTexto(visible)
       setGuardado(visible)
+      setLenguaje(null)
+      setLectura((previa) => previa + 1)
     },
     [pedirContenido],
   )
@@ -127,6 +126,12 @@ export function EditorDeArchivo({
       <Dialog open={ruta !== null} onOpenChange={(sigue) => !sigue && pedirCierre()}>
         <FormDialogContent
           className="flex h-[calc(100dvh-2rem)] flex-col gap-3 overflow-hidden sm:max-w-5xl"
+          onEscapeKeyDown={(evento) => {
+            // Escape en el buscador lo cierra a él, no al archivo
+            if (evento.target instanceof Element && evento.target.closest('.cm-panels')) {
+              evento.preventDefault()
+            }
+          }}
           onKeyDown={(evento) => {
             if ((evento.ctrlKey || evento.metaKey) && evento.key.toLowerCase() === 's') {
               evento.preventDefault()
@@ -189,29 +194,36 @@ export function EditorDeArchivo({
             )}
 
             {!cargando && abierto && (
-              <textarea
-                ref={(nodo) => {
-                  area.current = nodo
-                }}
-                aria-label={`Contenido de ${abierto.nombre}`}
-                className="font-machine bg-muted/40 focus-visible:ring-ring h-full w-full resize-none rounded-md border p-3 text-[13px] leading-5 outline-none focus-visible:ring-2"
-                value={texto}
-                readOnly={!abierto.editable}
-                spellCheck={false}
-                autoCapitalize="off"
-                autoCorrect="off"
-                wrap="off"
-                onChange={(evento) => setTexto(evento.target.value)}
-              />
+              <Suspense fallback={<LineaEsqueleto className="m-2 w-2/3" />}>
+                <AreaDeCodigo
+                  key={lectura}
+                  texto={guardado}
+                  nombre={abierto.nombre}
+                  soloLectura={!abierto.editable}
+                  soloElFinal={abierto.recortado}
+                  onCambiar={setTexto}
+                  onLenguaje={setLenguaje}
+                />
+              </Suspense>
             )}
           </div>
 
           {abierto && (
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-muted-foreground mr-auto text-xs">
-                {abierto.editable
-                  ? `${abierto.fin === '\r\n' ? 'Fin de línea de Windows (CRLF)' : 'Fin de línea Unix (LF)'} · Ctrl+S guarda`
-                  : 'Solo lectura'}
+                {[
+                  lenguaje,
+                  abierto.editable
+                    ? abierto.fin === '\r\n'
+                      ? 'Fin de línea de Windows (CRLF)'
+                      : 'Fin de línea Unix (LF)'
+                    : 'Solo lectura',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+                <span className="pointer-coarse:hidden">
+                  {abierto.editable ? ' · Ctrl+F busca · Ctrl+S guarda' : ' · Ctrl+F busca'}
+                </span>
               </span>
               {abierto.editable && (
                 <Button

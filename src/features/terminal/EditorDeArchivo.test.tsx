@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react'
+import { EditorView } from '@codemirror/view'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -22,7 +23,7 @@ function leido(cambios: Partial<MensajeDeContenido> = {}): MensajeDeContenido {
   }
 }
 
-function montar(respuesta: MensajeDeContenido = leido()) {
+function montar(respuesta: MensajeDeContenido = leido(), ruta = RUTA) {
   const pedirContenido = vi.fn().mockResolvedValue(respuesta)
   const guardarContenido = vi
     .fn()
@@ -31,7 +32,7 @@ function montar(respuesta: MensajeDeContenido = leido()) {
   const onCerrar = vi.fn()
   render(
     <EditorDeArchivo
-      ruta={RUTA}
+      ruta={ruta}
       pedirContenido={pedirContenido}
       guardarContenido={guardarContenido}
       descargar={descargar}
@@ -41,20 +42,45 @@ function montar(respuesta: MensajeDeContenido = leido()) {
   return { pedirContenido, guardarContenido, descargar, onCerrar }
 }
 
+async function abrirEditor(nombre = '.env') {
+  const contenido = await screen.findByRole('textbox', { name: `Contenido de ${nombre}` })
+  return { contenido, vista: EditorView.findFromDOM(contenido)! }
+}
+
+/** jsdom no edita un contenteditable; se escribe como lo haría el teclado. */
+function escribir(vista: EditorView, texto: string, { reemplazar = false } = {}) {
+  const fin = vista.state.doc.length
+  vista.dispatch({
+    changes: { from: reemplazar ? 0 : fin, to: fin, insert: texto },
+    userEvent: 'input.type',
+  })
+}
+
 describe('EditorDeArchivo', () => {
-  it('muestra el texto del archivo', async () => {
-    const { pedirContenido } = montar()
+  it('muestra el texto del archivo con sus líneas numeradas', async () => {
+    const { pedirContenido } = montar(leido({ texto: 'uno\ndos\ntres\n' }))
 
-    const area = await screen.findByRole('textbox', { name: 'Contenido de .env' })
+    const { vista } = await abrirEditor()
 
-    expect(area).toHaveValue('APP_ENV=prod\n')
+    expect(vista.state.doc.toString()).toBe('uno\ndos\ntres\n')
     expect(pedirContenido).toHaveBeenCalledWith(RUTA)
+    const numeros = document.querySelector('.cm-lineNumbers')!
+    expect(within(numeros as HTMLElement).getByText('3')).toBeInTheDocument()
+  })
+
+  it('reconoce el lenguaje por el nombre del archivo', async () => {
+    const ruta = '/srv/app/docker-compose.yml'
+    montar(leido({ ruta, nombre: 'docker-compose.yml', texto: 'services:\n' }), ruta)
+
+    await abrirEditor('docker-compose.yml')
+
+    expect(await screen.findByText(/YAML/)).toBeInTheDocument()
   })
 
   it('sin cambios no deja guardar', async () => {
     montar()
 
-    await screen.findByRole('textbox', { name: 'Contenido de .env' })
+    await abrirEditor()
 
     expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled()
   })
@@ -62,10 +88,9 @@ describe('EditorDeArchivo', () => {
   it('guarda lo escrito con la versión que leyó', async () => {
     const usuario = userEvent.setup()
     const { guardarContenido } = montar()
-    const area = await screen.findByRole('textbox', { name: 'Contenido de .env' })
+    const { vista } = await abrirEditor()
 
-    await usuario.clear(area)
-    await usuario.type(area, 'APP_ENV=uat{Enter}')
+    escribir(vista, 'APP_ENV=uat\n', { reemplazar: true })
     await usuario.click(screen.getByRole('button', { name: 'Guardar' }))
 
     expect(guardarContenido).toHaveBeenCalledWith({
@@ -78,9 +103,10 @@ describe('EditorDeArchivo', () => {
   it('Ctrl+S guarda sin buscar el botón', async () => {
     const usuario = userEvent.setup()
     const { guardarContenido } = montar()
-    const area = await screen.findByRole('textbox', { name: 'Contenido de .env' })
+    const { contenido, vista } = await abrirEditor()
 
-    await usuario.type(area, 'X=1')
+    escribir(vista, 'X=1')
+    contenido.focus()
     await usuario.keyboard('{Control>}s{/Control}')
 
     expect(guardarContenido).toHaveBeenCalledTimes(1)
@@ -89,10 +115,10 @@ describe('EditorDeArchivo', () => {
   it('un archivo de Windows se guarda con sus finales de línea', async () => {
     const usuario = userEvent.setup()
     const { guardarContenido } = montar(leido({ texto: 'a\r\nb\r\n' }))
-    const area = await screen.findByRole('textbox', { name: 'Contenido de .env' })
+    const { vista } = await abrirEditor()
 
     expect(screen.getByText(/Windows \(CRLF\)/)).toBeInTheDocument()
-    await usuario.type(area, 'c')
+    escribir(vista, 'c')
     await usuario.click(screen.getByRole('button', { name: 'Guardar' }))
 
     expect(guardarContenido.mock.lastCall?.[0].texto).toBe('a\r\nb\r\nc')
@@ -106,24 +132,26 @@ describe('EditorDeArchivo', () => {
       estado: 'error',
       message: 'El archivo cambió en el servidor desde que lo abrió.',
     })
-    const area = await screen.findByRole('textbox', { name: 'Contenido de .env' })
+    const { vista } = await abrirEditor()
 
-    await usuario.type(area, 'X=1')
+    escribir(vista, 'X=1')
     await usuario.click(screen.getByRole('button', { name: 'Guardar' }))
 
     // Sigue sin guardar, y el texto escrito no se pierde
     expect(await screen.findByText('Sin guardar')).toBeInTheDocument()
-    expect(area).toHaveValue('APP_ENV=prod\nX=1')
+    expect(vista.state.doc.toString()).toBe('APP_ENV=prod\nX=1')
   })
 
   it('un archivo grande se abre solo para leer', async () => {
     montar(leido({ recortado: true, editable: false }))
 
-    const area = await screen.findByRole('textbox', { name: 'Contenido de .env' })
+    const { contenido } = await abrirEditor()
 
-    expect(area).toHaveAttribute('readonly')
+    expect(contenido).toHaveAttribute('aria-readonly', 'true')
     expect(screen.getByText(/Se ve solo el final/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Guardar' })).not.toBeInTheDocument()
+    // Los números de un trozo no serían los del archivo
+    expect(document.querySelector('.cm-lineNumbers')).toBeNull()
   })
 
   it('lo que no es texto ofrece descargarlo', async () => {
@@ -140,12 +168,27 @@ describe('EditorDeArchivo', () => {
     expect(descargar).toHaveBeenCalledWith(RUTA)
   })
 
+  it('Escape en el buscador lo cierra sin cerrar el archivo', async () => {
+    const usuario = userEvent.setup()
+    const { onCerrar } = montar()
+    const { contenido } = await abrirEditor()
+
+    contenido.focus()
+    await usuario.keyboard('{Control>}f{/Control}')
+    const buscar = await screen.findByRole('textbox', { name: 'Buscar' })
+    buscar.focus()
+    await usuario.keyboard('{Escape}')
+
+    expect(screen.queryByRole('textbox', { name: 'Buscar' })).not.toBeInTheDocument()
+    expect(onCerrar).not.toHaveBeenCalled()
+  })
+
   it('cerrar con cambios pide confirmarlo', async () => {
     const usuario = userEvent.setup()
     const { onCerrar } = montar()
-    const area = await screen.findByRole('textbox', { name: 'Contenido de .env' })
+    const { vista } = await abrirEditor()
 
-    await usuario.type(area, 'X=1')
+    escribir(vista, 'X=1')
     await usuario.keyboard('{Escape}')
 
     expect(await screen.findByRole('alertdialog', { name: '¿Cerrar sin guardar?' })).toBeVisible()
@@ -158,7 +201,7 @@ describe('EditorDeArchivo', () => {
   it('cerrar sin cambios no pregunta', async () => {
     const usuario = userEvent.setup()
     const { onCerrar } = montar()
-    await screen.findByRole('textbox', { name: 'Contenido de .env' })
+    await abrirEditor()
 
     await usuario.keyboard('{Escape}')
 
