@@ -1,28 +1,17 @@
 /** Copiar un archivo a la shell abierta, en tramos por el mismo socket. */
 
-/** 32 KB: lo que se teclea viaja por el mismo socket y espera detrás. */
-export const TAMANO_DE_TRAMO = 32 * 1024
+/** Por debajo del mega por mensaje que aceptan los proxies del WebSocket. */
+export const TAMANO_DE_TRAMO = 256 * 1024
 
-/** Se espera cuando el socket acumula más de esto sin llegar a mandarlo. */
-const COLA_MAXIMA = 96 * 1024
+/** Lo tecleado espera detrás de esta cola, por eso no pasa de dos tramos. */
+const COLA_MAXIMA = 2 * TAMANO_DE_TRAMO
 
 const ESPERA_DE_COLA_MS = 20
-
-export interface AvanceDeSubida {
-  nombre: string
-  carpeta: string
-  enviado: number
-  total: number
-}
 
 /** La carpeta de una ruta ya resuelta por el servidor. */
 export function fetchCarpetaDeLaRuta(ruta: string): string {
   const corte = ruta.lastIndexOf('/')
   return corte > 0 ? ruta.slice(0, corte) : '/'
-}
-
-export function fetchPorcentaje({ enviado, total }: AvanceDeSubida): number {
-  return total ? Math.min(100, Math.round((enviado / total) * 100)) : 0
 }
 
 interface Envio {

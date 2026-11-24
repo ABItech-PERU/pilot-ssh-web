@@ -15,7 +15,11 @@ import {
 import { leerDelPrompt, leerOsc7 } from '@/features/terminal/carpeta-actual'
 import { PanelDeArchivos } from '@/features/terminal/PanelDeArchivos'
 import { CIERRE, type EstadoTerminal, quotePath } from '@/features/terminal/socket'
-import { fetchPorcentaje } from '@/features/terminal/subida'
+import { DialogoDeConflicto } from '@/features/terminal/DialogoDeConflicto'
+import { PanelDeTransferencias } from '@/features/terminal/PanelDeTransferencias'
+import { leerSoltados } from '@/features/terminal/soltar'
+import { fetchCarpetaDeLaRuta } from '@/features/terminal/subida'
+import { planearSubida } from '@/features/terminal/transferencias'
 import {
   type Latencias,
   useTerminalSocket,
@@ -123,7 +127,14 @@ export function PanelDeTerminal({
 
   const {
     cambiarArchivo,
-    cancelarSubida,
+    cancelarTodas,
+    cancelarTransferencia,
+    conflicto,
+    decidirConflicto,
+    encolarSubidas,
+    limpiarTransferencias,
+    reintentarTransferencia,
+    transferencias,
     descargar,
     ejecutarTarea,
     guardarContenido,
@@ -131,8 +142,6 @@ export function PanelDeTerminal({
     enviarTamano,
     pedirArchivos,
     reconectar,
-    subida,
-    subirVarios,
     teclear,
   } = useTerminalSocket({
     server,
@@ -175,6 +184,12 @@ export function PanelDeTerminal({
 
   const cerrarArchivos = () => {
     setExplorando(null)
+    terminal.current?.focus()
+  }
+
+  /** Lleva la shell a la carpeta de lo subido y lo muestra. */
+  const irALaCarpeta = (ruta: string) => {
+    teclear(`cd ${quotePath(fetchCarpetaDeLaRuta(ruta))} && ls -l ${quotePath(ruta)}\r`)
     terminal.current?.focus()
   }
 
@@ -292,12 +307,14 @@ export function PanelDeTerminal({
           setDestinoDeArrastre(null)
         }
       }}
-      // En captura: el panel de archivos corta el drop que es suyo
+      // En captura, porque el panel de archivos corta el drop que es suyo
       onDropCapture={() => setDestinoDeArrastre(null)}
       onDrop={(evento) => {
         evento.preventDefault()
-        const soltados = [...evento.dataTransfer.files]
-        if (soltados.length) void subirVarios(soltados, fetchDestino())
+        const destino = fetchDestino()
+        void leerSoltados(evento.dataTransfer).then((soltados) =>
+          encolarSubidas(planearSubida(destino, soltados)),
+        )
       }}
     >
       <div ref={contenedor} className="min-h-0 flex-1 overflow-hidden" />
@@ -367,24 +384,33 @@ export function PanelDeTerminal({
             guardarContenido={guardarContenido}
             descargar={descargar}
             ejecutarTarea={ejecutarTarea}
-            subir={subirVarios}
+            subir={encolarSubidas}
             abrirEnTerminal={abrirEnTerminal}
             onCerrar={cerrarArchivos}
           />
         )}
       </div>
 
-      {subida && (
-        <div className="absolute inset-x-4 bottom-3 z-30">
-          <BarraDeAvance
-            porcentaje={fetchPorcentaje(subida)}
-            cancelar="Cancelar la subida"
-            onCancelar={cancelarSubida}
-          >
-            {subida.nombre} <span className="text-term-dim">→ {subida.carpeta}</span>
-          </BarraDeAvance>
+      {transferencias.length > 0 && (
+        <div
+          className={cn(
+            'absolute inset-x-3 bottom-3 z-30 sm:left-auto',
+            // A la izquierda del panel de archivos, para no tapar su lista
+            explorando !== null && 'sm:right-[27.5rem]',
+          )}
+        >
+          <PanelDeTransferencias
+            transferencias={transferencias}
+            onCancelar={cancelarTransferencia}
+            onCancelarTodo={cancelarTodas}
+            onReintentar={reintentarTransferencia}
+            onIrALaCarpeta={irALaCarpeta}
+            onCerrar={limpiarTransferencias}
+          />
         </div>
       )}
+
+      <DialogoDeConflicto conflicto={conflicto} onDecidir={decidirConflicto} />
     </div>
   )
 }
@@ -406,45 +432,6 @@ async function pegarDelPortapapeles(teclear: (datos: string) => void) {
   } catch {
     // Sin permiso no se pega; Ctrl+V del navegador sigue funcionando
   }
-}
-
-/** Cómo va una subida, con su cancelar a mano. */
-function BarraDeAvance({
-  porcentaje,
-  cancelar,
-  onCancelar,
-  children,
-}: {
-  porcentaje: number
-  cancelar: string
-  onCancelar: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <div className="border-term-border bg-term-bg rounded-md border px-3 py-2">
-      <div className="flex items-center justify-between gap-3 text-xs">
-        <span className="font-machine truncate">{children}</span>
-        <span className="text-term-dim ml-auto shrink-0 tabular-nums">
-          {porcentaje} %
-        </span>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={cancelar}
-          onClick={onCancelar}
-          className="text-term-dim hover:text-term-text size-5 hover:bg-white/5"
-        >
-          <XIcon className="size-3.5" />
-        </Button>
-      </div>
-      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
-        <div
-          className="bg-term-ok h-1 rounded-full transition-[width]"
-          style={{ width: `${porcentaje}%` }}
-        />
-      </div>
-    </div>
-  )
 }
 
 function BotonDeCierre({ className, ...props }: React.ComponentProps<typeof Button>) {
