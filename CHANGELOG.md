@@ -37,7 +37,8 @@ Cambios notables de Pilot SSH Web, según Keep a Changelog 1.1 y SemVer 2.0.
 
 ### Corregido
 
-- Una dirección IPv6 se parte en dos líneas y ya no tapa la columna vecina en la actividad y la auditoría.
+- Una dirección IPv6 se ve entera y ya no tapa la columna vecina en la actividad, la auditoría, las sesiones y las estadísticas.
+- En las sesiones, la columna «Desde» tiene el ancho de una IPv6 y las demás se ajustan a lo que muestran.
 
 ### Eliminado
 

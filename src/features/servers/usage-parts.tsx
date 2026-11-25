@@ -1,6 +1,7 @@
 import { cn } from 'cn'
 import { useState } from 'react'
 
+import { DireccionIp } from '@/components/direccion-ip'
 import { FilterBar } from '@/components/filter-bar'
 import { PeriodFilter, PeriodRange } from '@/components/period-filter'
 import { LineaEsqueleto } from '@/components/states'
@@ -152,7 +153,7 @@ export function Ranking({
   filas,
   vacio,
 }: {
-  filas?: { nombre: string; total: number; maquina?: boolean }[]
+  filas?: { nombre: string; total: number; maquina?: boolean; esIp?: boolean }[]
   /** `EmptyState` compacto: marco del bloque. */
   vacio: React.ReactNode
 }) {
@@ -178,11 +179,15 @@ export function Ranking({
       {filas.map((fila) => (
         <li key={fila.nombre} className="space-y-1.5 px-4 py-3">
           <div className="flex items-baseline justify-between gap-3">
-            <span
-              className={cn('min-w-0 truncate text-sm', fila.maquina && 'font-machine')}
-            >
-              {fila.nombre}
-            </span>
+            {fila.esIp ? (
+              <DireccionIp valor={fila.nombre} className="min-w-0" />
+            ) : (
+              <span
+                className={cn('min-w-0 truncate text-sm', fila.maquina && 'font-machine')}
+              >
+                {fila.nombre}
+              </span>
+            )}
             <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
               {fila.total}
             </span>
