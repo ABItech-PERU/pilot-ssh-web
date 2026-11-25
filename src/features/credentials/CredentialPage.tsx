@@ -182,34 +182,32 @@ export function CredentialPage() {
 
       <Metricas credencial={credencial} />
 
-      <div className="grid gap-6 lg:grid-cols-[20rem_1fr] lg:items-start">
-        <Ficha
-          credencial={credencial}
-          gestiona={gestiona}
-          onEnlaces={() => setEnlacesAbiertos(true)}
-          onEtiquetas={() => setEtiquetasAbiertas(true)}
-        />
+      <Ficha
+        credencial={credencial}
+        gestiona={gestiona}
+        onEnlaces={() => setEnlacesAbiertos(true)}
+        onEtiquetas={() => setEtiquetasAbiertas(true)}
+      />
 
-        <section id="sesiones" ref={panel} className="min-w-0 scroll-mt-6 space-y-4">
-          <TabNav
-            etiqueta="Secciones de la credencial"
-            pestanas={[
-              {
-                to: buildCredentialPath(credencial.id),
-                etiqueta: 'Sesiones',
-                cuenta: credencial.total_sessions,
-                end: true,
-              },
-              {
-                to: buildCredentialPath(credencial.id, 'stats'),
-                etiqueta: 'Estadísticas',
-                end: true,
-              },
-            ]}
-          />
-          <Outlet context={credencial} />
-        </section>
-      </div>
+      <section id="sesiones" ref={panel} className="min-w-0 scroll-mt-6 space-y-4">
+        <TabNav
+          etiqueta="Secciones de la credencial"
+          pestanas={[
+            {
+              to: buildCredentialPath(credencial.id),
+              etiqueta: 'Sesiones',
+              cuenta: credencial.total_sessions,
+              end: true,
+            },
+            {
+              to: buildCredentialPath(credencial.id, 'stats'),
+              etiqueta: 'Estadísticas',
+              end: true,
+            },
+          ]}
+        />
+        <Outlet context={credencial} />
+      </section>
 
       <CredentialFormDialog
         server={{ id: credencial.server, name: credencial.server_name }}
@@ -280,7 +278,7 @@ function Ficha({
   const conEtiquetas = Object.keys(credencial.labels).length > 0
 
   return (
-    <dl className="divide-y rounded-lg border">
+    <dl className={REJILLA_DE_FICHA}>
       <Dato
         etiqueta="Etiquetas"
         accion={
@@ -319,11 +317,6 @@ function Ficha({
       >
         <LinkChips links={credencial.links} vacio="Ninguno" />
       </Dato>
-      {credencial.notes && (
-        <Dato etiqueta="Notas">
-          <p className="whitespace-pre-line">{credencial.notes}</p>
-        </Dato>
-      )}
       <Dato etiqueta="Alta">
         <span className="block" title={formatDateTime(credencial.created_at)}>
           {formatDateTime(credencial.created_at)}
@@ -334,27 +327,42 @@ function Ficha({
             : 'No consta quién la dio de alta'}
         </span>
       </Dato>
-      <Dato etiqueta="Último cambio">
+      <Dato etiqueta="Último cambio" className={CIERRE_DE_FICHA}>
         <span title={formatDateTime(credencial.updated_at)}>
           {formatRelative(credencial.updated_at)}
         </span>
       </Dato>
+      {credencial.notes && (
+        <Dato etiqueta="Notas" className="sm:col-span-2 lg:col-span-5">
+          <p className="whitespace-pre-line">{credencial.notes}</p>
+        </Dato>
+      )}
     </dl>
   )
 }
 
+/** Franja sobre la tabla, que así ocupa todo el ancho. Cinco datos por fila
+ *  en escritorio, dos en tableta y uno en el celular. */
+const REJILLA_DE_FICHA =
+  'bg-border grid gap-px overflow-hidden rounded-lg border sm:grid-cols-2 lg:grid-cols-5'
+
+/** El quinto dato llena su fila en tableta, sin dejar un hueco gris. */
+const CIERRE_DE_FICHA = 'sm:col-span-2 lg:col-span-1'
+
 function Dato({
   etiqueta,
   accion,
+  className = '',
   children,
 }: {
   etiqueta: string
   accion?: React.ReactNode
+  className?: string
   children: React.ReactNode
 }) {
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between gap-2">
+    <div className={`bg-card min-w-0 p-4 ${className}`}>
+      <div className="flex min-h-6 items-center justify-between gap-2">
         <dt className="text-muted-foreground text-[11px] tracking-[0.12em] uppercase">
           {etiqueta}
         </dt>
@@ -425,46 +433,44 @@ function Esqueleto({ credentialId }: { credentialId: string }) {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[20rem_1fr] lg:items-start">
-        <dl className="divide-y rounded-lg border">
-          <Dato etiqueta="Etiquetas">
-            <LineaEsqueleto className="w-20" />
-          </Dato>
-          <Dato etiqueta="Carpeta de trabajo">
-            <LineaEsqueleto className="w-48" />
-          </Dato>
-          <Dato etiqueta="Enlaces">
-            <LineaEsqueleto className="w-24" />
-          </Dato>
-          <Dato etiqueta="Alta">
-            <LineaEsqueleto className="w-32" />
-            <LineaEsqueleto texto="xs" className="w-40" />
-          </Dato>
-          <Dato etiqueta="Último cambio">
-            <LineaEsqueleto className="w-24" />
-          </Dato>
-        </dl>
+      <dl className={REJILLA_DE_FICHA}>
+        <Dato etiqueta="Etiquetas">
+          <LineaEsqueleto className="w-20" />
+        </Dato>
+        <Dato etiqueta="Carpeta de trabajo">
+          <LineaEsqueleto className="w-40" />
+        </Dato>
+        <Dato etiqueta="Enlaces">
+          <LineaEsqueleto className="w-24" />
+        </Dato>
+        <Dato etiqueta="Alta">
+          <LineaEsqueleto className="w-32" />
+          <LineaEsqueleto texto="xs" className="w-28" />
+        </Dato>
+        <Dato etiqueta="Último cambio" className={CIERRE_DE_FICHA}>
+          <LineaEsqueleto className="w-24" />
+        </Dato>
+      </dl>
 
-        <section className="min-w-0 space-y-4">
-          <TabNav
-            etiqueta="Secciones de la credencial"
-            pestanas={[
-              {
-                to: buildCredentialPath(credentialId),
-                etiqueta: 'Sesiones',
-                cuentaPendiente: true,
-                end: true,
-              },
-              {
-                to: buildCredentialPath(credentialId, 'stats'),
-                etiqueta: 'Estadísticas',
-                end: true,
-              },
-            ]}
-          />
-          <Skeleton className="h-72 w-full rounded-lg" />
-        </section>
-      </div>
+      <section className="min-w-0 space-y-4">
+        <TabNav
+          etiqueta="Secciones de la credencial"
+          pestanas={[
+            {
+              to: buildCredentialPath(credentialId),
+              etiqueta: 'Sesiones',
+              cuentaPendiente: true,
+              end: true,
+            },
+            {
+              to: buildCredentialPath(credentialId, 'stats'),
+              etiqueta: 'Estadísticas',
+              end: true,
+            },
+          ]}
+        />
+        <Skeleton className="h-72 w-full rounded-lg" />
+      </section>
     </div>
   )
 }

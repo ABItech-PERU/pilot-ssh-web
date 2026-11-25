@@ -3,6 +3,7 @@ import { ActivityIcon, KeyRoundIcon, SearchXIcon, TerminalIcon } from 'lucide-re
 import { useState } from 'react'
 
 import { columnaDeNumero, DataTable, type Columna } from '@/components/data-table'
+import { DireccionIp } from '@/components/direccion-ip'
 import {
   FilterBar,
   FiltroSelect,
@@ -74,7 +75,7 @@ export function SessionsHistory({ clave, pedir, credenciales, total }: Props) {
       key: 'quien',
       header: 'Quién entró',
       rol: 'titulo',
-      ancho: '23%',
+      ancho: '20%',
       cell: (sesion) => (
         <span className="truncate font-medium">{sesion.opened_by_name ?? 'Alguien'}</span>
       ),
@@ -84,7 +85,7 @@ export function SessionsHistory({ clave, pedir, credenciales, total }: Props) {
           {
             key: 'credencial',
             header: 'Credencial',
-            ancho: '18%',
+            ancho: '13%',
             cell: (sesion: TerminalSession) => (
               <span className="font-machine text-muted-foreground text-[13px]">
                 {sesion.username ?? '—'}
@@ -97,7 +98,7 @@ export function SessionsHistory({ clave, pedir, credenciales, total }: Props) {
       // Fecha exacta, no relativa: el historial se consulta para saber cuándo
       key: 'inicio',
       header: 'Inicio',
-      ancho: '20%',
+      ancho: '17%',
       lineas: 2,
       cell: (sesion) => (
         <span className="block">
@@ -111,25 +112,23 @@ export function SessionsHistory({ clave, pedir, credenciales, total }: Props) {
     {
       key: 'estado',
       header: 'Estado',
-      ancho: '14%',
+      ancho: '11%',
       cell: (sesion) => <EstadoDeSesion status={sesion.status} />,
     },
     {
       key: 'ip',
       header: 'Desde',
       desde: 'lg',
-      ancho: '12%',
+      ancho: '24%',
       cell: (sesion) => (
-        <span className="font-machine text-muted-foreground text-xs">
-          {sesion.client_ip ?? '—'}
-        </span>
+        <DireccionIp valor={sesion.client_ip} className="text-muted-foreground" />
       ),
     },
     {
       key: 'duracion',
       header: 'Duración',
       alineacion: 'derecha',
-      ancho: '8%',
+      ancho: '10%',
       cell: (sesion) => <span className="tabular-nums">{sesion.duration}</span>,
     },
   ]

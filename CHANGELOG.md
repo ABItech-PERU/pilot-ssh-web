@@ -34,10 +34,12 @@ Cambios notables de Pilot SSH Web, según Keep a Changelog 1.1 y SemVer 2.0.
 - Arrastrar un archivo sobre la terminal dice a qué carpeta irá, y los avisos de la terminal salen en el centro de la cabecera, sin tapar la shell ni el panel de archivos.
 - Una reconexión ya no escribe líneas en la terminal: se ve en el estado y, si tarda, en un aviso que se va solo.
 - Al volver a la pestaña, la terminal comprueba la conexión y, si no contesta en 4 s, vuelve a la misma shell.
+- Los datos de una credencial van en una franja sobre sus sesiones, que ahora ocupan todo el ancho.
 
 ### Corregido
 
-- Una dirección IPv6 se parte en dos líneas y ya no tapa la columna vecina en la actividad y la auditoría.
+- Una dirección IPv6 se ve entera y ya no tapa la columna vecina en la actividad, la auditoría, las sesiones y las estadísticas.
+- En las sesiones, la columna «Desde» tiene el ancho de una IPv6 y las demás se ajustan a lo que muestran.
 
 ### Eliminado
 

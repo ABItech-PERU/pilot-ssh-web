@@ -104,7 +104,7 @@ export function CredentialStatsTab() {
             filas={datos?.top_addresses.map((fila) => ({
               nombre: fila.ip,
               total: fila.sessions,
-              maquina: true,
+              esIp: true,
             }))}
             vacio={
               <EmptyState
