@@ -11,6 +11,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 
 import { columnaDeNumero, DataTable, type Columna } from '@/components/data-table'
+import { DireccionIp } from '@/components/direccion-ip'
 import {
   FilterBar,
   FiltroSelect,
@@ -60,9 +61,7 @@ const COLUMNAS: Columna<AuditEntry>[] = [
     desde: 'lg',
     ancho: '14%',
     cell: (entrada) => (
-      <span className="font-machine text-muted-foreground text-xs">
-        {entrada.ip_address ?? '—'}
-      </span>
+      <DireccionIp valor={entrada.ip_address} className="text-muted-foreground" />
     ),
   },
   {

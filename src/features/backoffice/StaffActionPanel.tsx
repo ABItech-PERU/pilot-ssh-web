@@ -1,5 +1,6 @@
 import { ArrowRightIcon } from 'lucide-react'
 
+import { DireccionIp } from '@/components/direccion-ip'
 import { SidePanelBody, SidePanelContent, SidePanelHeader } from '@/components/side-panel'
 import { Sheet, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import {
@@ -105,7 +106,7 @@ export function StaffActionPanel({ cambio, titulo, open, onOpenChange }: Props) 
                   leería como una de ellas */}
               <Dato etiqueta="Equipo">{cambio.device || 'Sin dato'}</Dato>
               <Dato etiqueta="IP">
-                <span className="font-machine text-xs">{cambio.ip_address || '—'}</span>
+                <DireccionIp valor={cambio.ip_address} />
               </Dato>
             </dl>
           </SidePanelBody>
