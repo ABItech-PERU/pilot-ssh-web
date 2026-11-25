@@ -13,6 +13,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { columnaDeNumero, DataTable, type Columna } from '@/components/data-table'
+import { DireccionIp } from '@/components/direccion-ip'
 import {
   FilterBar,
   FiltroSelect,
@@ -114,9 +115,7 @@ const COLUMNAS: Columna<AuditEntry>[] = [
     desde: 'lg',
     ancho: '15%',
     cell: (entrada) => (
-      <span className="font-machine text-muted-foreground text-xs">
-        {entrada.ip_address ?? '—'}
-      </span>
+      <DireccionIp valor={entrada.ip_address} className="text-muted-foreground" />
     ),
   },
 ]

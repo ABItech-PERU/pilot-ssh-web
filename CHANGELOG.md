@@ -35,6 +35,10 @@ Cambios notables de Pilot SSH Web, según Keep a Changelog 1.1 y SemVer 2.0.
 - Una reconexión ya no escribe líneas en la terminal: se ve en el estado y, si tarda, en un aviso que se va solo.
 - Al volver a la pestaña, la terminal comprueba la conexión y, si no contesta en 4 s, vuelve a la misma shell.
 
+### Corregido
+
+- Una dirección IPv6 se parte en dos líneas y ya no tapa la columna vecina en la actividad y la auditoría.
+
 ### Eliminado
 
 - El botón «Subir» de la barra de la terminal: se sube desde el panel de archivos o arrastrando.

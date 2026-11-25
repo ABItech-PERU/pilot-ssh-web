@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { HistoryIcon, Loader2Icon } from 'lucide-react'
 import { Link } from 'react-router'
 
+import { DireccionIp } from '@/components/direccion-ip'
 import { SettingsSection } from '@/components/settings-section'
 import { EmptyState } from '@/components/states'
 import { Button } from '@/components/ui/button'
@@ -68,7 +69,7 @@ export function AccountActivity() {
                   {entrada.ip_address && (
                     <>
                       {' · '}
-                      <span className="font-machine">{entrada.ip_address}</span>
+                      <DireccionIp valor={entrada.ip_address} />
                     </>
                   )}
                   {entrada.detail && (

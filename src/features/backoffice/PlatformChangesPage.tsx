@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 
 import { ColumnasMenu } from '@/components/columns-menu'
 import { columnaDeNumero, DataTable, type Columna } from '@/components/data-table'
+import { DireccionIp } from '@/components/direccion-ip'
 import {
   FilterBar,
   FiltroSelect,
@@ -162,9 +163,7 @@ function Historial() {
       porDefecto: false,
       prioridad: 9,
       ancho: '12%',
-      cell: (entrada) => (
-        <span className="font-machine text-xs">{entrada.ip_address || '—'}</span>
-      ),
+      cell: (entrada) => <DireccionIp valor={entrada.ip_address} />,
     },
     {
       key: 'acciones',
